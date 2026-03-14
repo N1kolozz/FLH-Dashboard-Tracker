@@ -10,6 +10,7 @@ export interface PlatformStats {
   weekly_growth: number | null;
   monthly_growth: number | null;
   last_updated: string | null;
+  scraped_at: string | null;
 }
 
 export interface StatsResponse {
@@ -27,6 +28,7 @@ export async function GET() {
       followers_7d: number | null;
       followers_30d: number | null;
       last_updated: string | null;
+      scraped_at: string | null;
     }>(`
       SELECT
         sa.platform,
@@ -36,10 +38,11 @@ export async function GET() {
         yesterday.followers AS followers_yesterday,
         week_ago.followers AS followers_7d,
         month_ago.followers AS followers_30d,
-        TO_CHAR(latest.recorded_date, 'YYYY-MM-DD') AS last_updated
+        TO_CHAR(latest.recorded_date, 'YYYY-MM-DD') AS last_updated,
+        TO_CHAR(latest.created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS scraped_at
       FROM social_accounts sa
       LEFT JOIN LATERAL (
-        SELECT followers, recorded_date
+        SELECT followers, recorded_date, created_at
         FROM follower_history
         WHERE account_id = sa.id
         ORDER BY recorded_date DESC
@@ -92,6 +95,7 @@ export async function GET() {
             ? current - row.followers_30d
             : null,
         last_updated: row.last_updated,
+        scraped_at: row.scraped_at,
       };
     }
 

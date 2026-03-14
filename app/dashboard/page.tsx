@@ -3,11 +3,13 @@
 import { useState, useEffect, useCallback } from "react";
 import PlatformCard from "@/components/PlatformCard";
 import GrowthChart from "@/components/GrowthChart";
+import CombinedGrowthChart from "@/components/CombinedGrowthChart";
 import DashboardStats from "@/components/DashboardStats";
 import { StatsResponse } from "@/app/api/stats/route";
 
 const PLATFORMS = ["instagram", "tiktok", "facebook"] as const;
 type Platform = (typeof PLATFORMS)[number];
+type ChartTab = Platform | "all";
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<StatsResponse | null>(null);
@@ -15,7 +17,7 @@ export default function DashboardPage() {
   const [statsError, setStatsError] = useState<string | null>(null);
   const [scraping, setScraping] = useState(false);
   const [scrapeResult, setScrapeResult] = useState<string | null>(null);
-  const [activeChart, setActiveChart] = useState<Platform>("instagram");
+  const [activeChart, setActiveChart] = useState<ChartTab>("all");
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
 
   const fetchStats = useCallback(async () => {
@@ -101,26 +103,6 @@ export default function DashboardPage() {
                 Updated {lastRefresh.toLocaleTimeString()}
               </span>
             )}
-            <button
-              onClick={fetchStats}
-              disabled={loadingStats}
-              className="p-2 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors disabled:opacity-40"
-              title="Refresh stats"
-            >
-              <svg
-                className={`w-4 h-4 ${loadingStats ? "animate-spin" : ""}`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                />
-              </svg>
-            </button>
             <button
               onClick={triggerScrape}
               disabled={scraping}
@@ -226,6 +208,7 @@ export default function DashboardPage() {
                     weekly_growth: null,
                     monthly_growth: null,
                     last_updated: null,
+                    scraped_at: null,
                   }
                 }
                 isLoading={loadingStats}
@@ -242,6 +225,16 @@ export default function DashboardPage() {
             </h2>
             {/* Platform Tab Selector */}
             <div className="flex bg-gray-100 rounded-lg p-0.5 gap-0.5">
+              <button
+                onClick={() => setActiveChart("all")}
+                className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                  activeChart === "all"
+                    ? "bg-white text-gray-800 shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                All
+              </button>
               {PLATFORMS.map((p) => (
                 <button
                   key={p}
@@ -257,7 +250,11 @@ export default function DashboardPage() {
               ))}
             </div>
           </div>
-          <GrowthChart platform={activeChart} />
+          {activeChart === "all" ? (
+            <CombinedGrowthChart />
+          ) : (
+            <GrowthChart platform={activeChart} />
+          )}
         </section>
       </main>
 

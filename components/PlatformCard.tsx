@@ -44,6 +44,17 @@ const PLATFORM_CONFIG = {
   },
 } as const;
 
+function timeAgo(isoString: string): string {
+  const diffMs = Date.now() - new Date(isoString).getTime();
+  const mins = Math.floor(diffMs / 60_000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
 interface PlatformCardProps {
   stats: PlatformStats;
   isLoading?: boolean;
@@ -107,11 +118,15 @@ export default function PlatformCard({ stats, isLoading }: PlatformCardProps) {
           </div>
           <div>
             <h3 className="font-semibold text-gray-800">{config.label}</h3>
-            {stats.last_updated && (
+            {stats.scraped_at ? (
+              <p className="text-xs text-gray-400">
+                Scraped {timeAgo(stats.scraped_at)}
+              </p>
+            ) : stats.last_updated ? (
               <p className="text-xs text-gray-400">
                 Updated {new Date(stats.last_updated).toLocaleDateString()}
               </p>
-            )}
+            ) : null}
           </div>
         </div>
         <a
