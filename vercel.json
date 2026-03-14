@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/scrape?key=${CRON_SECRET}",
+      "schedule": "0 2 * * *"
+    }
+  ]
+}
