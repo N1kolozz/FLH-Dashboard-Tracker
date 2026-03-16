@@ -386,7 +386,13 @@ async function main() {
   console.log("\nDone!");
 }
 
-main().catch((err) => {
-  console.error("Scrape job failed:", err);
-  process.exit(1);
-});
+// Run main() only when this file is executed directly (e.g. npm run scrape), not when
+// imported by the API route or during Vercel build (no Chromium in build env).
+const isRunDirectly =
+  typeof require !== "undefined" && require.main === module;
+if (isRunDirectly && !process.env.VERCEL) {
+  main().catch((err) => {
+    console.error("Scrape job failed:", err);
+    process.exit(1);
+  });
+}
