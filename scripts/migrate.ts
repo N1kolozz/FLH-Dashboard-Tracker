@@ -45,6 +45,14 @@ async function migrate() {
     `);
     console.log("✓ follower_history table ready");
 
+    await client.query(`
+      ALTER TABLE follower_history ADD COLUMN IF NOT EXISTS total_likes INTEGER
+    `);
+    await client.query(`
+      ALTER TABLE follower_history ADD COLUMN IF NOT EXISTS posts_count INTEGER
+    `);
+    console.log("✓ follower_history profile stats columns ready");
+
     // Seed accounts (upsert by URL to avoid duplicates)
     const accounts = [
       {

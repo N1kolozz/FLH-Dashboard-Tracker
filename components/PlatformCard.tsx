@@ -55,6 +55,57 @@ function timeAgo(isoString: string): string {
   return `${days}d ago`;
 }
 
+function getTrend(weeklyGrowth: number | null): {
+  label: "Up" | "Flat" | "Down";
+  icon: "up" | "flat" | "down";
+  classes: string;
+} {
+  if (weeklyGrowth === null) {
+    return { label: "Flat", icon: "flat", classes: "bg-amber-100 text-amber-700 border border-amber-200" };
+  }
+  if (weeklyGrowth > 0) {
+    return { label: "Up", icon: "up", classes: "bg-emerald-100 text-emerald-700 border border-emerald-200" };
+  }
+  if (weeklyGrowth < 0) {
+    return { label: "Down", icon: "down", classes: "bg-rose-100 text-rose-700 border border-rose-200" };
+  }
+  return { label: "Flat", icon: "flat", classes: "bg-amber-100 text-amber-700 border border-amber-200" };
+}
+
+function TrendBadge({
+  label,
+  icon,
+  classes,
+}: {
+  label: "Up" | "Flat" | "Down";
+  icon: "up" | "flat" | "down";
+  classes: string;
+}) {
+  return (
+    <span
+      title={`Trend: ${label}`}
+      aria-label={`Trend: ${label}`}
+      className={`inline-flex items-center justify-center w-6 h-6 rounded-full ${classes}`}
+    >
+      {icon === "up" && (
+        <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M7 14l5-5 5 5" />
+        </svg>
+      )}
+      {icon === "down" && (
+        <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M7 10l5 5 5-5" />
+        </svg>
+      )}
+      {icon === "flat" && (
+        <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6 12h12" />
+        </svg>
+      )}
+    </span>
+  );
+}
+
 interface PlatformCardProps {
   stats: PlatformStats;
   isLoading?: boolean;
@@ -83,6 +134,7 @@ function GrowthBadge({
 
 export default function PlatformCard({ stats, isLoading }: PlatformCardProps) {
   const config = PLATFORM_CONFIG[stats.platform as keyof typeof PLATFORM_CONFIG];
+  const trend = getTrend(stats.weekly_growth);
 
   if (!config) return null;
 
@@ -117,7 +169,10 @@ export default function PlatformCard({ stats, isLoading }: PlatformCardProps) {
             {config.icon}
           </div>
           <div>
-            <h3 className="font-semibold text-gray-800">{config.label}</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold text-gray-800">{config.label}</h3>
+              <TrendBadge label={trend.label} icon={trend.icon} classes={trend.classes} />
+            </div>
             {stats.scraped_at ? (
               <p className="text-xs text-gray-400">
                 Scraped {timeAgo(stats.scraped_at)}
@@ -140,7 +195,7 @@ export default function PlatformCard({ stats, isLoading }: PlatformCardProps) {
       </div>
 
       {/* Follower Count */}
-      <div className="mb-4">
+      <div className="mb-3">
         {stats.followers !== null ? (
           <span className="text-4xl font-bold text-gray-900 tracking-tight">
             {stats.followers.toLocaleString()}
@@ -152,6 +207,26 @@ export default function PlatformCard({ stats, isLoading }: PlatformCardProps) {
         )}
         <span className="ml-2 text-sm text-gray-500">followers</span>
       </div>
+
+      {/* Profile-level: total likes & posts/videos */}
+      {(stats.total_likes != null || stats.posts_count != null) && (
+        <div className="flex flex-wrap gap-x-4 gap-y-1 mb-4 text-sm text-gray-600">
+          {stats.total_likes != null && (
+            <span>
+              <span className="font-medium text-gray-800">{stats.total_likes.toLocaleString()}</span>
+              <span className="ml-1 text-gray-500">likes</span>
+            </span>
+          )}
+          {stats.posts_count != null && (
+            <span>
+              <span className="font-medium text-gray-800">{stats.posts_count.toLocaleString()}</span>
+              <span className="ml-1 text-gray-500">
+                {stats.platform === "tiktok" ? "videos" : "posts"}
+              </span>
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Growth Badges */}
       <div className="flex flex-wrap gap-2">

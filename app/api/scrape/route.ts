@@ -41,14 +41,20 @@ export async function POST(request: NextRequest) {
 
       const accountId = accountRes.rows[0].id;
       await pool.query(
-        `INSERT INTO follower_history (account_id, followers, recorded_date)
-         VALUES ($1, $2, CURRENT_DATE)
+        `INSERT INTO follower_history (account_id, followers, total_likes, posts_count, recorded_date)
+         VALUES ($1, $2, $3, $4, CURRENT_DATE)
          ON CONFLICT (account_id, recorded_date)
-         DO UPDATE SET followers = EXCLUDED.followers, created_at = CURRENT_TIMESTAMP`,
-        [accountId, result.followers]
+         DO UPDATE SET
+           followers = EXCLUDED.followers,
+           total_likes = COALESCE(EXCLUDED.total_likes, follower_history.total_likes),
+           posts_count = COALESCE(EXCLUDED.posts_count, follower_history.posts_count),
+           created_at = CURRENT_TIMESTAMP`,
+        [accountId, result.followers, result.total_likes ?? null, result.posts_count ?? null]
       );
 
-      saved.push(`${result.platform}: ${result.followers}`);
+      saved.push(
+        `${result.platform}: ${result.followers} followers${result.total_likes != null ? `, ${result.total_likes} likes` : ""}${result.posts_count != null ? `, ${result.posts_count} posts` : ""}`
+      );
     }
 
     return NextResponse.json({

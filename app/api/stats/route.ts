@@ -6,6 +6,8 @@ export interface PlatformStats {
   name: string;
   url: string;
   followers: number | null;
+  total_likes: number | null;
+  posts_count: number | null;
   daily_growth: number | null;
   weekly_growth: number | null;
   monthly_growth: number | null;
@@ -24,6 +26,8 @@ export async function GET() {
       name: string;
       url: string;
       followers: number | null;
+      total_likes: number | null;
+      posts_count: number | null;
       followers_yesterday: number | null;
       followers_7d: number | null;
       followers_30d: number | null;
@@ -35,6 +39,8 @@ export async function GET() {
         sa.name,
         sa.url,
         latest.followers,
+        latest.total_likes,
+        latest.posts_count,
         yesterday.followers AS followers_yesterday,
         week_ago.followers AS followers_7d,
         month_ago.followers AS followers_30d,
@@ -42,7 +48,7 @@ export async function GET() {
         TO_CHAR(latest.created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS scraped_at
       FROM social_accounts sa
       LEFT JOIN LATERAL (
-        SELECT followers, recorded_date, created_at
+        SELECT followers, total_likes, posts_count, recorded_date, created_at
         FROM follower_history
         WHERE account_id = sa.id
         ORDER BY recorded_date DESC
@@ -82,6 +88,8 @@ export async function GET() {
         name: row.name,
         url: row.url,
         followers: current,
+        total_likes: row.total_likes ?? null,
+        posts_count: row.posts_count ?? null,
         daily_growth:
           current !== null && row.followers_yesterday !== null
             ? current - row.followers_yesterday
