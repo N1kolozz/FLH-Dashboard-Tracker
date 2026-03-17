@@ -1,6 +1,6 @@
 # FLH Social Media Growth Dashboard
 
-A full-stack analytics dashboard for **Future Leaders Hub** that tracks daily follower growth across Instagram, TikTok, and Facebook.
+A full-stack analytics dashboard for **Future Leaders Hub** that tracks daily follower growth across Instagram, TikTok and Facebook.
 
 ## Features
 
