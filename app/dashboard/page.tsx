@@ -95,7 +95,7 @@ export default function DashboardPage() {
     setLoadingStats(true);
     setStatsError(null);
     try {
-      const res = await fetch("/api/stats");
+      const res = await fetch("/api/stats", { cache: "no-store" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data: StatsResponse = await res.json();
       setStats(data);
@@ -120,7 +120,8 @@ export default function DashboardPage() {
         const currentResults = await Promise.all(
           PLATFORMS.map(async (platform) => {
             const res = await fetch(
-              `/api/history?platform=${platform}&range=${insightsRange}`
+              `/api/history?platform=${platform}&range=${insightsRange}`,
+              { cache: "no-store" }
             );
             if (!res.ok) throw new Error(`History ${platform}: HTTP ${res.status}`);
             const data: HistoryPoint[] = await res.json();
@@ -152,7 +153,8 @@ export default function DashboardPage() {
           const previousResults = await Promise.all(
             PLATFORMS.map(async (platform) => {
               const res = await fetch(
-                `/api/history?platform=${platform}&start=${ymd(previousStart)}&end=${ymd(previousEnd)}`
+                `/api/history?platform=${platform}&start=${ymd(previousStart)}&end=${ymd(previousEnd)}`,
+                { cache: "no-store" }
               );
               if (!res.ok) throw new Error(`Compare ${platform}: HTTP ${res.status}`);
               const data: HistoryPoint[] = await res.json();
@@ -207,11 +209,12 @@ export default function DashboardPage() {
       });
       const json = await res.json();
       if (res.ok) {
-        setScrapeResult(
+        const message =
+          json.message ??
           `Scrape complete! Saved: ${json.saved?.join(", ") || "none"}${
             json.errors?.length ? ` | Errors: ${json.errors.join("; ")}` : ""
-          }`
-        );
+          }`;
+        setScrapeResult(message);
         await fetchStats();
       } else {
         setScrapeResult(`Error: ${json.error}`);
