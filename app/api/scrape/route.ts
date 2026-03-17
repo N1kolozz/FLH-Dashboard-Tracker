@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { pool } from "@/lib/db";
-import { scrapeAll } from "@/scripts/scrapeFollowers";
 
-export const maxDuration = 300; // 5 minutes for scraping
+// Scraping no longer runs here (Playwright/Chromium not available on Vercel).
+// It runs in GitHub Actions. This endpoint can trigger that workflow if configured.
+
+export const maxDuration = 30;
 
 export async function POST(request: NextRequest) {
   const key = request.nextUrl.searchParams.get("key");
@@ -11,64 +12,52 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  try {
-    console.log("Starting scrape job via API...");
-    const results = await scrapeAll();
+  const repo = process.env.GITHUB_REPO; // e.g. "owner/repo"
+  const token = process.env.GITHUB_ACTIONS_TOKEN;
 
-    const saved: string[] = [];
-    const skipped: string[] = [];
-    const errors: string[] = [];
-
-    for (const result of results) {
-      if (result.error) {
-        errors.push(`${result.platform}: ${result.error}`);
-        continue;
-      }
-      if (result.followers === null) {
-        skipped.push(result.platform);
-        continue;
-      }
-
-      const accountRes = await pool.query(
-        "SELECT id FROM social_accounts WHERE platform = $1",
-        [result.platform]
+  if (repo && token) {
+    try {
+      const res = await fetch(
+        `https://api.github.com/repos/${repo}/actions/workflows/scrape.yml/dispatches`,
+        {
+          method: "POST",
+          headers: {
+            Accept: "application/vnd.github+json",
+            Authorization: `Bearer ${token}`,
+            "X-GitHub-Api-Version": "2022-11-28",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+          ref: process.env.GITHUB_REF || "main",
+        }),
+        }
       );
-
-      if (accountRes.rows.length === 0) {
-        errors.push(`${result.platform}: account not found in DB`);
-        continue;
+      if (!res.ok) {
+        const text = await res.text();
+        console.error("GitHub Actions trigger failed:", res.status, text);
+        return NextResponse.json(
+          { error: "Failed to trigger workflow", details: text },
+          { status: 502 }
+        );
       }
-
-      const accountId = accountRes.rows[0].id;
-      await pool.query(
-        `INSERT INTO follower_history (account_id, followers, total_likes, posts_count, recorded_date)
-         VALUES ($1, $2, $3, $4, CURRENT_DATE)
-         ON CONFLICT (account_id, recorded_date)
-         DO UPDATE SET
-           followers = EXCLUDED.followers,
-           total_likes = COALESCE(EXCLUDED.total_likes, follower_history.total_likes),
-           posts_count = COALESCE(EXCLUDED.posts_count, follower_history.posts_count),
-           created_at = CURRENT_TIMESTAMP`,
-        [accountId, result.followers, result.total_likes ?? null, result.posts_count ?? null]
-      );
-
-      saved.push(
-        `${result.platform}: ${result.followers} followers${result.total_likes != null ? `, ${result.total_likes} likes` : ""}${result.posts_count != null ? `, ${result.posts_count} posts` : ""}`
+      return NextResponse.json({
+        success: true,
+        message: "Scrape workflow triggered in GitHub Actions",
+        timestamp: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.error("Scrape API error:", err);
+      return NextResponse.json(
+        { error: "Trigger failed", details: String(err) },
+        { status: 500 }
       );
     }
-
-    return NextResponse.json({
-      success: true,
-      saved,
-      skipped,
-      errors,
-      timestamp: new Date().toISOString(),
-    });
-  } catch (err) {
-    console.error("Scrape API error:", err);
-    return NextResponse.json(
-      { error: "Scrape job failed", details: String(err) },
-      { status: 500 }
-    );
   }
+
+  return NextResponse.json({
+    success: true,
+    message:
+      "Scraping runs via GitHub Actions (schedule or manual run). Set GITHUB_REPO and GITHUB_ACTIONS_TOKEN to trigger from this URL.",
+    timestamp: new Date().toISOString(),
+  });
 }

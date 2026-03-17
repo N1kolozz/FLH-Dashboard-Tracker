@@ -4,12 +4,12 @@ A full-stack analytics dashboard for **Future Leaders Hub** that tracks daily fo
 
 ## Features
 
-- Daily automated follower count collection via Playwright
+- Daily automated follower count collection via Playwright (runs in **GitHub Actions**, not on Vercel)
 - Historical growth charts (30 days / 90 days / All time)
 - Per-platform stats: current followers, daily/weekly/monthly growth
 - Aggregate overview statistics
 - PostgreSQL data storage with daily snapshots
-- Secure scrape trigger endpoint
+- Optional: trigger scrape from API (dispatches GitHub Actions workflow)
 
 ## Tracked Accounts
 
@@ -56,19 +56,43 @@ npm run dev
 
 Open [http://localhost:3000/dashboard](http://localhost:3000/dashboard)
 
-### 4. Trigger your first scrape
+### 4. Trigger your first scrape (local)
 
-Either run the script directly:
+Run the script directly:
 
 ```bash
 npm run scrape
 ```
 
-Or call the API endpoint:
+---
 
-```bash
-curl -X POST "http://localhost:3000/api/scrape?key=YOUR_CRON_SECRET"
-```
+## GitHub Actions (scraping on deploy)
+
+Playwright/Chromium cannot run on Vercel’s serverless runtime, so scraping runs in **GitHub Actions** instead.
+
+### 1. Add repository secrets
+
+In your GitHub repo: **Settings → Secrets and variables → Actions**. Add:
+
+| Secret            | Description |
+|-------------------|-------------|
+| `DATABASE_URL`    | Same PostgreSQL connection string as in Vercel (e.g. Neon/Railway). The workflow uses it to save scraped data. |
+
+### 2. Schedule and manual run
+
+- **Schedule:** The workflow runs daily at **06:00 UTC** (edit `.github/workflows/scrape.yml` to change the cron).
+- **Manual run:** In GitHub go to **Actions → “Scrape followers” → Run workflow**.
+
+### 3. (Optional) Trigger from Vercel / cron
+
+To have your existing scrape URL trigger the workflow (e.g. from Vercel Cron or cron-job.org), set these in **Vercel → Project → Settings → Environment Variables**:
+
+| Variable               | Description |
+|------------------------|-------------|
+| `GITHUB_REPO`          | Repo in the form `owner/repo`, e.g. `myorg/flh-dashboard`. |
+| `GITHUB_ACTIONS_TOKEN` | A [Personal Access Token](https://github.com/settings/tokens) with `repo` scope (or fine-grained with “Actions: write”). |
+
+Then `POST /api/scrape?key=YOUR_CRON_SECRET` will trigger the “Scrape followers” workflow and return immediately; the actual scrape runs in GitHub Actions.
 
 ---
 
@@ -78,7 +102,7 @@ curl -X POST "http://localhost:3000/api/scrape?key=YOUR_CRON_SECRET"
 |--------|----------|-------------|
 | `GET`  | `/api/stats` | Current followers + daily/weekly/monthly growth |
 | `GET`  | `/api/history?platform=instagram&range=30` | Historical data for charts |
-| `POST` | `/api/scrape?key=CRON_SECRET` | Trigger follower scrape |
+| `POST` | `/api/scrape?key=CRON_SECRET` | Trigger scrape (dispatches GitHub Actions if `GITHUB_REPO` + `GITHUB_ACTIONS_TOKEN` are set) |
 
 **History query params:**
 - `platform`: `instagram` \| `tiktok` \| `facebook`
@@ -98,12 +122,11 @@ npx vercel --prod
 
 - `DATABASE_URL` — your Neon/Railway connection string
 - `CRON_SECRET` — your secret key
+- (Optional) `GITHUB_REPO` and `GITHUB_ACTIONS_TOKEN` — to trigger the scrape workflow from `/api/scrape` (see GitHub Actions section above)
 
-### 3. Cron job
+### 3. Scraping (GitHub Actions)
 
-The `vercel.json` file configures a daily cron job at **02:00 UTC** that calls `/api/scrape`. This requires a **Vercel Pro** plan or higher for cron jobs.
-
-**Alternative (free):** Use [GitHub Actions](https://github.com/features/actions) or [cron-job.org](https://cron-job.org) to call the endpoint daily.
+Scraping is handled by the **GitHub Actions** workflow (`.github/workflows/scrape.yml`), not by Vercel. Add `DATABASE_URL` as a repository secret and run the workflow on schedule or manually. If you set `GITHUB_REPO` and `GITHUB_ACTIONS_TOKEN` on Vercel, you can keep calling `/api/scrape` (e.g. from [cron-job.org](https://cron-job.org)); that endpoint will trigger the workflow.
 
 ---
 
@@ -117,7 +140,7 @@ flh-dashboard/
 │   ├── api/
 │   │   ├── stats/route.ts    # GET follower stats + growth
 │   │   ├── history/route.ts  # GET historical data
-│   │   └── scrape/route.ts   # POST trigger scrape
+│   │   └── scrape/route.ts   # POST trigger scrape (dispatches GitHub Actions)
 │   ├── layout.tsx
 │   └── page.tsx              # Redirects to /dashboard
 ├── components/
@@ -129,8 +152,10 @@ flh-dashboard/
 ├── scripts/
 │   ├── migrate.ts            # DB schema + seed
 │   └── scrapeFollowers.ts    # Playwright scraper
+├── .github/workflows/
+│   └── scrape.yml            # Scheduled + manual scrape (Playwright)
 ├── .env.local.example
-├── vercel.json               # Cron job config
+├── vercel.json
 └── tsconfig.scripts.json     # TS config for Node scripts
 ```
 

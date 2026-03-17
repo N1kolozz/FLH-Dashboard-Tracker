@@ -386,11 +386,12 @@ async function main() {
   console.log("\nDone!");
 }
 
-// Run main() only when this file is executed directly (e.g. npm run scrape), not when
-// imported by the API route or during Vercel build (no Chromium in build env).
+// Run main() when executed directly (e.g. npm run scrape) or in CI (e.g. GitHub Actions).
+// Do not run when imported by the API route or during Vercel build (no Chromium there).
 const isRunDirectly =
   typeof require !== "undefined" && require.main === module;
-if (isRunDirectly && !process.env.VERCEL) {
+const isCI = process.env.CI === "true";
+if ((isRunDirectly || isCI) && !process.env.VERCEL) {
   main().catch((err) => {
     console.error("Scrape job failed:", err);
     process.exit(1);

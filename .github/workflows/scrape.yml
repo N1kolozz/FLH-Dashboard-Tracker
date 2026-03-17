@@ -1,0 +1,42 @@
+# Run follower scrape (Playwright) on schedule or manually.
+# Scraping runs here instead of Vercel so Chromium is available.
+
+name: Scrape followers
+
+on:
+  schedule:
+    # Daily at 06:00 UTC (adjust as needed)
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+    # Allow manual run from Actions tab
+  repository_dispatch:
+    # Optional: trigger from Vercel API (see README)
+
+env:
+  NODE_ENV: production
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium
+
+      - name: Run scrape and save to DB
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: npm run scrape
