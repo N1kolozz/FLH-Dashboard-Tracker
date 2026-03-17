@@ -40,4 +40,5 @@ jobs:
       - name: Run scrape and save to DB
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          APP_TIMEZONE: ${{ vars.APP_TIMEZONE || 'UTC' }}
         run: npx ts-node --project tsconfig.scripts.json scripts/scrapeFollowers.ts

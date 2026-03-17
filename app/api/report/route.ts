@@ -3,9 +3,13 @@ import { pool } from "@/lib/db";
 
 type TimeRange = "30" | "90" | "all";
 
-function getDateFilter(range: TimeRange): string {
-  if (range === "30") return "AND fh.recorded_date >= CURRENT_DATE - INTERVAL '30 days'";
-  if (range === "90") return "AND fh.recorded_date >= CURRENT_DATE - INTERVAL '90 days'";
+function getDateFilter(range: TimeRange, tzParamIndex: number): string {
+  if (range === "30") {
+    return `AND fh.recorded_date >= timezone($${tzParamIndex}, now())::date - 30`;
+  }
+  if (range === "90") {
+    return `AND fh.recorded_date >= timezone($${tzParamIndex}, now())::date - 90`;
+  }
   return "";
 }
 
@@ -20,13 +24,18 @@ function csvEscape(value: string | number | null): string {
 
 export async function GET(request: NextRequest) {
   try {
+    const appTimeZone = process.env.APP_TIMEZONE || "UTC";
     const rangeParam = request.nextUrl.searchParams.get("range") ?? "30";
     const range: TimeRange =
       rangeParam === "30" || rangeParam === "90" || rangeParam === "all"
         ? rangeParam
         : "30";
 
-    const dateFilter = getDateFilter(range);
+    const queryParams: string[] = [];
+    if (range !== "all") {
+      queryParams.push(appTimeZone);
+    }
+    const dateFilter = getDateFilter(range, queryParams.length);
 
     const result = await pool.query<{
       date: string;
@@ -47,7 +56,8 @@ export async function GET(request: NextRequest) {
       WHERE 1=1
         ${dateFilter}
       ORDER BY fh.recorded_date ASC, sa.platform ASC
-      `
+      `,
+      queryParams
     );
 
     const header = ["date", "platform", "followers", "total_likes", "posts_count"];

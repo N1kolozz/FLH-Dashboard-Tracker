@@ -24,6 +24,7 @@ export interface StatsResponse {
 
 export async function GET() {
   try {
+    const appTimeZone = process.env.APP_TIMEZONE || "UTC";
     const result = await pool.query<{
       platform: string;
       name: string;
@@ -37,6 +38,9 @@ export async function GET() {
       last_updated: string | null;
       scraped_at: string | null;
     }>(`
+      WITH tz AS (
+        SELECT timezone($1, now())::date AS today
+      )
       SELECT
         sa.platform,
         sa.name,
@@ -50,6 +54,7 @@ export async function GET() {
         TO_CHAR(latest.recorded_date, 'YYYY-MM-DD') AS last_updated,
         TO_CHAR(latest.created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS scraped_at
       FROM social_accounts sa
+      CROSS JOIN tz
       LEFT JOIN LATERAL (
         SELECT followers, total_likes, posts_count, recorded_date, created_at
         FROM follower_history
@@ -61,14 +66,14 @@ export async function GET() {
         SELECT followers
         FROM follower_history
         WHERE account_id = sa.id
-          AND recorded_date = CURRENT_DATE - INTERVAL '1 day'
+          AND recorded_date = tz.today - 1
         LIMIT 1
       ) yesterday ON true
       LEFT JOIN LATERAL (
         SELECT followers
         FROM follower_history
         WHERE account_id = sa.id
-          AND recorded_date <= CURRENT_DATE - INTERVAL '7 days'
+          AND recorded_date <= tz.today - 7
         ORDER BY recorded_date DESC
         LIMIT 1
       ) week_ago ON true
@@ -76,12 +81,12 @@ export async function GET() {
         SELECT followers
         FROM follower_history
         WHERE account_id = sa.id
-          AND recorded_date <= CURRENT_DATE - INTERVAL '30 days'
+          AND recorded_date <= tz.today - 30
         ORDER BY recorded_date DESC
         LIMIT 1
       ) month_ago ON true
       ORDER BY sa.id
-    `);
+    `, [appTimeZone]);
 
     const stats: StatsResponse = {};
     for (const row of result.rows) {

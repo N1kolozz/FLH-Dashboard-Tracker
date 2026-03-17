@@ -17,6 +17,7 @@ export async function GET(request: NextRequest) {
   const range = searchParams.get("range") ?? "30"; // "30", "90", or "all"
   const start = searchParams.get("start");
   const end = searchParams.get("end");
+  const appTimeZone = process.env.APP_TIMEZONE || "UTC";
 
   if (!platform) {
     return NextResponse.json(
@@ -40,9 +41,11 @@ export async function GET(request: NextRequest) {
       dateFilter = "AND fh.recorded_date BETWEEN $2::date AND $3::date";
       queryParams.push(start, end);
     } else if (range === "30") {
-      dateFilter = "AND fh.recorded_date >= CURRENT_DATE - INTERVAL '30 days'";
+      queryParams.push(appTimeZone);
+      dateFilter = `AND fh.recorded_date >= timezone($${queryParams.length}, now())::date - 30`;
     } else if (range === "90") {
-      dateFilter = "AND fh.recorded_date >= CURRENT_DATE - INTERVAL '90 days'";
+      queryParams.push(appTimeZone);
+      dateFilter = `AND fh.recorded_date >= timezone($${queryParams.length}, now())::date - 90`;
     }
     // "all" has no date filter when start/end are not provided
 

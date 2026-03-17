@@ -327,6 +327,7 @@ async function saveResults(results: ScrapeResult[]): Promise<void> {
   if (!process.env.DATABASE_URL) {
     throw new Error("DATABASE_URL is not set");
   }
+  const appTimeZone = process.env.APP_TIMEZONE || "UTC";
 
   const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
@@ -358,14 +359,20 @@ async function saveResults(results: ScrapeResult[]): Promise<void> {
 
       await client.query(
         `INSERT INTO follower_history (account_id, followers, total_likes, posts_count, recorded_date)
-         VALUES ($1, $2, $3, $4, CURRENT_DATE)
+         VALUES ($1, $2, $3, $4, timezone($5, now())::date)
          ON CONFLICT (account_id, recorded_date)
          DO UPDATE SET
            followers = EXCLUDED.followers,
            total_likes = COALESCE(EXCLUDED.total_likes, follower_history.total_likes),
            posts_count = COALESCE(EXCLUDED.posts_count, follower_history.posts_count),
            created_at = CURRENT_TIMESTAMP`,
-        [accountId, result.followers, result.total_likes ?? null, result.posts_count ?? null]
+        [
+          accountId,
+          result.followers,
+          result.total_likes ?? null,
+          result.posts_count ?? null,
+          appTimeZone,
+        ]
       );
 
       console.log(

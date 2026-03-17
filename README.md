@@ -36,6 +36,7 @@ Edit `.env.local`:
 ```
 DATABASE_URL=postgresql://USER:PASSWORD@HOST:PORT/DATABASE
 CRON_SECRET=your-secret-key-here
+APP_TIMEZONE=Africa/Cairo
 ```
 
 **Recommended PostgreSQL providers:** [Neon](https://neon.tech) (free tier), [Railway](https://railway.app), [Render](https://render.com)
@@ -77,6 +78,7 @@ In your GitHub repo: **Settings → Secrets and variables → Actions**. Add:
 | Secret            | Description |
 |-------------------|-------------|
 | `DATABASE_URL`    | Same PostgreSQL connection string as in Vercel (e.g. Neon/Railway). The workflow uses it to save scraped data. |
+| `APP_TIMEZONE`    | Optional timezone for recording dates (example: `Africa/Cairo`). Set this as a **Repository variable** in GitHub Actions (`Settings → Secrets and variables → Actions → Variables`). If missing, defaults to `UTC`. |
 
 ### 2. Schedule and manual run
 
@@ -122,6 +124,7 @@ npx vercel --prod
 
 - `DATABASE_URL` — your Neon/Railway connection string
 - `CRON_SECRET` — your secret key
+- `APP_TIMEZONE` — your local timezone (example: `Africa/Cairo`) so `recorded_date` matches your day
 - (Optional) `GITHUB_REPO` and `GITHUB_ACTIONS_TOKEN` — to trigger the scrape workflow from `/api/scrape` (see GitHub Actions section above)
 
 ### 3. Scraping (GitHub Actions)
