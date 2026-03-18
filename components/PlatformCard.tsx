@@ -10,8 +10,8 @@ const PLATFORM_CONFIG = {
         <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
       </svg>
     ),
-    gradient: "from-purple-500 via-pink-500 to-orange-400",
-    bg: "bg-gradient-to-br from-purple-50 to-pink-50",
+    gradient: "from-violet-600 to-purple-500",
+    bg: "bg-gradient-to-br from-purple-50 to-violet-50/50",
     border: "border-purple-200",
     textAccent: "text-purple-600",
     badgeBg: "bg-purple-100",
@@ -23,11 +23,11 @@ const PLATFORM_CONFIG = {
         <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.33-6.34V8.69a8.18 8.18 0 0 0 4.78 1.52V6.75a4.85 4.85 0 0 1-1.01-.06z" />
       </svg>
     ),
-    gradient: "from-gray-900 to-gray-700",
-    bg: "bg-gradient-to-br from-gray-50 to-slate-50",
-    border: "border-gray-200",
-    textAccent: "text-gray-700",
-    badgeBg: "bg-gray-100",
+    gradient: "from-slate-800 to-slate-600",
+    bg: "bg-gradient-to-br from-slate-50 to-purple-50/30",
+    border: "border-purple-200",
+    textAccent: "text-purple-600",
+    badgeBg: "bg-purple-100",
   },
   facebook: {
     label: "Facebook",
@@ -36,11 +36,11 @@ const PLATFORM_CONFIG = {
         <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
       </svg>
     ),
-    gradient: "from-blue-600 to-blue-400",
-    bg: "bg-gradient-to-br from-blue-50 to-indigo-50",
-    border: "border-blue-200",
-    textAccent: "text-blue-600",
-    badgeBg: "bg-blue-100",
+    gradient: "from-violet-600 to-purple-500",
+    bg: "bg-gradient-to-br from-purple-50/80 to-violet-50/50",
+    border: "border-purple-200",
+    textAccent: "text-purple-600",
+    badgeBg: "bg-purple-100",
   },
 } as const;
 
@@ -61,15 +61,15 @@ function getTrend(weeklyGrowth: number | null): {
   classes: string;
 } {
   if (weeklyGrowth === null) {
-    return { label: "Flat", icon: "flat", classes: "bg-amber-100 text-amber-700 border border-amber-200" };
+    return { label: "Flat", icon: "flat", classes: "bg-slate-100 text-slate-600 border border-slate-200" };
   }
   if (weeklyGrowth > 0) {
-    return { label: "Up", icon: "up", classes: "bg-emerald-100 text-emerald-700 border border-emerald-200" };
+    return { label: "Up", icon: "up", classes: "bg-purple-100 text-purple-700 border border-purple-200" };
   }
   if (weeklyGrowth < 0) {
     return { label: "Down", icon: "down", classes: "bg-rose-100 text-rose-700 border border-rose-200" };
   }
-  return { label: "Flat", icon: "flat", classes: "bg-amber-100 text-amber-700 border border-amber-200" };
+  return { label: "Flat", icon: "flat", classes: "bg-slate-100 text-slate-600 border border-slate-200" };
 }
 
 function TrendBadge({
@@ -124,8 +124,12 @@ function GrowthBadge({
 }) {
   if (value === null) return null;
   const isPositive = value >= 0;
+  const isNegative = value < 0;
+  const badgeClasses = isNegative
+    ? "bg-rose-100 text-rose-700"
+    : `${badgeBg} ${accentColor}`;
   return (
-    <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${badgeBg} ${accentColor}`}>
+    <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${badgeClasses}`}>
       <span>{isPositive ? "+" : ""}{value.toLocaleString()}</span>
       <span className="opacity-70">{label}</span>
     </div>
@@ -143,13 +147,13 @@ export default function PlatformCard({ stats, isLoading }: PlatformCardProps) {
       <div className={`rounded-2xl border ${config.border} ${config.bg} p-6 shadow-sm`}>
         <div className="animate-pulse space-y-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gray-200" />
-            <div className="h-5 bg-gray-200 rounded w-24" />
+            <div className="w-10 h-10 rounded-xl bg-slate-200" />
+            <div className="h-5 bg-slate-200 rounded w-24" />
           </div>
-          <div className="h-10 bg-gray-200 rounded w-32" />
+          <div className="h-10 bg-slate-200 rounded w-32" />
           <div className="flex gap-2">
-            <div className="h-6 bg-gray-200 rounded-full w-20" />
-            <div className="h-6 bg-gray-200 rounded-full w-20" />
+            <div className="h-6 bg-slate-200 rounded-full w-20" />
+            <div className="h-6 bg-slate-200 rounded-full w-20" />
           </div>
         </div>
       </div>
@@ -170,15 +174,15 @@ export default function PlatformCard({ stats, isLoading }: PlatformCardProps) {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="font-semibold text-gray-800">{config.label}</h3>
+              <h3 className="font-semibold text-slate-800">{config.label}</h3>
               <TrendBadge label={trend.label} icon={trend.icon} classes={trend.classes} />
             </div>
             {stats.scraped_at ? (
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-slate-500">
                 Scraped {timeAgo(stats.scraped_at)}
               </p>
             ) : stats.last_updated ? (
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-slate-500">
                 Updated {new Date(stats.last_updated).toLocaleDateString()}
               </p>
             ) : null}
@@ -197,30 +201,30 @@ export default function PlatformCard({ stats, isLoading }: PlatformCardProps) {
       {/* Follower Count */}
       <div className="mb-3">
         {stats.followers !== null ? (
-          <span className="text-4xl font-bold text-gray-900 tracking-tight">
+          <span className="text-4xl font-bold text-slate-900 tracking-tight">
             {stats.followers.toLocaleString()}
           </span>
         ) : (
-          <span className="text-2xl font-semibold text-gray-400 italic">
+          <span className="text-2xl font-semibold text-slate-400 italic">
             N/A
           </span>
         )}
-        <span className="ml-2 text-sm text-gray-500">followers</span>
+        <span className="ml-2 text-sm text-slate-500">followers</span>
       </div>
 
       {/* Profile-level: total likes & posts/videos */}
       {(stats.total_likes != null || stats.posts_count != null) && (
-        <div className="flex flex-wrap gap-x-4 gap-y-1 mb-4 text-sm text-gray-600">
+        <div className="flex flex-wrap gap-x-4 gap-y-1 mb-4 text-sm text-slate-600">
           {stats.total_likes != null && (
             <span>
-              <span className="font-medium text-gray-800">{stats.total_likes.toLocaleString()}</span>
-              <span className="ml-1 text-gray-500">likes</span>
+              <span className="font-medium text-slate-800">{stats.total_likes.toLocaleString()}</span>
+              <span className="ml-1 text-slate-500">likes</span>
             </span>
           )}
           {stats.posts_count != null && (
             <span>
-              <span className="font-medium text-gray-800">{stats.posts_count.toLocaleString()}</span>
-              <span className="ml-1 text-gray-500">
+              <span className="font-medium text-slate-800">{stats.posts_count.toLocaleString()}</span>
+              <span className="ml-1 text-slate-500">
                 {stats.platform === "tiktok" ? "videos" : "posts"}
               </span>
             </span>
@@ -251,7 +255,7 @@ export default function PlatformCard({ stats, isLoading }: PlatformCardProps) {
         {stats.daily_growth === null &&
           stats.weekly_growth === null &&
           stats.monthly_growth === null && (
-            <span className="text-xs text-gray-400 italic">
+            <span className="text-xs text-slate-500 italic">
               Growth data available after 2+ days of tracking
             </span>
           )}

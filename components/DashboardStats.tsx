@@ -17,18 +17,18 @@ function StatBox({
   isLoading?: boolean;
 }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-100 px-5 py-4 shadow-sm text-center">
+    <div className="bg-white rounded-xl border border-purple-100 px-5 py-4 shadow-sm text-center">
       {isLoading ? (
         <div className="animate-pulse">
-          <div className="h-7 bg-gray-200 rounded w-20 mx-auto mb-1" />
-          <div className="h-4 bg-gray-100 rounded w-16 mx-auto" />
+          <div className="h-7 bg-slate-200 rounded w-20 mx-auto mb-1" />
+          <div className="h-4 bg-slate-100 rounded w-16 mx-auto" />
         </div>
       ) : (
         <>
-          <div className="text-2xl font-bold text-gray-900">
+          <div className="text-2xl font-bold text-slate-900">
             {value ?? "N/A"}
           </div>
-          <div className="text-xs text-gray-500 mt-0.5">{label}</div>
+          <div className="text-xs text-slate-500 mt-0.5">{label}</div>
         </>
       )}
     </div>

@@ -151,30 +151,33 @@ export default function GrowthChart({ platform }: GrowthChartProps) {
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+    <div className="bg-white rounded-2xl border border-purple-100 shadow-sm p-4 sm:p-6 overflow-hidden">
       {/* Chart Header */}
-      <div className="flex items-center justify-between mb-5">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+        <div className="flex items-center gap-2 min-w-0">
           <div
             className="w-3 h-3 rounded-full"
             style={{ backgroundColor: config.border }}
           />
-          <h3 className="font-semibold text-gray-800">{config.label} Growth</h3>
+          <h3 className="font-semibold text-slate-800 leading-tight">
+            {config.label} Growth
+          </h3>
         </div>
         {/* Range Selector */}
-        <div className="flex bg-gray-100 rounded-lg p-0.5 gap-0.5">
+        <div className="flex w-full sm:w-auto overflow-x-auto bg-slate-100 rounded-lg p-0.5 gap-0.5 whitespace-nowrap">
           {(Object.entries(RANGE_LABELS) as [TimeRange, string][]).map(
             ([key, label]) => (
               <button
                 key={key}
                 onClick={() => setRange(key)}
-                className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                className={`shrink-0 px-2.5 sm:px-3 py-1 rounded-md text-[11px] sm:text-xs font-medium transition-colors ${
                   range === key
-                    ? "bg-white text-gray-800 shadow-sm"
-                    : "text-gray-500 hover:text-gray-700"
+                    ? "bg-white text-slate-800 shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
                 }`}
               >
-                {label}
+                <span className="sm:hidden">{key === "all" ? "All" : `${key}d`}</span>
+                <span className="hidden sm:inline">{label}</span>
               </button>
             )
           )}
@@ -185,16 +188,16 @@ export default function GrowthChart({ platform }: GrowthChartProps) {
       <div className="h-52">
         {loading && (
           <div className="h-full flex items-center justify-center">
-            <div className="animate-spin w-6 h-6 border-2 border-gray-300 border-t-gray-600 rounded-full" />
+            <div className="animate-spin w-6 h-6 border-2 border-slate-300 border-t-slate-600 rounded-full" />
           </div>
         )}
         {!loading && error && (
-          <div className="h-full flex items-center justify-center text-sm text-red-400">
+          <div className="h-full flex items-center justify-center text-sm text-rose-500">
             Failed to load chart data
           </div>
         )}
         {!loading && !error && data.length === 0 && (
-          <div className="h-full flex flex-col items-center justify-center text-gray-400">
+          <div className="h-full flex flex-col items-center justify-center text-slate-500">
             <svg
               className="w-10 h-10 mb-2 opacity-30"
               fill="none"
