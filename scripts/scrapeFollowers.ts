@@ -52,6 +52,56 @@ function instagramUsernameFromUrl(url: string): string | null {
   return match?.[1] ?? null;
 }
 
+function extractInstagramCountFromHtml(
+  html: string,
+  key: "edge_followed_by" | "edge_owner_to_timeline_media"
+): number | null {
+  const patterns = [
+    new RegExp(`"${key}"\\s*:\\s*\\{\\s*"count"\\s*:\\s*(\\d+)`),
+    new RegExp(`\\\\\\"${key}\\\\\\"\\s*:\\s*\\{\\s*\\\\\\"count\\\\\\"\\s*:\\s*(\\d+)`),
+  ];
+  for (const pattern of patterns) {
+    const match = html.match(pattern);
+    if (match) {
+      const parsed = parseInt(match[1], 10);
+      if (Number.isFinite(parsed) && parsed >= 0) return parsed;
+    }
+  }
+  return null;
+}
+
+async function extractInstagramCountersFromAnchors(page: Page): Promise<{
+  followers: number | null;
+  postsCount: number | null;
+}> {
+  const [followersLinkText, postsLinkText] = await Promise.all([
+    page
+      .locator('a[href*="/followers/"]')
+      .first()
+      .innerText({ timeout: 3000 })
+      .catch(() => null),
+    page
+      .locator('a[href*="/reels/"], a[href$="/"]')
+      .first()
+      .innerText({ timeout: 3000 })
+      .catch(() => null),
+  ]);
+
+  const followers =
+    followersLinkText
+      ? extractFirstNumber(followersLinkText, "followers") ??
+        parseNumber((followersLinkText.match(/([\d,.]+(?:\s*[KMBkmb])?)/)?.[1] ?? ""))
+      : null;
+
+  const postsCount =
+    postsLinkText
+      ? extractFirstNumber(postsLinkText, "posts") ??
+        parseNumber((postsLinkText.match(/([\d,.]+(?:\s*[KMBkmb])?)/)?.[1] ?? ""))
+      : null;
+
+  return { followers, postsCount };
+}
+
 async function scrapeInstagramFromWebProfileApi(
   page: Page,
   url: string
@@ -60,45 +110,57 @@ async function scrapeInstagramFromWebProfileApi(
   if (!username) return null;
 
   try {
-    const res = await page.request.get(
+    const cookies = await page.context().cookies("https://www.instagram.com");
+    const csrfToken = cookies.find((c) => c.name === "csrftoken")?.value ?? "";
+    const headers = {
+      // Common app id used by Instagram web requests.
+      "x-ig-app-id": "936619743392459",
+      "x-csrftoken": csrfToken,
+      "x-requested-with": "XMLHttpRequest",
+      "user-agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+      "accept-language": "en-US,en;q=0.9",
+      accept: "application/json",
+      referer: url,
+    };
+    const endpoints = [
+      `https://www.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(
+        username
+      )}`,
       `https://i.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(
         username
       )}`,
-      {
-        headers: {
-          // Common app id used by Instagram web requests.
-          "x-ig-app-id": "936619743392459",
-          "user-agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-          accept: "application/json",
-        },
+    ];
+
+    for (const endpoint of endpoints) {
+      const res = await page.request.get(endpoint, { headers }).catch(() => null);
+      if (!res || !res.ok()) continue;
+
+      const data = await res.json().catch(() => null);
+      const user = data?.data?.user;
+      if (!user) continue;
+
+      const followersRaw =
+        user?.edge_followed_by?.count ?? user?.follower_count ?? null;
+      const postsRaw =
+        user?.edge_owner_to_timeline_media?.count ?? user?.media_count ?? null;
+
+      const followers =
+        typeof followersRaw === "number" ? followersRaw : parseNumber(String(followersRaw ?? ""));
+      const postsCount =
+        typeof postsRaw === "number" ? postsRaw : parseNumber(String(postsRaw ?? ""));
+
+      if (followers !== null) {
+        console.log(`  [IG] followers (api): ${followers}`);
       }
-    );
-    if (!res.ok()) return null;
-
-    const data = await res.json();
-    const user = data?.data?.user;
-    if (!user) return null;
-
-    const followersRaw =
-      user?.edge_followed_by?.count ?? user?.follower_count ?? null;
-    const postsRaw =
-      user?.edge_owner_to_timeline_media?.count ?? user?.media_count ?? null;
-
-    const followers =
-      typeof followersRaw === "number" ? followersRaw : parseNumber(String(followersRaw ?? ""));
-    const postsCount =
-      typeof postsRaw === "number" ? postsRaw : parseNumber(String(postsRaw ?? ""));
-
-    if (followers !== null) {
-      console.log(`  [IG] followers (api): ${followers}`);
+      if (postsCount !== null) {
+        console.log(`  [IG] posts (api): ${postsCount}`);
+      }
+      if (followers !== null || postsCount !== null) {
+        return { followers, totalLikes: null, postsCount };
+      }
     }
-    if (postsCount !== null) {
-      console.log(`  [IG] posts (api): ${postsCount}`);
-    }
-
-    if (followers === null && postsCount === null) return null;
-    return { followers, totalLikes: null, postsCount };
+    return null;
   } catch {
     return null;
   }
@@ -111,6 +173,9 @@ async function createContext(): Promise<{ context: BrowserContext; close: () => 
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
     viewport: { width: 1280, height: 720 },
     locale: "en-US",
+    extraHTTPHeaders: {
+      "accept-language": "en-US,en;q=0.9",
+    },
   });
   return { context, close: () => browser.close() };
 }
@@ -123,9 +188,10 @@ const PAGE_OPTS = {
 
 async function scrapeInstagramWithPage(page: Page, url: string): Promise<ProfileScrape> {
   await page.goto(url, { waitUntil: PAGE_OPTS.waitUntil, timeout: PAGE_OPTS.timeout });
-  await page.waitForTimeout(PAGE_OPTS.waitAfter);
+  await page.waitForTimeout(1200);
 
   const pageText = await page.evaluate(() => document.body.innerText);
+  const pageHtml = await page.content();
   let followers: number | null = extractFirstNumber(pageText, "followers");
   if (followers === null) {
     for (const selector of [
@@ -153,6 +219,9 @@ async function scrapeInstagramWithPage(page: Page, url: string): Promise<Profile
       }
     }
   }
+  if (followers === null) {
+    followers = extractInstagramCountFromHtml(pageHtml, "edge_followed_by");
+  }
   if (followers !== null) console.log(`  [IG] followers: ${followers}`);
 
   let postsCount: number | null = extractFirstNumber(pageText, "posts");
@@ -174,6 +243,14 @@ async function scrapeInstagramWithPage(page: Page, url: string): Promise<Profile
         break;
       }
     }
+  }
+  if (postsCount === null) {
+    postsCount = extractInstagramCountFromHtml(pageHtml, "edge_owner_to_timeline_media");
+  }
+  if (followers === null || postsCount === null) {
+    const anchorCounts = await extractInstagramCountersFromAnchors(page);
+    followers = followers ?? anchorCounts.followers;
+    postsCount = postsCount ?? anchorCounts.postsCount;
   }
   if (postsCount !== null) console.log(`  [IG] posts: ${postsCount}`);
 
