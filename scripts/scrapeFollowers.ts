@@ -254,12 +254,12 @@ async function scrapeInstagramWithPage(page: Page, url: string): Promise<Profile
   }
   if (postsCount !== null) console.log(`  [IG] posts: ${postsCount}`);
 
-  if (followers === null || postsCount === null) {
-    const apiFallback = await scrapeInstagramFromWebProfileApi(page, url);
-    if (apiFallback) {
-      followers = followers ?? apiFallback.followers;
-      postsCount = postsCount ?? apiFallback.postsCount;
-    }
+  // Prefer Instagram's web profile API when available because page text parsing
+  // can drift due to UI changes and localized formatting.
+  const apiFallback = await scrapeInstagramFromWebProfileApi(page, url);
+  if (apiFallback) {
+    followers = apiFallback.followers ?? followers;
+    postsCount = apiFallback.postsCount ?? postsCount;
   }
 
   // Instagram profiles don't show total likes; only followers and posts
