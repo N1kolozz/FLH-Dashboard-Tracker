@@ -340,11 +340,6 @@ async function saveResults(results: ScrapeResult[]): Promise<void> {
   const client = await pool.connect();
   try {
     for (const result of results) {
-      if (result.followers === null) {
-        console.log(`Skipping ${result.platform} — no follower count`);
-        continue;
-      }
-
       const accountRes = await client.query(
         "SELECT id FROM social_accounts WHERE platform = $1",
         [result.platform]
@@ -356,6 +351,44 @@ async function saveResults(results: ScrapeResult[]): Promise<void> {
       }
 
       const accountId = accountRes.rows[0].id;
+      let followersToSave: number | null = result.followers;
+      let totalLikesToSave: number | null = result.total_likes ?? null;
+      let postsCountToSave: number | null = result.posts_count ?? null;
+
+      // Keep a continuous daily series: if scrape fails for a platform today,
+      // carry forward the last known values into today's date.
+      if (followersToSave === null) {
+        const prevRes = await client.query<{
+          followers: number;
+          total_likes: number | null;
+          posts_count: number | null;
+        }>(
+          `SELECT followers, total_likes, posts_count
+           FROM follower_history
+           WHERE account_id = $1
+           ORDER BY recorded_date DESC
+           LIMIT 1`,
+          [accountId]
+        );
+
+        if (prevRes.rows.length === 0) {
+          console.log(
+            `Skipping ${result.platform} — no follower count and no previous data to carry`
+          );
+          continue;
+        }
+
+        const prev = prevRes.rows[0];
+        followersToSave = prev.followers;
+        totalLikesToSave = prev.total_likes;
+        postsCountToSave = prev.posts_count;
+        console.log(
+          `Carried forward ${result.platform}: ${followersToSave} followers` +
+            `${totalLikesToSave != null ? `, ${totalLikesToSave} likes` : ""}` +
+            `${postsCountToSave != null ? `, ${postsCountToSave} posts` : ""}` +
+            `${result.error ? ` (scrape error: ${result.error})` : ""}`
+        );
+      }
 
       await client.query(
         `INSERT INTO follower_history (account_id, followers, total_likes, posts_count, recorded_date)
@@ -368,15 +401,15 @@ async function saveResults(results: ScrapeResult[]): Promise<void> {
            created_at = CURRENT_TIMESTAMP`,
         [
           accountId,
-          result.followers,
-          result.total_likes ?? null,
-          result.posts_count ?? null,
+          followersToSave,
+          totalLikesToSave,
+          postsCountToSave,
           appTimeZone,
         ]
       );
 
       console.log(
-        `Saved ${result.platform}: ${result.followers} followers${result.total_likes != null ? `, ${result.total_likes} likes` : ""}${result.posts_count != null ? `, ${result.posts_count} posts` : ""}`
+        `Saved ${result.platform}: ${followersToSave} followers${totalLikesToSave != null ? `, ${totalLikesToSave} likes` : ""}${postsCountToSave != null ? `, ${postsCountToSave} posts` : ""}`
       );
     }
   } finally {
