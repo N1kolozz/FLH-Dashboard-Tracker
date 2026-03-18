@@ -47,6 +47,63 @@ function extractFirstNumber(text: string, keyword: string): number | null {
   return null;
 }
 
+function instagramUsernameFromUrl(url: string): string | null {
+  const match = url.match(/instagram\.com\/([^/?#]+)/i);
+  return match?.[1] ?? null;
+}
+
+async function scrapeInstagramFromWebProfileApi(
+  page: Page,
+  url: string
+): Promise<ProfileScrape | null> {
+  const username = instagramUsernameFromUrl(url);
+  if (!username) return null;
+
+  try {
+    const res = await page.request.get(
+      `https://i.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(
+        username
+      )}`,
+      {
+        headers: {
+          // Common app id used by Instagram web requests.
+          "x-ig-app-id": "936619743392459",
+          "user-agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+          accept: "application/json",
+        },
+      }
+    );
+    if (!res.ok()) return null;
+
+    const data = await res.json();
+    const user = data?.data?.user;
+    if (!user) return null;
+
+    const followersRaw =
+      user?.edge_followed_by?.count ?? user?.follower_count ?? null;
+    const postsRaw =
+      user?.edge_owner_to_timeline_media?.count ?? user?.media_count ?? null;
+
+    const followers =
+      typeof followersRaw === "number" ? followersRaw : parseNumber(String(followersRaw ?? ""));
+    const postsCount =
+      typeof postsRaw === "number" ? postsRaw : parseNumber(String(postsRaw ?? ""));
+
+    if (followers !== null) {
+      console.log(`  [IG] followers (api): ${followers}`);
+    }
+    if (postsCount !== null) {
+      console.log(`  [IG] posts (api): ${postsCount}`);
+    }
+
+    if (followers === null && postsCount === null) return null;
+    return { followers, totalLikes: null, postsCount };
+  } catch {
+    return null;
+  }
+}
+
 async function createContext(): Promise<{ context: BrowserContext; close: () => Promise<void> }> {
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({
@@ -119,6 +176,14 @@ async function scrapeInstagramWithPage(page: Page, url: string): Promise<Profile
     }
   }
   if (postsCount !== null) console.log(`  [IG] posts: ${postsCount}`);
+
+  if (followers === null || postsCount === null) {
+    const apiFallback = await scrapeInstagramFromWebProfileApi(page, url);
+    if (apiFallback) {
+      followers = followers ?? apiFallback.followers;
+      postsCount = postsCount ?? apiFallback.postsCount;
+    }
+  }
 
   // Instagram profiles don't show total likes; only followers and posts
   return { followers: followers ?? null, totalLikes: null, postsCount: postsCount ?? null };
