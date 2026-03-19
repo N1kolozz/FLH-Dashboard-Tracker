@@ -48,6 +48,18 @@ function sumGrowth(
   return (total >= 0 ? "+" : "") + total.toLocaleString();
 }
 
+function sumPositiveGrowth(
+  stats: StatsResponse | null,
+  field: "daily_growth" | "weekly_growth" | "monthly_growth"
+): string | null {
+  if (!stats) return null;
+  const values = Object.values(stats)
+    .map((s) => s[field])
+    .filter((v): v is number => v !== null && v > 0);
+  const total = values.reduce((a, b) => a + b, 0);
+  return "+" + total.toLocaleString();
+}
+
 function totalFollowers(stats: StatsResponse | null): string | null {
   if (!stats) return null;
   const values = Object.values(stats)
@@ -70,7 +82,7 @@ export default function DashboardStats({
       />
       <StatBox
         label="Total Daily Growth"
-        value={sumGrowth(stats, "daily_growth")}
+        value={sumPositiveGrowth(stats, "daily_growth")}
         isLoading={isLoading}
       />
       <StatBox
