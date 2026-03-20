@@ -5,8 +5,13 @@ name: Scrape followers
 
 on:
   schedule:
-    # Daily at 06:00 UTC (adjust as needed)
-    - cron: "0 6 * * *"
+    # GitHub cron is UTC. Asia/Tbilisi = UTC+4 → subtract 4h for UTC.
+    # 08:00 Tbilisi → 04:00 UTC
+    - cron: "0 4 * * *"
+    # 17:00 Tbilisi → 13:00 UTC
+    - cron: "0 13 * * *"
+    # 22:00 Tbilisi → 18:00 UTC
+    - cron: "0 18 * * *"
   workflow_dispatch:
     # Allow manual run from Actions tab
   repository_dispatch:
