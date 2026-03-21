@@ -1,518 +1,324 @@
 "use client";
 
-import Image from "next/image";
+import Link from "next/link";
 import { useState, useEffect, useCallback } from "react";
-import PlatformCard from "@/components/PlatformCard";
-import GrowthChart from "@/components/GrowthChart";
-import CombinedGrowthChart from "@/components/CombinedGrowthChart";
-import DashboardStats from "@/components/DashboardStats";
 import { StatsResponse } from "@/app/api/stats/route";
-import { HistoryPoint } from "@/app/api/history/route";
+import { loadStore } from "@/lib/store";
 
-const PLATFORMS = ["instagram", "tiktok", "facebook"] as const;
-type Platform = (typeof PLATFORMS)[number];
-type ChartTab = Platform | "all";
-type TimeRange = "30" | "90" | "all";
-
-interface GrowthHighlight {
-  platform: Platform;
+/* ─── Types for localStorage modules ─── */
+interface Project {
+  id: string;
+  name: string;
+  status: string;
+}
+interface InventoryItem {
+  id: string;
+  name: string;
+  status: string;
+}
+interface CalEvent {
+  id: string;
+  title: string;
   date: string;
-  value: number;
+}
+interface Expense {
+  id: string;
+  amount: number;
+  date: string;
+}
+interface TeamMember {
+  id: string;
+  name: string;
+  department: string;
 }
 
-interface CompareRow {
-  platform: Platform;
-  currentGrowth: number | null;
-  previousGrowth: number | null;
-  deltaPercent: number | null;
+/* ─── Quick-stat card ─── */
+function QuickStat({
+  label,
+  value,
+  icon,
+  color,
+  href,
+}: {
+  label: string;
+  value: string;
+  icon: React.ReactNode;
+  color: string;
+  href: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="group bg-white rounded-2xl border border-purple-100 p-5 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5"
+    >
+      <div className="flex items-center gap-4">
+        <div
+          className={`w-12 h-12 rounded-xl ${color} flex items-center justify-center text-white shadow-sm group-hover:scale-105 transition-transform`}
+        >
+          {icon}
+        </div>
+        <div>
+          <p className="text-2xl font-bold text-slate-900">{value}</p>
+          <p className="text-xs text-slate-500 mt-0.5">{label}</p>
+        </div>
+      </div>
+    </Link>
+  );
 }
 
-function rangeToDays(range: TimeRange): number {
-  if (range === "30") return 30;
-  if (range === "90") return 90;
-  return 0;
-}
-
-function ymd(date: Date): string {
-  return date.toISOString().slice(0, 10);
-}
-
-function growthFromHistory(points: HistoryPoint[]): number | null {
-  if (points.length < 2) return null;
-  return points[points.length - 1].followers - points[0].followers;
+/* ─── Quick-link card ─── */
+function QuickLink({
+  label,
+  description,
+  href,
+  icon,
+}: {
+  label: string;
+  description: string;
+  href: string;
+  icon: React.ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      className="group flex items-center gap-4 bg-white rounded-xl border border-slate-100 px-4 py-3 hover:border-purple-200 hover:bg-purple-50/30 transition-all duration-150"
+    >
+      <div className="w-10 h-10 rounded-lg bg-slate-100 group-hover:bg-purple-100 flex items-center justify-center text-slate-400 group-hover:text-purple-600 transition-colors shrink-0">
+        {icon}
+      </div>
+      <div className="min-w-0">
+        <p className="text-sm font-semibold text-slate-700 group-hover:text-purple-700 transition-colors">
+          {label}
+        </p>
+        <p className="text-xs text-slate-500 truncate">{description}</p>
+      </div>
+      <svg
+        className="w-4 h-4 text-slate-300 group-hover:text-purple-400 ml-auto shrink-0 transition-colors"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+      </svg>
+    </Link>
+  );
 }
 
 export default function DashboardPage() {
-  const [stats, setStats] = useState<StatsResponse | null>(null);
-  const [loadingStats, setLoadingStats] = useState(true);
-  const [statsError, setStatsError] = useState<string | null>(null);
-  const [insightsError, setInsightsError] = useState<string | null>(null);
-  const [insightsLoading, setInsightsLoading] = useState(true);
-  const [activeChart, setActiveChart] = useState<ChartTab>("all");
-  const [insightsRange, setInsightsRange] = useState<TimeRange>("30");
-  const [compareMode, setCompareMode] = useState(false);
-  const [insightsLastUpdated, setInsightsLastUpdated] = useState<Date | null>(
-    null
-  );
-  const [historyByPlatform, setHistoryByPlatform] = useState<
-    Record<Platform, HistoryPoint[]>
-  >({
-    instagram: [],
-    tiktok: [],
-    facebook: [],
-  });
-  const [compareRows, setCompareRows] = useState<CompareRow[]>([]);
+  const [totalFollowers, setTotalFollowers] = useState<string>("—");
+  const [followerGrowth, setFollowerGrowth] = useState<string>("—");
+  const [projectCount, setProjectCount] = useState(0);
+  const [inventoryCount, setInventoryCount] = useState(0);
+  const [eventCount, setEventCount] = useState(0);
+  const [expenseTotal, setExpenseTotal] = useState(0);
+  const [teamCount, setTeamCount] = useState(0);
 
-  const fetchStats = useCallback(async () => {
-    setLoadingStats(true);
-    setStatsError(null);
+  // Fetch social stats from API
+  const fetchSocial = useCallback(async () => {
     try {
       const res = await fetch("/api/stats", { cache: "no-store" });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) return;
       const data: StatsResponse = await res.json();
-      setStats(data);
-    } catch (err) {
-      setStatsError(String(err));
-    } finally {
-      setLoadingStats(false);
+      const values = Object.values(data);
+      const fols = values
+        .map((s) => s.followers)
+        .filter((v): v is number => v !== null);
+      const total = fols.reduce((a, b) => a + b, 0);
+      setTotalFollowers(total.toLocaleString());
+
+      const growths = values
+        .map((s) => s.daily_growth)
+        .filter((v): v is number => v !== null);
+      const totalGrowth = growths.reduce((a, b) => a + b, 0);
+      setFollowerGrowth(
+        totalGrowth >= 0 ? `+${totalGrowth.toLocaleString()}` : totalGrowth.toLocaleString()
+      );
+    } catch {
+      /* ignore */
     }
   }, []);
 
   useEffect(() => {
-    fetchStats();
-  }, [fetchStats]);
+    fetchSocial();
 
-  useEffect(() => {
-    let cancelled = false;
-    setInsightsLoading(true);
-    setInsightsError(null);
+    // Load localStorage stats
+    const projects = loadStore<Project>("flh_projects");
+    setProjectCount(projects.length);
 
-    const loadInsights = async () => {
-      try {
-        const currentResults = await Promise.all(
-          PLATFORMS.map(async (platform) => {
-            const res = await fetch(
-              `/api/history?platform=${platform}&range=${insightsRange}`,
-              { cache: "no-store" }
-            );
-            if (!res.ok) throw new Error(`History ${platform}: HTTP ${res.status}`);
-            const data: HistoryPoint[] = await res.json();
-            return { platform, data };
-          })
-        );
+    const inventory = loadStore<InventoryItem>("flh_inventory");
+    setInventoryCount(inventory.length);
 
-        const nextHistory = {
-          instagram: [],
-          tiktok: [],
-          facebook: [],
-        } as Record<Platform, HistoryPoint[]>;
-        currentResults.forEach(({ platform, data }) => {
-          nextHistory[platform] = data;
-        });
-        if (!cancelled) setHistoryByPlatform(nextHistory);
-        if (!cancelled) setInsightsLastUpdated(new Date());
+    const events = loadStore<CalEvent>("flh_events");
+    // upcoming events only
+    const today = new Date().toISOString().slice(0, 10);
+    setEventCount(events.filter((e) => e.date >= today).length);
 
-        if (compareMode && insightsRange !== "all") {
-          const days = rangeToDays(insightsRange);
-          const today = new Date();
-          const currentStart = new Date(today);
-          currentStart.setDate(today.getDate() - (days - 1));
-          const previousEnd = new Date(currentStart);
-          previousEnd.setDate(currentStart.getDate() - 1);
-          const previousStart = new Date(previousEnd);
-          previousStart.setDate(previousEnd.getDate() - (days - 1));
+    const expenses = loadStore<Expense>("flh_expenses");
+    const thisMonth = new Date().toISOString().slice(0, 7);
+    const monthTotal = expenses
+      .filter((e) => e.date.startsWith(thisMonth))
+      .reduce((sum, e) => sum + (e.amount || 0), 0);
+    setExpenseTotal(monthTotal);
 
-          const previousResults = await Promise.all(
-            PLATFORMS.map(async (platform) => {
-              const res = await fetch(
-                `/api/history?platform=${platform}&start=${ymd(previousStart)}&end=${ymd(previousEnd)}`,
-                { cache: "no-store" }
-              );
-              if (!res.ok) throw new Error(`Compare ${platform}: HTTP ${res.status}`);
-              const data: HistoryPoint[] = await res.json();
-              return { platform, data };
-            })
-          );
-
-          const rows: CompareRow[] = PLATFORMS.map((platform) => {
-            const current = growthFromHistory(nextHistory[platform]);
-            const previous = growthFromHistory(
-              previousResults.find((r) => r.platform === platform)?.data ?? []
-            );
-            const deltaPercent =
-              current !== null && previous !== null && previous !== 0
-                ? ((current - previous) / Math.abs(previous)) * 100
-                : null;
-            return {
-              platform,
-              currentGrowth: current,
-              previousGrowth: previous,
-              deltaPercent:
-                deltaPercent === null ? null : Number(deltaPercent.toFixed(1)),
-            };
-          });
-          if (!cancelled) setCompareRows(rows);
-        } else if (!cancelled) {
-          setCompareRows([]);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setInsightsError(String(err));
-        }
-      } finally {
-        if (!cancelled) setInsightsLoading(false);
-      }
-    };
-
-    loadInsights();
-    return () => {
-      cancelled = true;
-    };
-  }, [insightsRange, compareMode]);
-
-  async function exportCsv() {
-    try {
-      const res = await fetch(`/api/report?range=${insightsRange}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `flh-report-${insightsRange}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
-    } catch (err) {
-      setInsightsError(`CSV export failed: ${String(err)}`);
-    }
-  }
-
-  const dropAlerts = PLATFORMS.filter(
-    (platform) => (stats?.[platform]?.daily_growth ?? 0) < 0
-  ).map((platform) => ({
-    platform,
-    value: stats?.[platform]?.daily_growth ?? 0,
-  }));
-
-  const bestDay: GrowthHighlight | null = (() => {
-    let best: GrowthHighlight | null = null;
-    for (const platform of PLATFORMS) {
-      const points = historyByPlatform[platform];
-      for (let i = 1; i < points.length; i++) {
-        const growth = points[i].followers - points[i - 1].followers;
-        if (!best || growth > best.value) {
-          best = { platform, date: points[i].date, value: growth };
-        }
-      }
-    }
-    return best;
-  })();
-
-  const bestWeek: GrowthHighlight | null = (() => {
-    let best: GrowthHighlight | null = null;
-    for (const platform of PLATFORMS) {
-      const points = historyByPlatform[platform];
-      for (let i = 7; i < points.length; i++) {
-        const growth = points[i].followers - points[i - 7].followers;
-        if (!best || growth > best.value) {
-          best = { platform, date: points[i].date, value: growth };
-        }
-      }
-    }
-    return best;
-  })();
-
-  function deltaClass(deltaPercent: number | null): string {
-    if (deltaPercent === null) return "bg-slate-100 text-slate-600";
-    if (deltaPercent > 0) return "bg-purple-100 text-purple-700";
-    if (deltaPercent < 0) return "bg-rose-100 text-rose-700";
-    return "bg-slate-100 text-slate-600";
-  }
+    const team = loadStore<TeamMember>("flh_team");
+    setTeamCount(team.length);
+  }, [fetchSocial]);
 
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
-      <header className="sticky top-0 z-10 border-b border-purple-200/70 bg-gradient-to-r from-violet-100/70 via-purple-100/65 to-fuchsia-100/70 backdrop-blur-md shadow-[0_8px_30px_rgba(124,58,237,0.10)]">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <Image
-              src="/flhlogo.svg"
-              alt="FLH logo"
-              width={36}
-              height={36}
-              className="w-9 h-9 rounded-xl shadow-sm object-cover"
-              priority
-            />
-            <div className="min-w-0">
-              <h1 className="text-base sm:text-lg font-bold text-slate-900 leading-none truncate">
-                FLH Social Dashboard
-              </h1>
-              <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5 truncate">
-                Future Leaders Hub
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={exportCsv}
-              title="Export CSV"
-              aria-label="Export CSV"
-              className="flex items-center justify-center sm:justify-start gap-1.5 px-2.5 sm:px-3 py-1.5 bg-white/90 border border-purple-200 hover:bg-white text-purple-700 text-sm font-medium rounded-lg transition-colors"
-            >
-              <svg
-                className="w-3.5 h-3.5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                />
-              </svg>
-              <span className="hidden sm:inline">Export CSV</span>
-            </button>
-          </div>
+      <header className="border-b border-purple-200/70 bg-gradient-to-r from-violet-100/70 via-purple-100/65 to-fuchsia-100/70 backdrop-blur-md">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
+            Welcome back 👋
+          </h1>
+          <p className="text-sm text-slate-600 mt-1">
+            Here&apos;s an overview of Future Leaders Hub operations
+          </p>
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-8">
-        {/* Stats Error */}
-        {statsError && (
-          <div className="rounded-lg px-4 py-3 text-sm bg-rose-50 border border-rose-200 text-rose-700">
-            Failed to load stats: {statsError}
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+        {/* Stats Grid */}
+        <section>
+          <h2 className="text-sm font-semibold text-slate-600 uppercase tracking-wide mb-3">
+            At a Glance
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <QuickStat
+              label="Total Followers"
+              value={totalFollowers}
+              href="/social"
+              color="bg-gradient-to-br from-purple-600 to-violet-500"
+              icon={
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+              }
+            />
+            <QuickStat
+              label="Active Projects"
+              value={String(projectCount)}
+              href="/projects"
+              color="bg-gradient-to-br from-emerald-500 to-teal-500"
+              icon={
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+              }
+            />
+            <QuickStat
+              label="Inventory Items"
+              value={String(inventoryCount)}
+              href="/logistics/inventory"
+              color="bg-gradient-to-br from-blue-500 to-cyan-500"
+              icon={
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                </svg>
+              }
+            />
+            <QuickStat
+              label="Upcoming Events"
+              value={String(eventCount)}
+              href="/events"
+              color="bg-gradient-to-br from-amber-500 to-orange-500"
+              icon={
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              }
+            />
           </div>
-        )}
+        </section>
 
-        {/* Alerts */}
-        {dropAlerts.length > 0 && (
-          <section className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3">
-            <p className="text-sm font-semibold text-rose-700 mb-1">
-              Follower drop alert
+        {/* Second row — smaller stats */}
+        <section className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="bg-white rounded-xl border border-purple-100 p-4 shadow-sm text-center">
+            <p className="text-xl font-bold text-slate-900">{followerGrowth}</p>
+            <p className="text-xs text-slate-500 mt-0.5">Today&apos;s Growth</p>
+          </div>
+          <div className="bg-white rounded-xl border border-purple-100 p-4 shadow-sm text-center">
+            <p className="text-xl font-bold text-slate-900">
+              {expenseTotal > 0 ? `₾${expenseTotal.toLocaleString()}` : "₾0"}
             </p>
-            <div className="text-sm text-rose-700">
-              {dropAlerts.map((alert) => (
-                <span key={alert.platform} className="mr-4 capitalize">
-                  {alert.platform}: {alert.value}
-                </span>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Insights */}
-        <section className="bg-white rounded-2xl border border-purple-100 shadow-sm p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-            <h2 className="text-sm font-semibold text-slate-600 uppercase tracking-wide">
-              Insights
-            </h2>
-            <div className="flex items-center gap-2 flex-wrap justify-end">
-              {insightsLastUpdated && (
-                <span className="text-xs text-slate-500">
-                  Insights updated {insightsLastUpdated.toLocaleTimeString()}
-                </span>
-              )}
-              <div className="flex bg-slate-100 rounded-lg p-0.5 gap-0.5">
-                {(["30", "90", "all"] as TimeRange[]).map((r) => (
-                  <button
-                    key={r}
-                    onClick={() => setInsightsRange(r)}
-                    className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
-                      insightsRange === r
-                        ? "bg-white text-slate-800 shadow-sm"
-                        : "text-slate-500 hover:text-slate-700"
-                    }`}
-                  >
-                    {r === "all" ? "All time" : `${r} days`}
-                  </button>
-                ))}
-              </div>
-              <button
-                onClick={() => setCompareMode((v) => !v)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                  compareMode
-                    ? "bg-purple-50 border-purple-200 text-purple-700"
-                    : "bg-white border-slate-200 text-slate-600"
-                }`}
-              >
-                Compare mode {compareMode ? "ON" : "OFF"}
-              </button>
-            </div>
+            <p className="text-xs text-slate-500 mt-0.5">Expenses This Month</p>
           </div>
-
-          {insightsError && (
-            <div className="mb-4 rounded-lg px-3 py-2 text-sm bg-rose-50 border border-rose-200 text-rose-700">
-              Failed to load insights: {insightsError}
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="rounded-xl border border-purple-100 bg-purple-50/50 p-4">
-              <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">
-                Best Growth Day
-              </p>
-              {insightsLoading ? (
-                <p className="text-sm text-slate-400">Loading...</p>
-              ) : bestDay ? (
-                <>
-                  <p className="text-lg font-bold text-slate-900">
-                    +{bestDay.value.toLocaleString()}
-                  </p>
-                  <p className="text-sm text-slate-600 capitalize">
-                    {bestDay.platform} · {bestDay.date}
-                  </p>
-                </>
-              ) : (
-                <p className="text-sm text-slate-400">Not enough data yet</p>
-              )}
-            </div>
-
-            <div className="rounded-xl border border-purple-100 bg-purple-50/50 p-4">
-              <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">
-                Best Growth Week
-              </p>
-              {insightsLoading ? (
-                <p className="text-sm text-slate-400">Loading...</p>
-              ) : bestWeek ? (
-                <>
-                  <p className="text-lg font-bold text-slate-900">
-                    +{bestWeek.value.toLocaleString()}
-                  </p>
-                  <p className="text-sm text-slate-600 capitalize">
-                    {bestWeek.platform} · ending {bestWeek.date}
-                  </p>
-                </>
-              ) : (
-                <p className="text-sm text-slate-400">Not enough data yet</p>
-              )}
-            </div>
-
+          <div className="bg-white rounded-xl border border-purple-100 p-4 shadow-sm text-center">
+            <p className="text-xl font-bold text-slate-900">{teamCount}</p>
+            <p className="text-xs text-slate-500 mt-0.5">Team Members</p>
           </div>
-
-          {compareMode && insightsRange !== "all" && (
-            <div className="mt-4 rounded-xl border border-purple-100 overflow-hidden">
-              <div className="px-4 py-2 bg-purple-50/50 text-xs text-slate-500 uppercase tracking-wide">
-                Compare current range vs previous period
-              </div>
-              <div className="divide-y divide-purple-100">
-                {compareRows.map((row) => (
-                  <div
-                    key={row.platform}
-                    className="px-4 py-2 text-sm flex items-center justify-between"
-                  >
-                    <span className="capitalize text-slate-600">{row.platform}</span>
-                    <span className="text-slate-800 flex items-center gap-2">
-                      <span>
-                        {row.currentGrowth !== null ? `${row.currentGrowth >= 0 ? "+" : ""}${row.currentGrowth}` : "N/A"}
-                        {" vs "}
-                        {row.previousGrowth !== null ? `${row.previousGrowth >= 0 ? "+" : ""}${row.previousGrowth}` : "N/A"}
-                      </span>
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-xs font-semibold ${deltaClass(
-                          row.deltaPercent
-                        )}`}
-                      >
-                        {row.deltaPercent !== null
-                          ? `${row.deltaPercent >= 0 ? "+" : ""}${row.deltaPercent}%`
-                          : "N/A"}
-                      </span>
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </section>
 
-        {/* Summary Stats Row */}
+        {/* Quick Links */}
         <section>
           <h2 className="text-sm font-semibold text-slate-600 uppercase tracking-wide mb-3">
-            Overview
+            Quick Actions
           </h2>
-          <DashboardStats stats={stats} isLoading={loadingStats} />
-        </section>
-
-        {/* Platform Cards */}
-        <section>
-          <h2 className="text-sm font-semibold text-slate-600 uppercase tracking-wide mb-3">
-            By Platform
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {PLATFORMS.map((platform) => (
-              <PlatformCard
-                key={platform}
-                stats={
-                  stats?.[platform] ?? {
-                    platform,
-                    name: platform,
-                    url: "#",
-                    followers: null,
-                    total_likes: null,
-                    posts_count: null,
-                    daily_growth: null,
-                    weekly_growth: null,
-                    monthly_growth: null,
-                    last_updated: null,
-                    scraped_at: null,
-                  }
-                }
-                isLoading={loadingStats}
-              />
-            ))}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <QuickLink
+              label="Social Analytics"
+              description="View follower growth and platform stats"
+              href="/social"
+              icon={
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+              }
+            />
+            <QuickLink
+              label="Content Calendar"
+              description="Plan and schedule social media posts"
+              href="/social/calendar"
+              icon={
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              }
+            />
+            <QuickLink
+              label="Project Board"
+              description="Manage projects with drag-and-drop kanban"
+              href="/projects"
+              icon={
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                </svg>
+              }
+            />
+            <QuickLink
+              label="Inventory"
+              description="Track and manage NGO assets and supplies"
+              href="/logistics/inventory"
+              icon={
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                </svg>
+              }
+            />
+            <QuickLink
+              label="Expense Tracker"
+              description="Log expenses and track spending by category"
+              href="/logistics/expenses"
+              icon={
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              }
+            />
+            <QuickLink
+              label="Team Directory"
+              description="View and manage team members"
+              href="/team"
+              icon={
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              }
+            />
           </div>
         </section>
-
-        {/* Growth Charts */}
-        <section className="min-w-0">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
-            <h2 className="text-sm font-semibold text-slate-600 uppercase tracking-wide">
-              Growth Charts
-            </h2>
-            {/* Platform Tab Selector */}
-            <div className="flex w-full sm:w-auto overflow-x-auto bg-slate-100 rounded-lg p-0.5 gap-0.5 whitespace-nowrap">
-              <button
-                onClick={() => setActiveChart("all")}
-                className={`shrink-0 px-2.5 sm:px-3 py-1 rounded-md text-[11px] sm:text-xs font-medium transition-colors ${
-                  activeChart === "all"
-                    ? "bg-white text-slate-800 shadow-sm"
-                    : "text-slate-500 hover:text-slate-700"
-                }`}
-              >
-                All
-              </button>
-              {PLATFORMS.map((p) => (
-                <button
-                  key={p}
-                  onClick={() => setActiveChart(p)}
-                  className={`shrink-0 px-2.5 sm:px-3 py-1 rounded-md text-[11px] sm:text-xs font-medium capitalize transition-colors ${
-                    activeChart === p
-                      ? "bg-white text-slate-800 shadow-sm"
-                      : "text-slate-500 hover:text-slate-700"
-                  }`}
-                >
-                  {p}
-                </button>
-              ))}
-            </div>
-          </div>
-          {activeChart === "all" ? (
-            <CombinedGrowthChart />
-          ) : (
-            <GrowthChart platform={activeChart} />
-          )}
-        </section>
-      </main>
-
-      {/* Footer */}
-      <footer className="max-w-6xl mx-auto px-4 sm:px-6 py-6 border-t border-purple-100 mt-4">
-        <p className="text-xs text-slate-500 text-center">
-          Future Leaders Hub Social Media Dashboard · Data collected daily via
-          automated scraping
-        </p>
-      </footer>
+      </div>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
+import Sidebar from "@/components/Sidebar";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -14,8 +15,8 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "FLH Social Dashboard",
-  description: "Future Leaders Hub Social Media Growth Analytics",
+  title: "FLH Dashboard",
+  description: "Future Leaders Hub — NGO Operations Dashboard",
 };
 
 export default function RootLayout({
@@ -28,7 +29,10 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {children}
+        <div className="flex min-h-screen bg-slate-50">
+          <Sidebar />
+          <main className="flex-1 min-w-0 md:ml-0">{children}</main>
+        </div>
       </body>
     </html>
   );
