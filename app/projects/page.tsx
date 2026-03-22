@@ -135,10 +135,15 @@ export default function ProjectsPage() {
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
-      <header className="border-b border-purple-200/70 bg-gradient-to-r from-emerald-50/70 via-teal-50/65 to-cyan-50/70 backdrop-blur-md">
+      <header className="border-b border-purple-200/70 bg-emerald-100/80 backdrop-blur-md">
         <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <h1 className="text-lg font-bold text-slate-900">Project Board</h1>
+            <h1 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+              Project Board
+              <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+              </svg>
+            </h1>
             <p className="text-xs text-slate-500 mt-0.5">
               {projects.length} project{projects.length !== 1 ? "s" : ""} · Drag cards to change status
             </p>

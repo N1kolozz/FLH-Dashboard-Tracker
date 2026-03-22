@@ -101,7 +101,12 @@ export default function ContentCalendarPage() {
       <header className="border-b border-purple-200/70 bg-gradient-to-r from-violet-100/70 via-purple-100/65 to-fuchsia-100/70 backdrop-blur-md">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <h1 className="text-lg font-bold text-slate-900">Content Calendar</h1>
+            <h1 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+              Content Calendar
+              <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </h1>
             <p className="text-xs text-slate-500 mt-0.5">Plan and schedule posts across platforms</p>
           </div>
           <button

@@ -236,8 +236,11 @@ export default function DashboardPage() {
       <header className="sticky top-0 z-10 border-b border-purple-200/70 bg-gradient-to-r from-violet-100/70 via-purple-100/65 to-fuchsia-100/70 backdrop-blur-md shadow-[0_8px_30px_rgba(124,58,237,0.10)]">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <h1 className="text-base sm:text-lg font-bold text-slate-900 leading-none truncate">
+            <h1 className="text-base sm:text-lg font-bold text-slate-900 leading-none truncate flex items-center gap-2">
               Social Media Analytics
+              <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
             </h1>
             <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5 truncate">
               Instagram · TikTok · Facebook

@@ -142,10 +142,15 @@ export default function InventoryPage() {
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
-      <header className="border-b border-purple-200/70 bg-gradient-to-r from-blue-50/70 via-cyan-50/65 to-sky-50/70 backdrop-blur-md">
+      <header className="border-b border-purple-200/70 bg-blue-100/80 backdrop-blur-md">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <h1 className="text-lg font-bold text-slate-900">Inventory</h1>
+            <h1 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+              Inventory
+              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+              </svg>
+            </h1>
             <p className="text-xs text-slate-500 mt-0.5">
               {items.length} item{items.length !== 1 ? "s" : ""} tracked
             </p>
@@ -229,7 +234,7 @@ export default function InventoryPage() {
               return (
                 <div
                   key={item.id}
-                  className="bg-white rounded-xl border border-slate-100 p-4 shadow-sm hover:shadow-md transition-all duration-150 hover:-translate-y-0.5"
+                  className="bg-white rounded-xl border border-slate-200 p-4 transition-colors hover:bg-slate-50"
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div>

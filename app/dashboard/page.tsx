@@ -49,11 +49,11 @@ function QuickStat({
   return (
     <Link
       href={href}
-      className="group bg-white rounded-2xl border border-purple-100 p-5 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5"
+      className="group bg-white hover:bg-slate-50 transition-colors rounded-2xl border border-purple-100 p-5"
     >
       <div className="flex items-center gap-4">
         <div
-          className={`w-12 h-12 rounded-xl ${color} flex items-center justify-center text-white shadow-sm group-hover:scale-105 transition-transform`}
+          className={`w-12 h-12 rounded-xl ${color} flex items-center justify-center`}
         >
           {icon}
         </div>
@@ -166,11 +166,13 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Header */}
       <header className="border-b border-purple-200/70 bg-gradient-to-r from-violet-100/70 via-purple-100/65 to-fuchsia-100/70 backdrop-blur-md">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
-            Welcome back 👋
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 flex items-center gap-2">
+            Welcome back
+            <svg className="w-6 h-6 sm:w-7 sm:h-7 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+            </svg>
           </h1>
           <p className="text-sm text-slate-600 mt-1">
             Here&apos;s an overview of Future Leaders Hub operations
@@ -189,7 +191,7 @@ export default function DashboardPage() {
               label="Total Followers"
               value={totalFollowers}
               href="/social"
-              color="bg-gradient-to-br from-purple-600 to-violet-500"
+              color="bg-purple-100 text-purple-600"
               icon={
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -200,7 +202,7 @@ export default function DashboardPage() {
               label="Active Projects"
               value={String(projectCount)}
               href="/projects"
-              color="bg-gradient-to-br from-emerald-500 to-teal-500"
+              color="bg-emerald-100 text-emerald-600"
               icon={
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -211,7 +213,7 @@ export default function DashboardPage() {
               label="Inventory Items"
               value={String(inventoryCount)}
               href="/logistics/inventory"
-              color="bg-gradient-to-br from-blue-500 to-cyan-500"
+              color="bg-blue-100 text-blue-600"
               icon={
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
@@ -222,7 +224,7 @@ export default function DashboardPage() {
               label="Upcoming Events"
               value={String(eventCount)}
               href="/events"
-              color="bg-gradient-to-br from-amber-500 to-orange-500"
+              color="bg-amber-100 text-amber-600"
               icon={
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />

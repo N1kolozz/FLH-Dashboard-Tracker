@@ -111,8 +111,7 @@ export default function Sidebar() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const isActive = (href: string) => {
-    if (href === "/dashboard") return pathname === "/dashboard";
-    return pathname.startsWith(href);
+    return pathname === href;
   };
 
   const navContent = (
@@ -196,16 +195,29 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* Mobile hamburger */}
-      <button
-        onClick={() => setMobileOpen(true)}
-        className="md:hidden fixed top-3 left-3 z-50 w-10 h-10 flex items-center justify-center rounded-xl bg-white/90 border border-purple-200 shadow-sm text-slate-600 hover:text-slate-800 backdrop-blur-sm"
-        aria-label="Open menu"
-      >
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-        </svg>
-      </button>
+      {/* Mobile Top Navigation */}
+      <div className="md:hidden sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-purple-100/60 p-3 flex items-center gap-3">
+        <button
+          onClick={() => setMobileOpen(true)}
+          className="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-purple-100 shadow-sm text-slate-600 hover:text-slate-800 transition-colors"
+          aria-label="Open menu"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+        <div className="flex items-center gap-2">
+          <Image
+            src="/flhlogo.svg"
+            alt="FLH"
+            width={28}
+            height={28}
+            className="w-7 h-7 rounded-lg shadow-sm object-cover shrink-0"
+            priority
+          />
+          <h2 className="text-sm font-bold text-slate-800 leading-none">FLH Dashboard</h2>
+        </div>
+      </div>
 
       {/* Mobile backdrop */}
       {mobileOpen && (
@@ -218,7 +230,7 @@ export default function Sidebar() {
       {/* Sidebar panel */}
       <aside
         className={`
-          fixed md:sticky top-0 left-0 z-40 h-screen
+          fixed md:sticky top-0 left-0 z-50 h-screen
           bg-white/95 backdrop-blur-sm border-r border-purple-100/60 shadow-lg md:shadow-none
           transition-all duration-300 ease-in-out
           ${collapsed ? "md:w-[72px]" : "md:w-60"}

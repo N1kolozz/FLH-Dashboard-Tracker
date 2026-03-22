@@ -82,10 +82,15 @@ export default function ImpactPage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <header className="border-b border-purple-200/70 bg-gradient-to-r from-emerald-50/70 via-teal-50/65 to-cyan-50/70 backdrop-blur-md">
+      <header className="border-b border-purple-200/70 bg-emerald-100/80 backdrop-blur-md">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <h1 className="text-lg font-bold text-slate-900">Impact Tracker</h1>
+            <h1 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+              Impact Tracker
+              <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+              </svg>
+            </h1>
             <p className="text-xs text-slate-500 mt-0.5">Track beneficiaries and measure project impact</p>
           </div>
           <button
