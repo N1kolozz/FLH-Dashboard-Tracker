@@ -187,6 +187,40 @@ const PAGE_OPTS = {
 };
 
 async function scrapeInstagramWithPage(page: Page, url: string): Promise<ProfileScrape> {
+  // Try simple Node.js fetch with Googlebot UA first (bypasses login wall on GitHub Actions)
+  try {
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+        "Accept-Language": "en-US,en;q=0.9",
+      }
+    });
+    if (res.ok) {
+      const html = await res.text();
+      const match = 
+        html.match(/<meta[^>]*property="og:description"[^>]*content="([^"]+)"/i) || 
+        html.match(/<meta[^>]*content="([^"]+)"[^>]*property="og:description"/i) ||
+        html.match(/<meta[^>]*name="description"[^>]*content="([^"]+)"/i) ||
+        html.match(/<meta[^>]*content="([^"]+)"[^>]*name="description"/i);
+        
+      if (match && match[1]) {
+        const content = match[1];
+        const followers = extractFirstNumber(content, "Followers");
+        const postsCount = extractFirstNumber(content, "Posts");
+        
+        if (followers !== null || postsCount !== null) {
+          console.log(`  [IG] using Googlebot fetch fallback`);
+          if (followers !== null) console.log(`  [IG] followers: ${followers}`);
+          if (postsCount !== null) console.log(`  [IG] posts: ${postsCount}`);
+          return { followers: followers ?? null, totalLikes: null, postsCount: postsCount ?? null };
+        }
+      }
+    }
+  } catch (e) {
+    // Ignore and fallback to playwright
+  }
+
+  // --- Playwright scraping ---
   await page.goto(url, { waitUntil: PAGE_OPTS.waitUntil, timeout: PAGE_OPTS.timeout });
   await page.waitForTimeout(1200);
 
