@@ -86,12 +86,12 @@ export default function DashboardStats({
         isLoading={isLoading}
       />
       <StatBox
-        label="Total Weekly Growth"
+        label="Total 7-Day Growth"
         value={sumGrowth(stats, "weekly_growth")}
         isLoading={isLoading}
       />
       <StatBox
-        label="Total Monthly Growth"
+        label="Total 30-Day Growth"
         value={sumGrowth(stats, "monthly_growth")}
         isLoading={isLoading}
       />

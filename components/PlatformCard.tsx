@@ -55,18 +55,22 @@ function timeAgo(isoString: string): string {
   return `${days}d ago`;
 }
 
-function getTrend(weeklyGrowth: number | null): {
+function getTrend(
+  weeklyGrowth: number | null,
+  dailyGrowth: number | null
+): {
   label: "Up" | "Flat" | "Down";
   icon: "up" | "flat" | "down";
   classes: string;
 } {
-  if (weeklyGrowth === null) {
+  const g = weeklyGrowth ?? dailyGrowth;
+  if (g === null) {
     return { label: "Flat", icon: "flat", classes: "bg-slate-100 text-slate-600 border border-slate-200" };
   }
-  if (weeklyGrowth > 0) {
+  if (g > 0) {
     return { label: "Up", icon: "up", classes: "bg-purple-100 text-purple-700 border border-purple-200" };
   }
-  if (weeklyGrowth < 0) {
+  if (g < 0) {
     return { label: "Down", icon: "down", classes: "bg-rose-100 text-rose-700 border border-rose-200" };
   }
   return { label: "Flat", icon: "flat", classes: "bg-slate-100 text-slate-600 border border-slate-200" };
@@ -114,11 +118,13 @@ interface PlatformCardProps {
 function GrowthBadge({
   value,
   label,
+  title,
   accentColor,
   badgeBg,
 }: {
   value: number | null;
   label: string;
+  title?: string;
   accentColor: string;
   badgeBg: string;
 }) {
@@ -129,7 +135,10 @@ function GrowthBadge({
     ? "bg-rose-100 text-rose-700"
     : `${badgeBg} ${accentColor}`;
   return (
-    <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${badgeClasses}`}>
+    <div
+      title={title}
+      className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${badgeClasses}`}
+    >
       <span>{isPositive ? "+" : ""}{value.toLocaleString()}</span>
       <span className="opacity-70">{label}</span>
     </div>
@@ -138,7 +147,7 @@ function GrowthBadge({
 
 export default function PlatformCard({ stats, isLoading }: PlatformCardProps) {
   const config = PLATFORM_CONFIG[stats.platform as keyof typeof PLATFORM_CONFIG];
-  const trend = getTrend(stats.weekly_growth);
+  const trend = getTrend(stats.weekly_growth, stats.daily_growth);
 
   if (!config) return null;
 
@@ -237,18 +246,21 @@ export default function PlatformCard({ stats, isLoading }: PlatformCardProps) {
         <GrowthBadge
           value={stats.daily_growth}
           label="today"
+          title="Versus yesterday’s stored snapshot (exactly one calendar day earlier)."
           accentColor={config.textAccent}
           badgeBg={config.badgeBg}
         />
         <GrowthBadge
           value={stats.weekly_growth}
-          label="this week"
+          label="last 7 days"
+          title="Versus the newest snapshot between 7–10 calendar days before the latest date (avoids long gaps)."
           accentColor={config.textAccent}
           badgeBg={config.badgeBg}
         />
         <GrowthBadge
           value={stats.monthly_growth}
-          label="this month"
+          label="last 30 days"
+          title="Versus the newest snapshot between 30–35 calendar days before the latest date (avoids long gaps)."
           accentColor={config.textAccent}
           badgeBg={config.badgeBg}
         />
@@ -256,7 +268,7 @@ export default function PlatformCard({ stats, isLoading }: PlatformCardProps) {
           stats.weekly_growth === null &&
           stats.monthly_growth === null && (
             <span className="text-xs text-slate-500 italic">
-              Growth data available after 2+ days of tracking
+              Growth shows when there is a prior day plus 7d / 30d baseline windows in history
             </span>
           )}
       </div>
