@@ -1,8 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { loadStore, saveStore, generateId } from "@/lib/store";
 import Modal from "@/components/Modal";
+import {
+  type PublicHoliday,
+  buildHolidaysByDate,
+  fetchPublicHolidaysWithStatus,
+  holidayChipClass,
+  holidayLabel,
+} from "@/lib/public-holidays";
 
 /* ─── Types ─── */
 type Platform = "instagram" | "tiktok" | "facebook";
@@ -50,6 +57,13 @@ function getMonthDays(year: number, month: number) {
   return cells;
 }
 
+function getLocalISODate(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export default function ContentCalendarPage() {
   const [posts, setPosts] = useState<ContentPost[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
@@ -57,8 +71,32 @@ export default function ContentCalendarPage() {
   const [viewMonth, setViewMonth] = useState(() => new Date().getMonth());
   const [viewYear, setViewYear] = useState(() => new Date().getFullYear());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [publicHolidays, setPublicHolidays] = useState<PublicHoliday[]>([]);
+  const holidaysCacheRef = useRef<Record<number, PublicHoliday[]>>({});
 
   useEffect(() => { setPosts(loadStore<ContentPost>(STORE_KEY)); }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const cached = holidaysCacheRef.current[viewYear];
+    if (cached) {
+      setPublicHolidays(cached);
+    }
+    fetchPublicHolidaysWithStatus(viewYear).then(({ holidays, ok }) => {
+      if (cancelled) return;
+      if (ok) {
+        holidaysCacheRef.current[viewYear] = holidays;
+        setPublicHolidays(holidays);
+      } else if (!cached) {
+        setPublicHolidays([]);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [viewYear]);
+
+  const holidaysByDate = useMemo(() => buildHolidaysByDate(publicHolidays), [publicHolidays]);
 
   const persist = (next: ContentPost[]) => { setPosts(next); saveStore(STORE_KEY, next); };
 
@@ -86,7 +124,8 @@ export default function ContentCalendarPage() {
   const nextMonth = () => { if (viewMonth === 11) { setViewMonth(0); setViewYear((y) => y + 1); } else setViewMonth((m) => m + 1); };
 
   const cells = getMonthDays(viewYear, viewMonth);
-  const today = new Date().toISOString().slice(0, 10);
+  // Use local date (not UTC) so "today" matches the user's timezone.
+  const today = getLocalISODate();
 
   const postsForDate = (dateStr: string) => posts.filter((p) => p.date === dateStr);
 
@@ -150,6 +189,10 @@ export default function ContentCalendarPage() {
               if (day === null) return <div key={idx} className="min-h-[80px] border-b border-r border-slate-100 bg-slate-50/50" />;
               const dateStr = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
               const dayPosts = postsForDate(dateStr);
+              const dayHolidays = holidaysByDate.get(dateStr) ?? [];
+              const holidayLines =
+                Math.min(dayHolidays.length, 2) + (dayHolidays.length > 2 ? 1 : 0);
+              const postSlots = Math.max(0, 3 - holidayLines);
               const isToday = dateStr === today;
               const isSelected = dateStr === selectedDate;
               return (
@@ -159,7 +202,15 @@ export default function ContentCalendarPage() {
                   className={`min-h-[80px] border-b border-r border-slate-100 px-1.5 py-1 cursor-pointer transition-colors hover:bg-purple-50/30 ${isSelected ? "bg-purple-50" : ""}`}
                 >
                   <div className={`text-xs font-medium mb-1 w-6 h-6 flex items-center justify-center rounded-full ${isToday ? "bg-purple-600 text-white" : "text-slate-600"}`}>{day}</div>
-                  {dayPosts.slice(0, 3).map((p) => (
+                  {dayHolidays.slice(0, 2).map((h, hi) => (
+                    <div key={`${h.date}-${hi}`} className={holidayChipClass} title={h.name}>
+                      {holidayLabel(h)}
+                    </div>
+                  ))}
+                  {dayHolidays.length > 2 && (
+                    <p className="text-[10px] text-slate-400 px-1 mb-0.5">+{dayHolidays.length - 2} holiday</p>
+                  )}
+                  {dayPosts.slice(0, postSlots).map((p) => (
                     <div
                       key={p.id}
                       onClick={(e) => { e.stopPropagation(); setEditing(p); setModalOpen(true); }}
@@ -168,7 +219,7 @@ export default function ContentCalendarPage() {
                       {PLATFORM_CONFIG[p.platform].icon} {p.caption.slice(0, 20)}
                     </div>
                   ))}
-                  {dayPosts.length > 3 && <p className="text-[10px] text-slate-400 px-1">+{dayPosts.length - 3}</p>}
+                  {dayPosts.length > postSlots && <p className="text-[10px] text-slate-400 px-1">+{dayPosts.length - postSlots}</p>}
                 </div>
               );
             })}
@@ -184,6 +235,20 @@ export default function ContentCalendarPage() {
               </h3>
               <button onClick={() => openNew(selectedDate)} className="text-xs text-purple-600 hover:underline font-medium">+ Add post</button>
             </div>
+            {(holidaysByDate.get(selectedDate) ?? []).length > 0 && (
+              <div className="mb-4 space-y-2">
+                <p className="text-[10px] font-semibold text-amber-800 uppercase tracking-wide">Georgian public holiday</p>
+                {(holidaysByDate.get(selectedDate) ?? []).map((h, hi) => (
+                  <div
+                    key={`${h.date}-${hi}`}
+                    className="text-sm text-slate-800 border border-amber-100 bg-amber-50/60 rounded-lg px-3 py-2"
+                    title={h.name}
+                  >
+                    {holidayLabel(h)}
+                  </div>
+                ))}
+              </div>
+            )}
             {postsForDate(selectedDate).length === 0 ? (
               <p className="text-sm text-slate-500">No posts planned for this day.</p>
             ) : (

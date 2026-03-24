@@ -1,9 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { loadStore, saveStore, generateId } from "@/lib/store";
 import Modal from "@/components/Modal";
 import EmptyState from "@/components/EmptyState";
+import {
+  type PublicHoliday,
+  buildHolidaysByDate,
+  fetchPublicHolidaysWithStatus,
+  holidayChipClass,
+  holidayLabel,
+} from "@/lib/public-holidays";
 
 /* ─── Types ─── */
 type Department = "pr" | "logistics" | "projects" | "other";
@@ -46,6 +53,13 @@ function getMonthDays(year: number, month: number) {
   return cells;
 }
 
+function getLocalISODate(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export default function EventsPage() {
   const [events, setEvents] = useState<CalEvent[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
@@ -54,8 +68,32 @@ export default function EventsPage() {
   const [viewYear, setViewYear] = useState(() => new Date().getFullYear());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [view, setView] = useState<"calendar" | "list">("calendar");
+  const [publicHolidays, setPublicHolidays] = useState<PublicHoliday[]>([]);
+  const holidaysCacheRef = useRef<Record<number, PublicHoliday[]>>({});
 
   useEffect(() => { setEvents(loadStore<CalEvent>(STORE_KEY)); }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const cached = holidaysCacheRef.current[viewYear];
+    if (cached) {
+      setPublicHolidays(cached);
+    }
+    fetchPublicHolidaysWithStatus(viewYear).then(({ holidays, ok }) => {
+      if (cancelled) return;
+      if (ok) {
+        holidaysCacheRef.current[viewYear] = holidays;
+        setPublicHolidays(holidays);
+      } else if (!cached) {
+        setPublicHolidays([]);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [viewYear]);
+
+  const holidaysByDate = useMemo(() => buildHolidaysByDate(publicHolidays), [publicHolidays]);
 
   const persist = (next: CalEvent[]) => { setEvents(next); saveStore(STORE_KEY, next); };
 
@@ -89,7 +127,8 @@ export default function EventsPage() {
   };
 
   const cells = getMonthDays(viewYear, viewMonth);
-  const today = new Date().toISOString().slice(0, 10);
+  // Use local date (not UTC) to avoid off-by-one day in some timezones.
+  const today = getLocalISODate();
 
   const eventsForDate = (dateStr: string) => events.filter((e) => e.date === dateStr);
 
@@ -154,6 +193,10 @@ export default function EventsPage() {
                   if (day === null) return <div key={idx} className="min-h-[80px] border-b border-r border-slate-100 bg-slate-50/50" />;
                   const dateStr = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
                   const dayEvents = eventsForDate(dateStr);
+                  const dayHolidays = holidaysByDate.get(dateStr) ?? [];
+                  const holidayLines =
+                    Math.min(dayHolidays.length, 2) + (dayHolidays.length > 2 ? 1 : 0);
+                  const eventSlots = Math.max(0, 3 - holidayLines);
                   const isToday = dateStr === today;
                   const isSelected = dateStr === selectedDate;
                   return (
@@ -165,7 +208,15 @@ export default function EventsPage() {
                       <div className={`text-xs font-medium mb-1 w-6 h-6 flex items-center justify-center rounded-full ${isToday ? "bg-purple-600 text-white" : "text-slate-600"}`}>
                         {day}
                       </div>
-                      {dayEvents.slice(0, 3).map((ev) => (
+                      {dayHolidays.slice(0, 2).map((h, hi) => (
+                        <div key={`${h.date}-${hi}`} className={holidayChipClass} title={h.name}>
+                          {holidayLabel(h)}
+                        </div>
+                      ))}
+                      {dayHolidays.length > 2 && (
+                        <p className="text-[10px] text-slate-400 px-1 mb-0.5">+{dayHolidays.length - 2} holiday</p>
+                      )}
+                      {dayEvents.slice(0, eventSlots).map((ev) => (
                         <div
                           key={ev.id}
                           onClick={(e) => { e.stopPropagation(); setEditing(ev); setModalOpen(true); }}
@@ -174,8 +225,8 @@ export default function EventsPage() {
                           {ev.title}
                         </div>
                       ))}
-                      {dayEvents.length > 3 && (
-                        <p className="text-[10px] text-slate-400 px-1">+{dayEvents.length - 3} more</p>
+                      {dayEvents.length > eventSlots && (
+                        <p className="text-[10px] text-slate-400 px-1">+{dayEvents.length - eventSlots} more</p>
                       )}
                     </div>
                   );
@@ -192,8 +243,26 @@ export default function EventsPage() {
                   </h3>
                   <button onClick={() => openNew(selectedDate)} className="text-xs text-purple-600 hover:underline font-medium">+ Add event</button>
                 </div>
+                {(holidaysByDate.get(selectedDate) ?? []).length > 0 && (
+                  <div className="mb-4 space-y-2">
+                    <p className="text-[10px] font-semibold text-amber-800 uppercase tracking-wide">Georgian public holiday</p>
+                    {(holidaysByDate.get(selectedDate) ?? []).map((h, hi) => (
+                      <div
+                        key={`${h.date}-${hi}`}
+                        className="text-sm text-slate-800 border border-amber-100 bg-amber-50/60 rounded-lg px-3 py-2"
+                        title={h.name}
+                      >
+                        {holidayLabel(h)}
+                      </div>
+                    ))}
+                  </div>
+                )}
                 {eventsForDate(selectedDate).length === 0 ? (
-                  <p className="text-sm text-slate-500">No events on this day.</p>
+                  <p className="text-sm text-slate-500">
+                    {(holidaysByDate.get(selectedDate) ?? []).length > 0
+                      ? "No FLH events scheduled for this day."
+                      : "No events on this day."}
+                  </p>
                 ) : (
                   <div className="space-y-2">
                     {eventsForDate(selectedDate).sort((a, b) => a.time.localeCompare(b.time)).map((ev) => (
