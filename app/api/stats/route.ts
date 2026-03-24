@@ -31,9 +31,9 @@ export async function GET() {
       followers: number | null;
       total_likes: number | null;
       posts_count: number | null;
-      followers_yesterday: number | null;
-      followers_7d: number | null;
-      followers_30d: number | null;
+      daily_growth: number | null;
+      weekly_growth: number | null;
+      monthly_growth: number | null;
       last_updated: string | null;
       scraped_at: string | null;
     }>(`
@@ -44,9 +44,22 @@ export async function GET() {
         latest.followers,
         latest.total_likes,
         latest.posts_count,
-        yesterday.followers AS followers_yesterday,
-        week_ago.followers AS followers_7d,
-        month_ago.followers AS followers_30d,
+        CASE
+          WHEN latest.followers IS NOT NULL
+           AND prev.followers IS NOT NULL
+           AND (latest.recorded_date - prev.recorded_date) = 1
+          THEN latest.followers - prev.followers
+        END AS daily_growth,
+        CASE
+          WHEN latest.followers IS NOT NULL
+           AND wk.followers IS NOT NULL
+          THEN latest.followers - wk.followers
+        END AS weekly_growth,
+        CASE
+          WHEN latest.followers IS NOT NULL
+           AND mo.followers IS NOT NULL
+          THEN latest.followers - mo.followers
+        END AS monthly_growth,
         TO_CHAR(latest.recorded_date, 'YYYY-MM-DD') AS last_updated,
         TO_CHAR(latest.created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS scraped_at
       FROM social_accounts sa
@@ -58,56 +71,49 @@ export async function GET() {
         LIMIT 1
       ) latest ON true
       LEFT JOIN LATERAL (
-        SELECT followers
+        SELECT followers, recorded_date
         FROM follower_history
         WHERE account_id = sa.id
           AND latest.recorded_date IS NOT NULL
-          AND recorded_date = latest.recorded_date - 1
+          AND recorded_date < latest.recorded_date
+        ORDER BY recorded_date DESC
         LIMIT 1
-      ) yesterday ON true
+      ) prev ON true
       LEFT JOIN LATERAL (
         SELECT followers
         FROM follower_history
         WHERE account_id = sa.id
           AND latest.recorded_date IS NOT NULL
-          AND recorded_date <= latest.recorded_date - 7
+          AND recorded_date BETWEEN latest.recorded_date - 10
+                                AND latest.recorded_date - 7
         ORDER BY recorded_date DESC
         LIMIT 1
-      ) week_ago ON true
+      ) wk ON true
       LEFT JOIN LATERAL (
         SELECT followers
         FROM follower_history
         WHERE account_id = sa.id
           AND latest.recorded_date IS NOT NULL
-          AND recorded_date <= latest.recorded_date - 30
+          AND recorded_date BETWEEN latest.recorded_date - 35
+                                AND latest.recorded_date - 30
         ORDER BY recorded_date DESC
         LIMIT 1
-      ) month_ago ON true
+      ) mo ON true
       ORDER BY sa.id
     `);
 
     const stats: StatsResponse = {};
     for (const row of result.rows) {
-      const current = row.followers;
       stats[row.platform] = {
         platform: row.platform,
         name: row.name,
         url: row.url,
-        followers: current,
+        followers: row.followers,
         total_likes: row.total_likes ?? null,
         posts_count: row.posts_count ?? null,
-        daily_growth:
-          current !== null && row.followers_yesterday !== null
-            ? current - row.followers_yesterday
-            : null,
-        weekly_growth:
-          current !== null && row.followers_7d !== null
-            ? current - row.followers_7d
-            : null,
-        monthly_growth:
-          current !== null && row.followers_30d !== null
-            ? current - row.followers_30d
-            : null,
+        daily_growth: row.daily_growth ?? null,
+        weekly_growth: row.weekly_growth ?? null,
+        monthly_growth: row.monthly_growth ?? null,
         last_updated: row.last_updated,
         scraped_at: row.scraped_at,
       };
