@@ -233,8 +233,8 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Page Header */}
-      <header className="sticky top-0 z-10 border-b border-purple-200/70 bg-gradient-to-r from-violet-100/70 via-purple-100/65 to-fuchsia-100/70 backdrop-blur-md shadow-[0_8px_30px_rgba(124,58,237,0.10)]">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-3">
+      <header className="z-10 border-b border-purple-200 bg-gradient-to-r from-violet-100 via-purple-100 to-fuchsia-100">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-start gap-3">
           <div className="min-w-0">
             <h1 className="text-base sm:text-lg font-bold text-slate-900 leading-none truncate flex items-center gap-2">
               Social Media Analytics
