@@ -5,6 +5,13 @@ import * as path from "path";
 
 dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
 
+const GRAPH_API_VERSION = "v19.0";
+
+/** TikTok profile URL (Instagram/Facebook use Meta Graph API). */
+const TIKTOK_PROFILE_URL = "https://www.tiktok.com/@future_leaders_hub";
+
+const PLATFORM_ORDER = ["instagram", "tiktok", "facebook"] as const;
+
 interface ProfileScrape {
   followers: number | null;
   totalLikes: number | null;
@@ -47,122 +54,146 @@ function extractFirstNumber(text: string, keyword: string): number | null {
   return null;
 }
 
-function instagramUsernameFromUrl(url: string): string | null {
-  const match = url.match(/instagram\.com\/([^/?#]+)/i);
-  return match?.[1] ?? null;
+function metaGraphQuery(nodeId: string, fields: string): string {
+  const token = process.env.META_ACCESS_TOKEN?.trim() ?? "";
+  const params = new URLSearchParams({
+    fields,
+    access_token: token,
+  });
+  return `https://graph.facebook.com/${GRAPH_API_VERSION}/${encodeURIComponent(nodeId)}?${params}`;
 }
 
-function extractInstagramCountFromHtml(
-  html: string,
-  key: "edge_followed_by" | "edge_owner_to_timeline_media"
-): number | null {
-  const patterns = [
-    new RegExp(`"${key}"\\s*:\\s*\\{\\s*"count"\\s*:\\s*(\\d+)`),
-    new RegExp(`\\\\\\"${key}\\\\\\"\\s*:\\s*\\{\\s*\\\\\\"count\\\\\\"\\s*:\\s*(\\d+)`),
-  ];
-  for (const pattern of patterns) {
-    const match = html.match(pattern);
-    if (match) {
-      const parsed = parseInt(match[1], 10);
-      if (Number.isFinite(parsed) && parsed >= 0) return parsed;
-    }
+function formatMetaError(data: unknown, fallback: string): string {
+  const err = data as { error?: { message?: string; type?: string; code?: number } };
+  if (err?.error?.message) {
+    return err.error.code != null
+      ? `${err.error.message} (${err.error.type ?? "error"} ${err.error.code})`
+      : err.error.message;
   }
-  return null;
+  return fallback;
 }
 
-async function extractInstagramCountersFromAnchors(page: Page): Promise<{
-  followers: number | null;
-  postsCount: number | null;
-}> {
-  const [followersLinkText, postsLinkText] = await Promise.all([
-    page
-      .locator('a[href*="/followers/"]')
-      .first()
-      .innerText({ timeout: 3000 })
-      .catch(() => null),
-    page
-      .locator('a[href*="/reels/"], a[href$="/"]')
-      .first()
-      .innerText({ timeout: 3000 })
-      .catch(() => null),
-  ]);
-
-  const followers =
-    followersLinkText
-      ? extractFirstNumber(followersLinkText, "followers") ??
-        parseNumber((followersLinkText.match(/([\d,.]+(?:\s*[KMBkmb])?)/)?.[1] ?? ""))
-      : null;
-
-  const postsCount =
-    postsLinkText
-      ? extractFirstNumber(postsLinkText, "posts") ??
-        parseNumber((postsLinkText.match(/([\d,.]+(?:\s*[KMBkmb])?)/)?.[1] ?? ""))
-      : null;
-
-  return { followers, postsCount };
-}
-
-async function scrapeInstagramFromWebProfileApi(
-  page: Page,
-  url: string
-): Promise<ProfileScrape | null> {
-  const username = instagramUsernameFromUrl(url);
-  if (!username) return null;
+async function fetchInstagramGraphApi(): Promise<ScrapeResult> {
+  const token = process.env.META_ACCESS_TOKEN?.trim() ?? "";
+  const igId = process.env.IG_ACCOUNT_ID?.trim() ?? "";
+  const missing: string[] = [];
+  if (!token) missing.push("META_ACCESS_TOKEN");
+  if (!igId) missing.push("IG_ACCOUNT_ID");
+  if (missing.length > 0) {
+    return {
+      platform: "instagram",
+      followers: null,
+      total_likes: null,
+      posts_count: null,
+      error: `Missing env: ${missing.join(", ")}`,
+    };
+  }
 
   try {
-    const cookies = await page.context().cookies("https://www.instagram.com");
-    const csrfToken = cookies.find((c) => c.name === "csrftoken")?.value ?? "";
-    const headers = {
-      // Common app id used by Instagram web requests.
-      "x-ig-app-id": "936619743392459",
-      "x-csrftoken": csrfToken,
-      "x-requested-with": "XMLHttpRequest",
-      "user-agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-      "accept-language": "en-US,en;q=0.9",
-      accept: "application/json",
-      referer: url,
-    };
-    const endpoints = [
-      `https://www.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(
-        username
-      )}`,
-      `https://i.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(
-        username
-      )}`,
-    ];
+    const url = metaGraphQuery(igId, "followers_count,media_count");
+    const res = await fetch(url);
+    const data = (await res.json().catch(() => null)) as Record<string, unknown>;
 
-    for (const endpoint of endpoints) {
-      const res = await page.request.get(endpoint, { headers }).catch(() => null);
-      if (!res || !res.ok()) continue;
-
-      const data = await res.json().catch(() => null);
-      const user = data?.data?.user;
-      if (!user) continue;
-
-      const followersRaw =
-        user?.edge_followed_by?.count ?? user?.follower_count ?? null;
-      const postsRaw =
-        user?.edge_owner_to_timeline_media?.count ?? user?.media_count ?? null;
-
-      const followers =
-        typeof followersRaw === "number" ? followersRaw : parseNumber(String(followersRaw ?? ""));
-      const postsCount =
-        typeof postsRaw === "number" ? postsRaw : parseNumber(String(postsRaw ?? ""));
-
-      if (followers !== null) {
-        console.log(`  [IG] followers (api): ${followers}`);
-      }
-      if (postsCount !== null) {
-        console.log(`  [IG] posts (api): ${postsCount}`);
-      }
-      if (followers !== null || postsCount !== null) {
-        return { followers, totalLikes: null, postsCount };
-      }
+    if (!res.ok || (data && "error" in data && data.error)) {
+      const msg = formatMetaError(data, `HTTP ${res.status}`);
+      console.error(`  instagram error: ${msg}`);
+      return {
+        platform: "instagram",
+        followers: null,
+        total_likes: null,
+        posts_count: null,
+        error: msg,
+      };
     }
-    return null;
-  } catch {
-    return null;
+
+    const followersRaw = data.followers_count;
+    const mediaRaw = data.media_count;
+    const followers =
+      typeof followersRaw === "number" ? followersRaw : null;
+    const postsCount =
+      typeof mediaRaw === "number" ? mediaRaw : null;
+
+    if (followers !== null) console.log(`  [IG] followers: ${followers}`);
+    if (postsCount !== null) console.log(`  [IG] posts: ${postsCount}`);
+
+    return {
+      platform: "instagram",
+      followers,
+      total_likes: null,
+      posts_count: postsCount,
+    };
+  } catch (e) {
+    const error = e instanceof Error ? e.message : String(e);
+    console.error(`  instagram error: ${error}`);
+    return {
+      platform: "instagram",
+      followers: null,
+      total_likes: null,
+      posts_count: null,
+      error,
+    };
+  }
+}
+
+async function fetchFacebookGraphApi(): Promise<ScrapeResult> {
+  const token = process.env.META_ACCESS_TOKEN?.trim() ?? "";
+  const pageId = process.env.FB_PAGE_ID?.trim() ?? "";
+  const missing: string[] = [];
+  if (!token) missing.push("META_ACCESS_TOKEN");
+  if (!pageId) missing.push("FB_PAGE_ID");
+  if (missing.length > 0) {
+    return {
+      platform: "facebook",
+      followers: null,
+      total_likes: null,
+      posts_count: null,
+      error: `Missing env: ${missing.join(", ")}`,
+    };
+  }
+
+  try {
+    const url = metaGraphQuery(pageId, "followers_count,fan_count");
+    const res = await fetch(url);
+    const data = (await res.json().catch(() => null)) as Record<string, unknown>;
+
+    if (!res.ok || (data && "error" in data && data.error)) {
+      const msg = formatMetaError(data, `HTTP ${res.status}`);
+      console.error(`  facebook error: ${msg}`);
+      return {
+        platform: "facebook",
+        followers: null,
+        total_likes: null,
+        posts_count: null,
+        error: msg,
+      };
+    }
+
+    const followersRaw = data.followers_count;
+    const fanRaw = data.fan_count;
+    const followers =
+      typeof followersRaw === "number" ? followersRaw : null;
+    const totalLikes =
+      typeof fanRaw === "number" ? fanRaw : null;
+
+    if (followers !== null) console.log(`  [FB] followers: ${followers}`);
+    if (totalLikes !== null) console.log(`  [FB] likes: ${totalLikes}`);
+
+    return {
+      platform: "facebook",
+      followers,
+      total_likes: totalLikes,
+      posts_count: null,
+    };
+  } catch (e) {
+    const error = e instanceof Error ? e.message : String(e);
+    console.error(`  facebook error: ${error}`);
+    return {
+      platform: "facebook",
+      followers: null,
+      total_likes: null,
+      posts_count: null,
+      error,
+    };
   }
 }
 
@@ -185,86 +216,6 @@ const PAGE_OPTS = {
   timeout: 18000,
   waitAfter: 500,
 };
-
-async function scrapeInstagramWithPage(page: Page, url: string): Promise<ProfileScrape> {
-  await page.goto(url, { waitUntil: PAGE_OPTS.waitUntil, timeout: PAGE_OPTS.timeout });
-  await page.waitForTimeout(1200);
-
-  const pageText = await page.evaluate(() => document.body.innerText);
-  const pageHtml = await page.content();
-  let followers: number | null = extractFirstNumber(pageText, "followers");
-  if (followers === null) {
-    for (const selector of [
-      'meta[property="og:description"]',
-      'meta[name="description"]',
-    ]) {
-      const content = await page
-        .locator(selector)
-        .first()
-        .getAttribute("content")
-        .catch(() => null);
-      if (content) {
-        followers = extractFirstNumber(content, "Followers");
-        if (followers !== null) break;
-      }
-    }
-  }
-  if (followers === null) {
-    const scripts = await page.locator("script").allTextContents();
-    for (const script of scripts) {
-      const edgeMatch = script.match(/"edge_followed_by"\s*:\s*\{\s*"count"\s*:\s*(\d+)/);
-      if (edgeMatch) {
-        followers = parseInt(edgeMatch[1], 10);
-        if (followers > 0) break;
-      }
-    }
-  }
-  if (followers === null) {
-    followers = extractInstagramCountFromHtml(pageHtml, "edge_followed_by");
-  }
-  if (followers !== null) console.log(`  [IG] followers: ${followers}`);
-
-  let postsCount: number | null = extractFirstNumber(pageText, "posts");
-  if (postsCount === null) {
-    for (const selector of ['meta[property="og:description"]', 'meta[name="description"]']) {
-      const content = await page.locator(selector).first().getAttribute("content").catch(() => null);
-      if (content) {
-        postsCount = extractFirstNumber(content, "Posts");
-        if (postsCount !== null) break;
-      }
-    }
-  }
-  if (postsCount === null) {
-    const scripts = await page.locator("script").allTextContents();
-    for (const script of scripts) {
-      const m = script.match(/"edge_owner_to_timeline_media"\s*:\s*\{\s*"count"\s*:\s*(\d+)/);
-      if (m) {
-        postsCount = parseInt(m[1], 10);
-        break;
-      }
-    }
-  }
-  if (postsCount === null) {
-    postsCount = extractInstagramCountFromHtml(pageHtml, "edge_owner_to_timeline_media");
-  }
-  if (followers === null || postsCount === null) {
-    const anchorCounts = await extractInstagramCountersFromAnchors(page);
-    followers = followers ?? anchorCounts.followers;
-    postsCount = postsCount ?? anchorCounts.postsCount;
-  }
-  if (postsCount !== null) console.log(`  [IG] posts: ${postsCount}`);
-
-  // Prefer Instagram's web profile API when available because page text parsing
-  // can drift due to UI changes and localized formatting.
-  const apiFallback = await scrapeInstagramFromWebProfileApi(page, url);
-  if (apiFallback) {
-    followers = apiFallback.followers ?? followers;
-    postsCount = apiFallback.postsCount ?? postsCount;
-  }
-
-  // Instagram profiles don't show total likes; only followers and posts
-  return { followers: followers ?? null, totalLikes: null, postsCount: postsCount ?? null };
-}
 
 async function scrapeTikTokWithPage(page: Page, url: string): Promise<ProfileScrape> {
   await page.goto(url, { waitUntil: PAGE_OPTS.waitUntil, timeout: PAGE_OPTS.timeout });
@@ -323,127 +274,43 @@ async function scrapeTikTokWithPage(page: Page, url: string): Promise<ProfileScr
   return { followers: followers ?? null, totalLikes: totalLikes ?? null, postsCount: postsCount ?? null };
 }
 
-async function scrapeFacebookWithPage(page: Page, url: string): Promise<ProfileScrape> {
-  await page.goto(url, { waitUntil: PAGE_OPTS.waitUntil, timeout: PAGE_OPTS.timeout });
-  await page.waitForTimeout(PAGE_OPTS.waitAfter);
-
-  const pageText = await page.evaluate(() => document.body.innerText);
-
-  // Extract likes explicitly (Facebook profile/pages show "X likes" or "X people like this")
-  let totalLikes: number | null = extractFirstNumber(pageText, "likes");
-  if (totalLikes === null) {
-    const likePatterns = [
-      /([\d,. ]+[KkMmBb]?)\s*people like this/i,
-      /([\d,. ]+[KkMmBb]?)\s*likes?\s*$/im,
-      /(\d[\d,.\s]*)\s*likes/i,
-    ];
-    for (const pattern of likePatterns) {
-      const match = pageText.match(pattern);
-      if (match) {
-        const count = parseNumber(match[1].trim());
-        if (count !== null && count > 0) {
-          totalLikes = count;
-          break;
-        }
-      }
-    }
+async function tiktokToResult(page: Page, url: string): Promise<ScrapeResult> {
+  try {
+    const profile = await scrapeTikTokWithPage(page, url);
+    return {
+      platform: "tiktok",
+      followers: profile.followers ?? null,
+      total_likes: profile.totalLikes ?? null,
+      posts_count: profile.postsCount ?? null,
+    };
+  } catch (e) {
+    const error = e instanceof Error ? e.message : String(e);
+    console.error(`  tiktok error: ${error}`);
+    return { platform: "tiktok", followers: null, total_likes: null, posts_count: null, error };
   }
-  if (totalLikes === null) {
-    const content = await page
-      .locator('meta[name="description"], meta[property="og:description"]')
-      .first()
-      .getAttribute("content")
-      .catch(() => null);
-    if (content) totalLikes = extractFirstNumber(content, "likes") ?? extractFirstNumber(content, "Like");
-  }
-  if (totalLikes !== null) console.log(`  [FB] likes: ${totalLikes}`);
-
-  // Extract followers (may be separate from likes on some pages)
-  let followers: number | null = extractFirstNumber(pageText, "followers");
-  if (followers === null) {
-    const followPatterns = [
-      /([\d,. ]+[KkMmBb]?)\s*people follow this/i,
-      /([\d,. ]+[KkMmBb]?)\s*total followers/i,
-    ];
-    for (const pattern of followPatterns) {
-      const match = pageText.match(pattern);
-      if (match) {
-        const count = parseNumber(match[1].trim());
-        if (count !== null && count > 0) {
-          followers = count;
-          break;
-        }
-      }
-    }
-  }
-  if (followers === null) {
-    const content = await page
-      .locator('meta[name="description"], meta[property="og:description"]')
-      .first()
-      .getAttribute("content")
-      .catch(() => null);
-    if (content) followers = extractFirstNumber(content, "followers");
-  }
-  // For pages that only show "likes", use likes as the main follower metric
-  if (followers === null && totalLikes !== null) followers = totalLikes;
-  if (followers !== null) console.log(`  [FB] followers: ${followers}`);
-
-  let postsCount: number | null = extractFirstNumber(pageText, "posts");
-  if (postsCount === null) {
-    const content = await page
-      .locator('meta[name="description"], meta[property="og:description"]')
-      .first()
-      .getAttribute("content")
-      .catch(() => null);
-    if (content) postsCount = extractFirstNumber(content, "posts");
-  }
-  if (postsCount !== null) console.log(`  [FB] posts: ${postsCount}`);
-
-  return { followers: followers ?? null, totalLikes: totalLikes ?? null, postsCount: postsCount ?? null };
 }
 
-const PLATFORMS = [
-  { platform: "instagram", url: "https://www.instagram.com/future_leaders_hub/" },
-  { platform: "tiktok", url: "https://www.tiktok.com/@future_leaders_hub" },
-  { platform: "facebook", url: "https://www.facebook.com/profile.php?id=61556110770300" },
-] as const;
-
 export async function scrapeAll(): Promise<ScrapeResult[]> {
+  console.log("Fetching Instagram & Facebook via Meta Graph API; scraping TikTok with Playwright...");
+  const igPromise = fetchInstagramGraphApi();
+  const fbPromise = fetchFacebookGraphApi();
+
   const { context, close } = await createContext();
   try {
-    const [pageIg, pageTt, pageFb] = await Promise.all([
-      context.newPage(),
-      context.newPage(),
-      context.newPage(),
+    const pageTt = await context.newPage();
+    const [ig, tt, fb] = await Promise.all([
+      igPromise,
+      tiktokToResult(pageTt, TIKTOK_PROFILE_URL),
+      fbPromise,
     ]);
 
-    console.log("Scraping Instagram, TikTok, Facebook in parallel...");
-    const toResult = async (
-      page: Page,
-      url: string,
-      platform: string,
-      scrape: (p: Page, u: string) => Promise<ProfileScrape>
-    ): Promise<ScrapeResult> => {
-      try {
-        const profile = await scrape(page, url);
-        return {
-          platform,
-          followers: profile.followers ?? null,
-          total_likes: profile.totalLikes ?? null,
-          posts_count: profile.postsCount ?? null,
-        };
-      } catch (e) {
-        const error = e instanceof Error ? e.message : String(e);
-        console.error(`  ${platform} error: ${error}`);
-        return { platform, followers: null, total_likes: null, posts_count: null, error };
-      }
-    };
-
-    const results = await Promise.all([
-      toResult(pageIg, PLATFORMS[0].url, "instagram", scrapeInstagramWithPage),
-      toResult(pageTt, PLATFORMS[1].url, "tiktok", scrapeTikTokWithPage),
-      toResult(pageFb, PLATFORMS[2].url, "facebook", scrapeFacebookWithPage),
+    const byPlatform = new Map<string, ScrapeResult>([
+      [ig.platform, ig],
+      [tt.platform, tt],
+      [fb.platform, fb],
     ]);
+    const results = PLATFORM_ORDER.map((p) => byPlatform.get(p)!);
+
     results.forEach((r) =>
       console.log(
         `  ${r.platform}: followers ${r.followers ?? "N/A"}${r.total_likes != null ? `, likes ${r.total_likes}` : ""}${r.posts_count != null ? `, posts ${r.posts_count}` : ""}${r.error ? ` (${r.error})` : ""}`
@@ -453,7 +320,7 @@ export async function scrapeAll(): Promise<ScrapeResult[]> {
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err);
     console.error("Scrape error:", error);
-    return PLATFORMS.map(({ platform }) => ({
+    return PLATFORM_ORDER.map((platform) => ({
       platform,
       followers: null,
       total_likes: null,

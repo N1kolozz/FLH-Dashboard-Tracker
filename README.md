@@ -4,7 +4,7 @@ A full-stack analytics dashboard for **Future Leaders Hub** that tracks daily fo
 
 ## Features
 
-- Daily automated follower count collection via Playwright (runs in **GitHub Actions**, not on Vercel)
+- Daily automated follower counts: **Meta Graph API** for Instagram and Facebook, **Playwright** for TikTok (runs in **GitHub Actions**, not on Vercel)
 - Historical growth charts (30 days / 90 days / All time)
 - Per-platform stats: current followers, daily/weekly/monthly growth
 - Aggregate overview statistics
@@ -37,7 +37,12 @@ Edit `.env.local`:
 DATABASE_URL=postgresql://USER:PASSWORD@HOST:PORT/DATABASE
 CRON_SECRET=your-secret-key-here
 APP_TIMEZONE=Africa/Cairo
+META_ACCESS_TOKEN=...   # for local `npm run scrape` (Instagram + Facebook)
+FB_PAGE_ID=...
+IG_ACCOUNT_ID=...
 ```
+
+See [walkthrough.md](walkthrough.md) for Meta app permissions and how to obtain these IDs and token.
 
 **Recommended PostgreSQL providers:** [Neon](https://neon.tech) (free tier), [Railway](https://railway.app), [Render](https://render.com)
 
@@ -69,16 +74,19 @@ npm run scrape
 
 ## GitHub Actions (scraping on deploy)
 
-Playwright/Chromium cannot run on Vercel’s serverless runtime, so scraping runs in **GitHub Actions** instead.
+Playwright/Chromium cannot run on Vercel’s serverless runtime, so the TikTok scrape runs in **GitHub Actions** together with Meta Graph API calls for Instagram and Facebook.
 
 ### 1. Add repository secrets
 
 In your GitHub repo: **Settings → Secrets and variables → Actions**. Add:
 
-| Secret            | Description |
-|-------------------|-------------|
-| `DATABASE_URL`    | Same PostgreSQL connection string as in Vercel (e.g. Neon/Railway). The workflow uses it to save scraped data. |
-| `APP_TIMEZONE`    | Optional timezone for recording dates (example: `Africa/Cairo`). Set this as a **Repository variable** in GitHub Actions (`Settings → Secrets and variables → Actions → Variables`). If missing, defaults to `UTC`. |
+| Secret               | Description |
+|----------------------|-------------|
+| `DATABASE_URL`       | Same PostgreSQL connection string as in Vercel (e.g. Neon/Railway). The workflow uses it to save scraped data. |
+| `META_ACCESS_TOKEN`  | Long-lived Page access token from Meta (Graph API Explorer or your app). Needs `pages_read_engagement`, `pages_show_list`, `instagram_basic`. |
+| `FB_PAGE_ID`         | Facebook Page ID for the Graph API. |
+| `IG_ACCOUNT_ID`      | Instagram Business Account ID linked to that page. |
+| `APP_TIMEZONE`       | Optional timezone for recording dates (example: `Africa/Cairo`). Set this as a **Repository variable** in GitHub Actions (`Settings → Secrets and variables → Actions → Variables`). If missing, defaults to `UTC`. |
 
 ### 2. Schedule and manual run
 
@@ -154,9 +162,9 @@ flh-dashboard/
 │   └── db.ts                 # PostgreSQL pool
 ├── scripts/
 │   ├── migrate.ts            # DB schema + seed
-│   └── scrapeFollowers.ts    # Playwright scraper
+│   └── scrapeFollowers.ts    # Meta Graph API (IG/FB) + Playwright (TikTok)
 ├── .github/workflows/
-│   └── scrape.yml            # Scheduled + manual scrape (Playwright)
+│   └── scrape.yml            # Scheduled + manual scrape (Graph API + Playwright)
 ├── .env.local.example
 ├── vercel.json
 └── tsconfig.scripts.json     # TS config for Node scripts
@@ -191,8 +199,6 @@ CREATE TABLE follower_history (
 
 ## Notes on Scraping
 
-Instagram, TikTok, and Facebook all use aggressive anti-bot measures. The scraper uses best-effort extraction from page meta descriptions and structured data. If a platform blocks the scrape, it logs the error and skips that platform — data shows as **N/A** on the dashboard.
+Instagram and Facebook metrics come from the **Meta Graph API** (see [walkthrough.md](walkthrough.md) for setup). TikTok still uses a **Playwright** profile scrape; if TikTok blocks the run, that platform logs an error and may carry forward the last saved values.
 
-For more reliable data collection, consider official APIs where available:
-- [Facebook Graph API](https://developers.facebook.com/docs/graph-api/)
-- [TikTok Research API](https://developers.tiktok.com/products/research-api/) (requires application)
+For TikTok, an official option is the [TikTok Research API](https://developers.tiktok.com/products/research-api/) (requires application).

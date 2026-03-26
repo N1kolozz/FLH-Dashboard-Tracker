@@ -1,5 +1,5 @@
-# Run follower scrape (Playwright) on schedule or manually.
-# Scraping runs here instead of Vercel so Chromium is available.
+# Run follower collection on schedule or manually.
+# Instagram & Facebook: Meta Graph API. TikTok: Playwright/Chromium (runs here, not on Vercel).
 
 name: Scrape followers
 
@@ -46,4 +46,7 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           APP_TIMEZONE: ${{ vars.APP_TIMEZONE || 'UTC' }}
+          META_ACCESS_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
+          FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
+          IG_ACCOUNT_ID: ${{ secrets.IG_ACCOUNT_ID }}
         run: npx ts-node --project tsconfig.scripts.json scripts/scrapeFollowers.ts
