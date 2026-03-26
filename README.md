@@ -90,7 +90,7 @@ In your GitHub repo: **Settings → Secrets and variables → Actions**. Add:
 
 ### 2. Schedule and manual run
 
-- **Schedule:** The workflow runs **three times daily** at **08:00, 17:00, and 22:00 Asia/Tbilisi** (mapped to UTC in `.github/workflows/scrape.yml`; GitHub cron is always UTC).
+- **Schedule:** The workflow runs **seven times daily** at **08:00, 12:00, 15:00, 17:00, 20:00, 22:00, and 00:00 (24:00) Asia/Tbilisi** (mapped to UTC in `.github/workflows/scrape.yml`; GitHub cron is always UTC).
 - **Manual run:** In GitHub go to **Actions → “Scrape followers” → Run workflow**.
 
 ### 3. (Optional) Trigger from Vercel / cron

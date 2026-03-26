@@ -6,12 +6,21 @@ name: Scrape followers
 on:
   schedule:
     # GitHub cron is UTC. Asia/Tbilisi = UTC+4 → subtract 4h for UTC.
+    # Extra midday slots = fresher IG/FB/TikTok without on-demand fetches per visitor.
     # 08:00 Tbilisi → 04:00 UTC
     - cron: "0 4 * * *"
+    # 12:00 Tbilisi → 08:00 UTC
+    - cron: "0 8 * * *"
+    # 15:00 Tbilisi → 11:00 UTC
+    - cron: "0 11 * * *"
     # 17:00 Tbilisi → 13:00 UTC
     - cron: "0 13 * * *"
+    # 20:00 Tbilisi → 16:00 UTC
+    - cron: "0 16 * * *"
     # 22:00 Tbilisi → 18:00 UTC
     - cron: "0 18 * * *"
+    # 00:00 Tbilisi (midnight; same instant as "24:00") → 20:00 UTC
+    - cron: "0 20 * * *"
   workflow_dispatch:
     # Allow manual run from Actions tab
   repository_dispatch:
