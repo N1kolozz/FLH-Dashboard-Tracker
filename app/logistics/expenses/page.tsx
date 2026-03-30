@@ -33,7 +33,7 @@ const CATEGORY_CONFIG: Record<ExpenseCategory, { label: string; color: string }>
 };
 
 const BAR_COLORS = [
-  "bg-blue-500", "bg-amber-500", "bg-orange-500", "bg-purple-500",
+  "bg-emerald-500", "bg-amber-500", "bg-orange-500", "bg-purple-500",
   "bg-cyan-500", "bg-emerald-500", "bg-pink-500", "bg-slate-400",
 ];
 
@@ -100,12 +100,12 @@ export default function ExpensesPage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <header className="border-b border-purple-200/70 bg-blue-100/80 backdrop-blur-md">
+      <header className="border-b border-purple-200/70 bg-emerald-100/80 backdrop-blur-md">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <h1 className="text-lg font-bold text-slate-900 flex items-center gap-2">
               Expense Tracker
-              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </h1>
@@ -170,7 +170,8 @@ export default function ExpensesPage() {
           <select
             value={filterCategory}
             onChange={(e) => setFilterCategory(e.target.value as ExpenseCategory | "all")}
-            className="px-3 py-1.5 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-300"
+            title="Filter category"
+            className="px-3 text-slate-500 py-1.5 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-300"
           >
             <option value="all">All categories</option>
             {(Object.keys(CATEGORY_CONFIG) as ExpenseCategory[]).map((c) => (
@@ -225,36 +226,47 @@ export default function ExpensesPage() {
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Description *</label>
-            <input type="text" value={editing.description} onChange={(e) => setEditing({ ...editing, description: e.target.value })} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300" placeholder="e.g., Banners for Youth Event" />
+            <input type="text" value={editing.description} onChange={(e) => setEditing({ ...editing, description: e.target.value })} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400" placeholder="e.g., Banners for Youth Event" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Amount (₾) *</label>
-              <input type="number" min={0} step={0.01} value={editing.amount || ""} onChange={(e) => setEditing({ ...editing, amount: parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300" placeholder="0.00" />
+              <input type="number" min={0} step={0.01} value={editing.amount || ""} onChange={(e) => setEditing({ ...editing, amount: parseFloat(e.target.value) || 0 })} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400" placeholder="0.00" />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Date *</label>
-              <input type="date" value={editing.date} onChange={(e) => setEditing({ ...editing, date: e.target.value })} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300" />
+              <input
+                type="date"
+                value={editing.date}
+                onChange={(e) => setEditing({ ...editing, date: e.target.value })}
+                title="Date"
+                className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400"
+              />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Category</label>
-              <select value={editing.category} onChange={(e) => setEditing({ ...editing, category: e.target.value as ExpenseCategory })} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300">
+              <select
+                value={editing.category}
+                onChange={(e) => setEditing({ ...editing, category: e.target.value as ExpenseCategory })}
+                title="Category"
+                className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400"
+              >
                 {(Object.keys(CATEGORY_CONFIG) as ExpenseCategory[]).map((c) => (<option key={c} value={c}>{CATEGORY_CONFIG[c].label}</option>))}
               </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Paid By</label>
-              <input type="text" value={editing.paidBy} onChange={(e) => setEditing({ ...editing, paidBy: e.target.value })} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300" placeholder="e.g., Ahmed" />
+              <input type="text" value={editing.paidBy} onChange={(e) => setEditing({ ...editing, paidBy: e.target.value })} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400" placeholder="e.g., Ahmed" />
             </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Notes</label>
-            <textarea value={editing.notes} onChange={(e) => setEditing({ ...editing, notes: e.target.value })} rows={2} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 resize-none" placeholder="Any notes..." />
+            <textarea value={editing.notes} onChange={(e) => setEditing({ ...editing, notes: e.target.value })} rows={2} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 resize-none" placeholder="Any notes..." />
           </div>
           <div className="flex items-center gap-3 pt-2">
-            <button onClick={saveExpense} disabled={!editing.description.trim() || !editing.date || editing.amount <= 0} className="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white text-sm font-medium rounded-lg transition-colors">{editing.id ? "Save Changes" : "Add Expense"}</button>
+            <button onClick={saveExpense} disabled={!editing.description.trim() || !editing.date || editing.amount <= 0} className="flex-1  px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white text-sm font-medium rounded-lg transition-colors">{editing.id ? "Save Changes" : "Add Expense"}</button>
             {editing.id && (
               <button onClick={() => { deleteExpense(editing.id); setModalOpen(false); setEditing(EMPTY); }} className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 text-sm font-medium rounded-lg border border-rose-200 transition-colors">Delete</button>
             )}

@@ -188,7 +188,7 @@ export default function Sidebar() {
       <div className="hidden md:flex border-t border-purple-100/60 p-3">
         <button
           onClick={() => setCollapsed((v) => !v)}
-          className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+          className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-medium text-purple-600 hover:text-purple-700 hover:bg-purple-100 transition-colors"
         >
           <svg
             className={`w-4 h-4 transition-transform ${collapsed ? "rotate-180" : ""}`}

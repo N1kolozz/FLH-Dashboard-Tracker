@@ -202,7 +202,7 @@ export default function DashboardPage() {
               label="Active Projects"
               value={String(projectCount)}
               href="/projects"
-              color="bg-emerald-100 text-emerald-600"
+              color="bg-blue-100 text-blue-600"
               icon={
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -213,7 +213,7 @@ export default function DashboardPage() {
               label="Inventory Items"
               value={String(inventoryCount)}
               href="/logistics/inventory"
-              color="bg-blue-100 text-blue-600"
+              color="bg-emerald-100 text-emerald-600"
               icon={
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />

@@ -142,12 +142,12 @@ export default function InventoryPage() {
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
-      <header className="border-b border-purple-200/70 bg-blue-100/80 backdrop-blur-md">
+      <header className="border-b border-purple-200/70 bg-emerald-100/80 backdrop-blur-md">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <h1 className="text-lg font-bold text-slate-900 flex items-center gap-2">
               Inventory
-              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
               </svg>
             </h1>
@@ -161,12 +161,13 @@ export default function InventoryPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search items..."
-              className="px-3 py-1.5 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-300 w-40"
+              className="px-3 text-slate-500 py-1.5 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-300 w-40"
             />
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value as ItemStatus | "all")}
-              className="px-3 py-1.5 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-300"
+              title="Filter status"
+              className="px-3 text-slate-500 py-1.5 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-300"
             >
               <option value="all">All statuses</option>
               {(Object.keys(STATUS_CONFIG) as ItemStatus[]).map((s) => (
@@ -176,7 +177,8 @@ export default function InventoryPage() {
             <select
               value={filterCategory}
               onChange={(e) => setFilterCategory(e.target.value as Category | "all")}
-              className="px-3 py-1.5 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-300"
+              title="Filter category"
+              className="px-3 text-slate-500 py-1.5 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-300"
             >
               <option value="all">All categories</option>
               {(Object.keys(CATEGORY_LABELS) as Category[]).map((c) => (
@@ -195,7 +197,7 @@ export default function InventoryPage() {
             </div>
             <button
               onClick={() => { setEditing(EMPTY); setModalOpen(true); }}
-              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
             >
               + Add Item
             </button>
@@ -264,7 +266,7 @@ export default function InventoryPage() {
                     {item.status === "available" && (
                       <button
                         onClick={() => openCheckout(item)}
-                        className="flex-1 px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                        className="flex-1 px-3 py-1.5 text-xs font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors"
                       >
                         Check Out
                       </button>
@@ -321,7 +323,7 @@ export default function InventoryPage() {
                           {item.status === "available" && (
                             <button
                               onClick={() => openCheckout(item)}
-                              className="px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                              className="px-2 py-1 text-xs text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
                             >
                               Check Out
                             </button>
@@ -358,7 +360,7 @@ export default function InventoryPage() {
               type="text"
               value={editing.name}
               onChange={(e) => setEditing({ ...editing, name: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400"
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400"
               placeholder="e.g., Projector"
             />
           </div>
@@ -368,7 +370,8 @@ export default function InventoryPage() {
               <select
                 value={editing.category}
                 onChange={(e) => setEditing({ ...editing, category: e.target.value as Category })}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                title="Category"
+                className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400"
               >
                 {(Object.keys(CATEGORY_LABELS) as Category[]).map((c) => (
                   <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>
@@ -382,7 +385,8 @@ export default function InventoryPage() {
                 min={0}
                 value={editing.quantity}
                 onChange={(e) => setEditing({ ...editing, quantity: parseInt(e.target.value) || 0 })}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                title="Quantity"
+                className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400"
               />
             </div>
           </div>
@@ -392,7 +396,8 @@ export default function InventoryPage() {
               <select
                 value={editing.status}
                 onChange={(e) => setEditing({ ...editing, status: e.target.value as ItemStatus })}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                title="Status"
+                className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400"
               >
                 {(Object.keys(STATUS_CONFIG) as ItemStatus[]).map((s) => (
                   <option key={s} value={s}>{STATUS_CONFIG[s].label}</option>
@@ -405,7 +410,7 @@ export default function InventoryPage() {
                 type="text"
                 value={editing.location}
                 onChange={(e) => setEditing({ ...editing, location: e.target.value })}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400"
                 placeholder="e.g., Office A"
               />
             </div>
@@ -416,7 +421,7 @@ export default function InventoryPage() {
               value={editing.notes}
               onChange={(e) => setEditing({ ...editing, notes: e.target.value })}
               rows={2}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none"
+              className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 resize-none"
               placeholder="Any additional notes..."
             />
           </div>
@@ -424,7 +429,7 @@ export default function InventoryPage() {
             <button
               onClick={saveItem}
               disabled={!editing.name.trim()}
-              className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white text-sm font-medium rounded-lg transition-colors"
+              className="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white text-sm font-medium rounded-lg transition-colors"
             >
               {editing.id ? "Save Changes" : "Add Item"}
             </button>
@@ -454,14 +459,14 @@ export default function InventoryPage() {
               type="text"
               value={checkoutPerson}
               onChange={(e) => setCheckoutPerson(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+              className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400"
               placeholder="e.g., Ahmed"
             />
           </div>
           <button
             onClick={doCheckout}
             disabled={!checkoutPerson.trim()}
-            className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white text-sm font-medium rounded-lg transition-colors"
+            className="w-full px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white text-sm font-medium rounded-lg transition-colors"
           >
             Confirm Check Out
           </button>

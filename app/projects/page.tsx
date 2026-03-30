@@ -27,7 +27,7 @@ const COLUMNS: { id: Status; label: string; color: string }[] = [
   { id: "planning", label: "Planning", color: "border-t-slate-400" },
   { id: "in_progress", label: "In Progress", color: "border-t-blue-500" },
   { id: "review", label: "Review", color: "border-t-amber-500" },
-  { id: "completed", label: "Completed", color: "border-t-emerald-500" },
+  { id: "completed", label: "Completed", color: "border-t-blue-500" },
 ];
 
 const PRIORITY_CONFIG: Record<Priority, { label: string; classes: string }> = {
@@ -135,12 +135,12 @@ export default function ProjectsPage() {
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
-      <header className="border-b border-purple-200/70 bg-emerald-100/80 backdrop-blur-md">
+      <header className="border-b border-purple-200/70 bg-blue-100/80 backdrop-blur-md">
         <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <h1 className="text-lg font-bold text-slate-900 flex items-center gap-2">
               Project Board
-              <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
               </svg>
             </h1>
@@ -154,12 +154,13 @@ export default function ProjectsPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search projects..."
-              className="px-3 py-1.5 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 w-44"
+              className="px-3 text-slate-500 py-1.5 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 w-44"
             />
             <select
               value={filterPriority}
               onChange={(e) => setFilterPriority(e.target.value as Priority | "all")}
-              className="px-3 py-1.5 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-300"
+              title="Filter priority"
+              className="px-3 text-slate-500 py-1.5 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-300"
             >
               <option value="all">All priorities</option>
               <option value="high">High</option>
@@ -168,7 +169,7 @@ export default function ProjectsPage() {
             </select>
             <button
               onClick={() => openNew()}
-              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
             >
               + New Project
             </button>
@@ -281,7 +282,7 @@ export default function ProjectsPage() {
               type="text"
               value={editing.name}
               onChange={(e) => setEditing({ ...editing, name: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400"
+              className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400"
               placeholder="e.g., Youth Leadership Program"
             />
           </div>
@@ -291,7 +292,7 @@ export default function ProjectsPage() {
               value={editing.description}
               onChange={(e) => setEditing({ ...editing, description: e.target.value })}
               rows={3}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 resize-none"
+              className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 resize-none"
               placeholder="Brief description of the project..."
             />
           </div>
@@ -301,7 +302,8 @@ export default function ProjectsPage() {
               <select
                 value={editing.status}
                 onChange={(e) => setEditing({ ...editing, status: e.target.value as Status })}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300"
+                title="Status"
+                className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300"
               >
                 {COLUMNS.map((c) => (
                   <option key={c.id} value={c.id}>{c.label}</option>
@@ -313,7 +315,8 @@ export default function ProjectsPage() {
               <select
                 value={editing.priority}
                 onChange={(e) => setEditing({ ...editing, priority: e.target.value as Priority })}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300"
+                title="Priority"
+                className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300"
               >
                 <option value="low">Low</option>
                 <option value="medium">Medium</option>
@@ -328,7 +331,8 @@ export default function ProjectsPage() {
                 type="date"
                 value={editing.deadline}
                 onChange={(e) => setEditing({ ...editing, deadline: e.target.value })}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300"
+                title="Deadline"
+                className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300"
               />
             </div>
             <div>
@@ -337,7 +341,7 @@ export default function ProjectsPage() {
                 type="text"
                 value={editing.team}
                 onChange={(e) => setEditing({ ...editing, team: e.target.value })}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300"
+                className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300"
                 placeholder="e.g., PR Team"
               />
             </div>
@@ -347,7 +351,7 @@ export default function ProjectsPage() {
             <button
               onClick={saveProject}
               disabled={!editing.name.trim()}
-              className="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white text-sm font-medium rounded-lg transition-colors"
+              className="flex-1  px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white text-sm font-medium rounded-lg transition-colors"
             >
               {editing.id ? "Save Changes" : "Create Project"}
             </button>

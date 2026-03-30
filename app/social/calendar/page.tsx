@@ -31,10 +31,10 @@ const STORE_KEY = "flh_content_posts";
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const WEEKDAYS = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
 
-const PLATFORM_CONFIG: Record<Platform, { label: string; color: string; dot: string; icon: string }> = {
-  instagram: { label: "Instagram", color: "bg-purple-100 text-purple-700 border-purple-200", dot: "bg-purple-500", icon: "📷" },
-  tiktok: { label: "TikTok", color: "bg-slate-100 text-slate-700 border-slate-300", dot: "bg-slate-700", icon: "🎵" },
-  facebook: { label: "Facebook", color: "bg-blue-100 text-blue-700 border-blue-200", dot: "bg-blue-600", icon: "📘" },
+const PLATFORM_CONFIG: Record<Platform, { label: string; color: string; dot: string; }> = {
+  instagram: { label: "Instagram", color: "bg-purple-100 text-purple-700 border-purple-200", dot: "bg-purple-500"},
+  tiktok: { label: "TikTok", color: "bg-slate-100 text-slate-700 border-slate-300", dot: "bg-slate-700"},
+  facebook: { label: "Facebook", color: "bg-blue-100 text-blue-700 border-blue-200", dot: "bg-blue-600"},
 };
 
 const STATUS_CONFIG: Record<PostStatus, { label: string; classes: string }> = {
@@ -216,7 +216,7 @@ export default function ContentCalendarPage() {
                       onClick={(e) => { e.stopPropagation(); setEditing(p); setModalOpen(true); }}
                       className={`text-[10px] px-1.5 py-0.5 rounded mb-0.5 truncate cursor-pointer font-medium ${PLATFORM_CONFIG[p.platform].color}`}
                     >
-                      {PLATFORM_CONFIG[p.platform].icon} {p.caption.slice(0, 20)}
+                      {p.caption.slice(0, 20)}
                     </div>
                   ))}
                   {dayPosts.length > postSlots && <p className="text-[10px] text-slate-400 px-1">+{dayPosts.length - postSlots}</p>}
@@ -274,33 +274,33 @@ export default function ContentCalendarPage() {
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Platform</label>
-            <select value={editing.platform} onChange={(e) => setEditing({ ...editing, platform: e.target.value as Platform })} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300">
-              {(Object.keys(PLATFORM_CONFIG) as Platform[]).map((p) => (<option key={p} value={p}>{PLATFORM_CONFIG[p].icon} {PLATFORM_CONFIG[p].label}</option>))}
+            <select value={editing.platform} onChange={(e) => setEditing({ ...editing, platform: e.target.value as Platform })} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300">
+              {(Object.keys(PLATFORM_CONFIG) as Platform[]).map((p) => (<option key={p} value={p}>{PLATFORM_CONFIG[p].label}</option>))}
             </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Caption / Content *</label>
-            <textarea value={editing.caption} onChange={(e) => setEditing({ ...editing, caption: e.target.value })} rows={3} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 resize-none" placeholder="Post caption or content idea..." />
+            <textarea value={editing.caption} onChange={(e) => setEditing({ ...editing, caption: e.target.value })} rows={3} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 resize-none" placeholder="Post caption or content idea..." />
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Date *</label>
-              <input type="date" value={editing.date} onChange={(e) => setEditing({ ...editing, date: e.target.value })} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300" />
+              <input type="date" value={editing.date} onChange={(e) => setEditing({ ...editing, date: e.target.value })} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300" />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Time</label>
-              <input type="time" value={editing.time} onChange={(e) => setEditing({ ...editing, time: e.target.value })} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300" />
+              <input type="time" value={editing.time} onChange={(e) => setEditing({ ...editing, time: e.target.value })} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300" />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
-              <select value={editing.status} onChange={(e) => setEditing({ ...editing, status: e.target.value as PostStatus })} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300">
+              <select value={editing.status} onChange={(e) => setEditing({ ...editing, status: e.target.value as PostStatus })} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300">
                 {(Object.keys(STATUS_CONFIG) as PostStatus[]).map((s) => (<option key={s} value={s}>{STATUS_CONFIG[s].label}</option>))}
               </select>
             </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Notes</label>
-            <textarea value={editing.notes} onChange={(e) => setEditing({ ...editing, notes: e.target.value })} rows={2} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 resize-none" placeholder="Internal notes..." />
+            <textarea value={editing.notes} onChange={(e) => setEditing({ ...editing, notes: e.target.value })} rows={2} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 resize-none" placeholder="Internal notes..." />
           </div>
           <div className="flex items-center gap-3 pt-2">
             <button onClick={savePost} disabled={!editing.caption.trim() || !editing.date} className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 text-white text-sm font-medium rounded-lg transition-colors">{editing.id ? "Save Changes" : "Plan Post"}</button>

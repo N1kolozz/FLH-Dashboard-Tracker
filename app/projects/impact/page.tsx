@@ -23,7 +23,7 @@ const STORE_KEY = "flh_impact";
 const ACTIVITY_CONFIG: Record<ActivityType, { label: string; color: string }> = {
   workshop: { label: "Workshop", color: "bg-purple-100 text-purple-700" },
   training: { label: "Training", color: "bg-blue-100 text-blue-700" },
-  outreach: { label: "Outreach", color: "bg-emerald-100 text-emerald-700" },
+  outreach: { label: "Outreach", color: "bg-blue-100 text-blue-700" },
   mentoring: { label: "Mentoring", color: "bg-amber-100 text-amber-700" },
   event: { label: "Event", color: "bg-rose-100 text-rose-700" },
   other: { label: "Other", color: "bg-slate-100 text-slate-600" },
@@ -82,12 +82,12 @@ export default function ImpactPage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <header className="border-b border-purple-200/70 bg-emerald-100/80 backdrop-blur-md">
+      <header className="border-b border-purple-200/70 bg-blue-100/80 backdrop-blur-md">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <h1 className="text-lg font-bold text-slate-900 flex items-center gap-2">
               Impact Tracker
-              <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
               </svg>
             </h1>
@@ -95,7 +95,7 @@ export default function ImpactPage() {
           </div>
           <button
             onClick={() => { setEditing({ ...EMPTY, date: new Date().toISOString().slice(0, 10) }); setModalOpen(true); }}
-            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
           >+ Add Record</button>
         </div>
       </header>
@@ -104,7 +104,7 @@ export default function ImpactPage() {
         {/* Summary */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="bg-white rounded-xl border border-slate-100 p-5 shadow-sm text-center">
-            <p className="text-3xl font-bold text-emerald-600">{totalPeople.toLocaleString()}</p>
+            <p className="text-3xl font-bold text-blue-600">{totalPeople.toLocaleString()}</p>
             <p className="text-xs text-slate-500 mt-1 uppercase font-semibold">People Reached</p>
           </div>
           <div className="bg-white rounded-xl border border-slate-100 p-5 shadow-sm text-center">
@@ -130,7 +130,7 @@ export default function ImpactPage() {
                   </div>
                   <div className="w-full bg-slate-100 rounded-full h-2.5">
                     <div
-                      className="h-2.5 rounded-full bg-emerald-500 transition-all duration-500"
+                      className="h-2.5 rounded-full bg-blue-500 transition-all duration-500"
                       style={{ width: `${(total / maxProjectImpact) * 100}%` }}
                     />
                   </div>
@@ -153,7 +153,7 @@ export default function ImpactPage() {
                       {point.date}: {point.total.toLocaleString()} total
                     </div>
                     <div
-                      className="w-full bg-emerald-400 rounded-t-sm transition-all duration-300 hover:bg-emerald-500 min-h-[4px]"
+                      className="w-full bg-blue-400 rounded-t-sm transition-all duration-300 hover:bg-blue-500 min-h-[4px]"
                       style={{ height: `${Math.max(height, 3)}%` }}
                     />
                   </div>
@@ -195,7 +195,7 @@ export default function ImpactPage() {
                     <td className="px-4 py-3">
                       <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${ACTIVITY_CONFIG[r.activityType].color}`}>{ACTIVITY_CONFIG[r.activityType].label}</span>
                     </td>
-                    <td className="px-4 py-3 text-right font-semibold text-emerald-700">{r.peopleReached.toLocaleString()}</td>
+                    <td className="px-4 py-3 text-right font-semibold text-blue-700">{r.peopleReached.toLocaleString()}</td>
                     <td className="px-4 py-3">
                       <button onClick={() => { setEditing(r); setModalOpen(true); }} className="text-xs text-slate-500 hover:text-slate-700 hover:bg-slate-100 px-2 py-1 rounded transition-colors">Edit</button>
                     </td>
@@ -212,30 +212,41 @@ export default function ImpactPage() {
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Project Name *</label>
-            <input type="text" value={editing.projectName} onChange={(e) => setEditing({ ...editing, projectName: e.target.value })} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300" placeholder="e.g., Youth Leadership Program" />
+            <input type="text" value={editing.projectName} onChange={(e) => setEditing({ ...editing, projectName: e.target.value })} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400" placeholder="e.g., Youth Leadership Program" />
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">People Reached *</label>
-              <input type="number" min={1} value={editing.peopleReached || ""} onChange={(e) => setEditing({ ...editing, peopleReached: parseInt(e.target.value) || 0 })} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300" placeholder="50" />
+              <input type="number" min={1} value={editing.peopleReached || ""} onChange={(e) => setEditing({ ...editing, peopleReached: parseInt(e.target.value) || 0 })} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400" placeholder="50" />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Date *</label>
-              <input type="date" value={editing.date} onChange={(e) => setEditing({ ...editing, date: e.target.value })} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300" />
+              <input
+                type="date"
+                value={editing.date}
+                onChange={(e) => setEditing({ ...editing, date: e.target.value })}
+                title="Date"
+                className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400"
+              />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Activity Type</label>
-              <select value={editing.activityType} onChange={(e) => setEditing({ ...editing, activityType: e.target.value as ActivityType })} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300">
+              <select
+                value={editing.activityType}
+                onChange={(e) => setEditing({ ...editing, activityType: e.target.value as ActivityType })}
+                title="Activity Type"
+                className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400"
+              >
                 {(Object.keys(ACTIVITY_CONFIG) as ActivityType[]).map((a) => (<option key={a} value={a}>{ACTIVITY_CONFIG[a].label}</option>))}
               </select>
             </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Notes</label>
-            <textarea value={editing.notes} onChange={(e) => setEditing({ ...editing, notes: e.target.value })} rows={2} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 resize-none" placeholder="Details about the activity..." />
+            <textarea value={editing.notes} onChange={(e) => setEditing({ ...editing, notes: e.target.value })} rows={2} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 resize-none" placeholder="Details about the activity..." />
           </div>
           <div className="flex items-center gap-3 pt-2">
-            <button onClick={saveRecord} disabled={!editing.projectName.trim() || !editing.date || editing.peopleReached <= 0} className="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white text-sm font-medium rounded-lg transition-colors">{editing.id ? "Save Changes" : "Add Record"}</button>
+            <button onClick={saveRecord} disabled={!editing.projectName.trim() || !editing.date || editing.peopleReached <= 0} className="flex-1  px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white text-sm font-medium rounded-lg transition-colors">{editing.id ? "Save Changes" : "Add Record"}</button>
             {editing.id && (
               <button onClick={() => { deleteRecord(editing.id); setModalOpen(false); setEditing(EMPTY); }} className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 text-sm font-medium rounded-lg border border-rose-200 transition-colors">Delete</button>
             )}
