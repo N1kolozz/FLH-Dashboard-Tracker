@@ -2,8 +2,11 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { getCurrentSession } from "@/app/actions/session";
+import type { Session } from "@/lib/auth";
+import { logout } from "@/app/actions/auth";
 
 /* ─── nav structure ─── */
 interface NavLink {
@@ -107,8 +110,14 @@ const NAV_SECTIONS: NavSection[] = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [session, setSession] = useState<Session | null>(null);
+
+  useEffect(() => {
+    getCurrentSession().then(setSession);
+  }, []);
 
   useEffect(() => {
     if (!mobileOpen) return;
@@ -123,6 +132,11 @@ export default function Sidebar() {
 
   const isActive = (href: string) => {
     return pathname === href;
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    router.push("/login");
   };
 
   const navContent = (
@@ -184,11 +198,30 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      {/* Collapse toggle (desktop only) */}
-      <div className="hidden md:flex border-t border-purple-100/60 p-3">
+      {/* Profile & Collapse */}
+      <div className="mt-auto border-t border-purple-100/60 p-3">
+        {session && (
+          <div className="mb-2">
+            {!collapsed ? (
+              <div className="flex items-center justify-between p-2 rounded-xl bg-slate-100/50">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-slate-800 truncate">{session.fullName}</p>
+                  <p className="text-[10px] text-slate-500 truncate">{session.role} • {session.department}</p>
+                </div>
+                <button onClick={handleLogout} className="text-slate-400 hover:text-rose-600 transition-colors" title="Logout">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                </button>
+              </div>
+            ) : (
+              <button onClick={handleLogout} className="w-full flex justify-center p-2 text-slate-400 hover:text-rose-600 transition-colors" title="Logout">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+              </button>
+            )}
+          </div>
+        )}
         <button
           onClick={() => setCollapsed((v) => !v)}
-          className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-medium text-purple-600 hover:text-purple-700 hover:bg-purple-100 transition-colors"
+          className="hidden md:flex w-full items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-medium text-purple-600 hover:text-purple-700 hover:bg-purple-100 transition-colors"
         >
           <svg
             className={`w-4 h-4 transition-transform ${collapsed ? "rotate-180" : ""}`}

@@ -23,6 +23,24 @@ async function migrate() {
     console.log("Running migrations...");
 
     await client.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password_hash VARCHAR(255),
+        full_name VARCHAR(255) NOT NULL,
+        role VARCHAR(50) NOT NULL,
+        department VARCHAR(100) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log("✓ users table ready");
+
+    await client.query(`
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS position VARCHAR(255) DEFAULT ''
+    `);
+    console.log("✓ users position column ready");
+
+    await client.query(`
       CREATE TABLE IF NOT EXISTS social_accounts (
         id SERIAL PRIMARY KEY,
         platform VARCHAR(50) NOT NULL,
@@ -89,6 +107,22 @@ async function migrate() {
     }
 
     console.log("\nMigration complete!");
+
+    // Seed default admin
+    const adminEmail = "mr.osievi5@gmail.com";
+    const existingAdmin = await client.query(
+      "SELECT id FROM users WHERE email = $1",
+      [adminEmail]
+    );
+    if (existingAdmin.rows.length === 0) {
+      await client.query(
+        "INSERT INTO users (email, full_name, role, department) VALUES ($1, $2, $3, $4)",
+        [adminEmail, "Admin User", "ADMIN", "Management"]
+      );
+      console.log(`✓ Seeded default admin: ${adminEmail}`);
+    } else {
+      console.log(`– Default admin already exists: ${adminEmail}`);
+    }
   } finally {
     client.release();
     await pool.end();
