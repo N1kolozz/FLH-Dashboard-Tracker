@@ -4,6 +4,8 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { loadStore, saveStore, generateId } from "@/lib/store";
 import Modal from "@/components/Modal";
 import EmptyState from "@/components/EmptyState";
+import { getCurrentSession } from "@/app/actions/session";
+import type { Session } from "@/lib/auth";
 import {
   type PublicHoliday,
   buildHolidaysByDate,
@@ -70,8 +72,12 @@ export default function EventsPage() {
   const [view, setView] = useState<"calendar" | "list">("calendar");
   const [publicHolidays, setPublicHolidays] = useState<PublicHoliday[]>([]);
   const holidaysCacheRef = useRef<Record<number, PublicHoliday[]>>({});
+  const [session, setSession] = useState<Session | null>(null);
 
-  useEffect(() => { setEvents(loadStore<CalEvent>(STORE_KEY)); }, []);
+  useEffect(() => { 
+    setEvents(loadStore<CalEvent>(STORE_KEY)); 
+    getCurrentSession().then(setSession);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -137,6 +143,12 @@ export default function EventsPage() {
     .sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time))
     .slice(0, 20);
 
+  const canEdit = session && (
+    session.role === "ADMIN" || 
+    session.role === "HEAD" || 
+    session.department === "Management"
+  );
+
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="border-b border-purple-200/70 bg-gradient-to-r from-amber-50/70 via-orange-50/65 to-yellow-50/70 backdrop-blur-md">
@@ -157,12 +169,14 @@ export default function EventsPage() {
               <button onClick={() => setView("calendar")} className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${view === "calendar" ? "bg-white shadow-sm text-slate-800" : "text-slate-500"}`}>Calendar</button>
               <button onClick={() => setView("list")} className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${view === "list" ? "bg-white shadow-sm text-slate-800" : "text-slate-500"}`}>List</button>
             </div>
-            <button
-              onClick={() => openNew()}
-              className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
-            >
-              + New Event
-            </button>
+            {canEdit && (
+              <button
+                onClick={() => openNew()}
+                className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+              >
+                + New Event
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -241,7 +255,9 @@ export default function EventsPage() {
                   <h3 className="text-sm font-semibold text-slate-700">
                     Events on {new Date(selectedDate + "T00:00:00").toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
                   </h3>
-                  <button onClick={() => openNew(selectedDate)} className="text-xs text-purple-600 hover:underline font-medium">+ Add event</button>
+                  {canEdit && (
+                    <button onClick={() => openNew(selectedDate)} className="text-xs text-purple-600 hover:underline font-medium">+ Add event</button>
+                  )}
                 </div>
                 {(holidaysByDate.get(selectedDate) ?? []).length > 0 && (
                   <div className="mb-4 space-y-2">
@@ -323,50 +339,52 @@ export default function EventsPage() {
       </div>
 
       {/* Modal */}
-      <Modal open={modalOpen} onClose={() => { setModalOpen(false); setEditing(EMPTY); }} title={editing.id ? "Edit Event" : "New Event"}>
+      <Modal open={modalOpen} onClose={() => { setModalOpen(false); setEditing(EMPTY); }} title={editing.id ? (canEdit ? "Edit Event" : "View Event") : "New Event"}>
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Event Title *</label>
-            <input type="text" value={editing.title} onChange={(e) => setEditing({ ...editing, title: e.target.value })} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400" placeholder="e.g., Summer Program Kickoff" />
+            <input disabled={!canEdit} type="text" value={editing.title} onChange={(e) => setEditing({ ...editing, title: e.target.value })} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 disabled:bg-slate-50" placeholder="e.g., Summer Program Kickoff" />
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Date *</label>
-              <input type="date" value={editing.date} onChange={(e) => setEditing({ ...editing, date: e.target.value })} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400" />
+              <input disabled={!canEdit} type="date" value={editing.date} onChange={(e) => setEditing({ ...editing, date: e.target.value })} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 disabled:bg-slate-50" />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Start Time</label>
-              <input type="time" value={editing.time} onChange={(e) => setEditing({ ...editing, time: e.target.value })} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400" />
+              <input disabled={!canEdit} type="time" value={editing.time} onChange={(e) => setEditing({ ...editing, time: e.target.value })} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 disabled:bg-slate-50" />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">End Time</label>
-              <input type="time" value={editing.endTime} onChange={(e) => setEditing({ ...editing, endTime: e.target.value })} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400" />
+              <input disabled={!canEdit} type="time" value={editing.endTime} onChange={(e) => setEditing({ ...editing, endTime: e.target.value })} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 disabled:bg-slate-50" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Department</label>
-              <select value={editing.department} onChange={(e) => setEditing({ ...editing, department: e.target.value as Department })} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400">
+              <select disabled={!canEdit} value={editing.department} onChange={(e) => setEditing({ ...editing, department: e.target.value as Department })} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 disabled:bg-slate-50">
                 {(Object.keys(DEPT_CONFIG) as Department[]).map((d) => (<option key={d} value={d}>{DEPT_CONFIG[d].label}</option>))}
               </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Location</label>
-              <input type="text" value={editing.location} onChange={(e) => setEditing({ ...editing, location: e.target.value })} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400" placeholder="e.g., Conference Room A" />
+              <input disabled={!canEdit} type="text" value={editing.location} onChange={(e) => setEditing({ ...editing, location: e.target.value })} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 disabled:bg-slate-50" placeholder="e.g., Conference Room A" />
             </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
-            <textarea value={editing.description} onChange={(e) => setEditing({ ...editing, description: e.target.value })} rows={2} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 resize-none" placeholder="Event details..." />
+            <textarea disabled={!canEdit} value={editing.description} onChange={(e) => setEditing({ ...editing, description: e.target.value })} rows={2} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 resize-none disabled:bg-slate-50" placeholder="Event details..." />
           </div>
-          <div className="flex items-center gap-3 pt-2">
-            <button onClick={saveEvent} disabled={!editing.title.trim() || !editing.date} className="flex-1  px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 text-white text-sm font-medium rounded-lg transition-colors">
-              {editing.id ? "Save Changes" : "Create Event"}
-            </button>
-            {editing.id && (
-              <button onClick={() => { deleteEvent(editing.id); setModalOpen(false); setEditing(EMPTY); }} className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 text-sm font-medium rounded-lg border border-rose-200 transition-colors">Delete</button>
-            )}
-          </div>
+          {canEdit && (
+            <div className="flex items-center gap-3 pt-2">
+              <button onClick={saveEvent} disabled={!editing.title.trim() || !editing.date} className="flex-1  px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 text-white text-sm font-medium rounded-lg transition-colors">
+                {editing.id ? "Save Changes" : "Create Event"}
+              </button>
+              {editing.id && (
+                <button onClick={() => { deleteEvent(editing.id); setModalOpen(false); setEditing(EMPTY); }} className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 text-sm font-medium rounded-lg border border-rose-200 transition-colors">Delete</button>
+              )}
+            </div>
+          )}
         </div>
       </Modal>
     </div>

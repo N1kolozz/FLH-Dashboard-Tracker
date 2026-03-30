@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { loadStore, saveStore, generateId } from "@/lib/store";
 import Modal from "@/components/Modal";
 import EmptyState from "@/components/EmptyState";
+import { getCurrentSession } from "@/app/actions/session";
+import type { Session } from "@/lib/auth";
 
 /* ─── Types ─── */
 type ItemStatus = "available" | "in_use" | "needs_repair" | "retired";
@@ -70,10 +72,18 @@ export default function InventoryPage() {
   const [filterStatus, setFilterStatus] = useState<ItemStatus | "all">("all");
   const [filterCategory, setFilterCategory] = useState<Category | "all">("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [session, setSession] = useState<Session | null>(null);
 
   useEffect(() => {
     setItems(loadStore<InventoryItem>(STORE_KEY));
+    getCurrentSession().then(setSession);
   }, []);
+
+  const canEdit = session && (
+    session.role === "ADMIN" || 
+    session.role === "HEAD" || 
+    session.department === "Logistics"
+  );
 
   const persist = (next: InventoryItem[]) => {
     setItems(next);
@@ -195,12 +205,14 @@ export default function InventoryPage() {
                 className={`px-2 py-1 rounded-md text-xs font-medium transition-colors ${viewMode === "list" ? "bg-white shadow-sm text-slate-800" : "text-slate-500"}`}
               >List</button>
             </div>
-            <button
-              onClick={() => { setEditing(EMPTY); setModalOpen(true); }}
-              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
-            >
-              + Add Item
-            </button>
+            {canEdit && (
+              <button
+                onClick={() => { setEditing(EMPTY); setModalOpen(true); }}
+                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+              >
+                + Add Item
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -261,9 +273,9 @@ export default function InventoryPage() {
                       onClick={() => { setEditing(item); setModalOpen(true); }}
                       className="flex-1 px-3 py-1.5 text-xs font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
                     >
-                      Edit
+                      {canEdit ? "Edit" : "View"}
                     </button>
-                    {item.status === "available" && (
+                    {canEdit && item.status === "available" && (
                       <button
                         onClick={() => openCheckout(item)}
                         className="flex-1 px-3 py-1.5 text-xs font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors"
@@ -271,7 +283,7 @@ export default function InventoryPage() {
                         Check Out
                       </button>
                     )}
-                    {item.status === "in_use" && (
+                    {canEdit && item.status === "in_use" && (
                       <button
                         onClick={() => doCheckin(item)}
                         className="flex-1 px-3 py-1.5 text-xs font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors"
@@ -318,9 +330,9 @@ export default function InventoryPage() {
                             onClick={() => { setEditing(item); setModalOpen(true); }}
                             className="px-2 py-1 text-xs text-slate-600 hover:bg-slate-100 rounded transition-colors"
                           >
-                            Edit
+                            {canEdit ? "Edit" : "View"}
                           </button>
-                          {item.status === "available" && (
+                          {canEdit && item.status === "available" && (
                             <button
                               onClick={() => openCheckout(item)}
                               className="px-2 py-1 text-xs text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
@@ -328,7 +340,7 @@ export default function InventoryPage() {
                               Check Out
                             </button>
                           )}
-                          {item.status === "in_use" && (
+                          {canEdit && item.status === "in_use" && (
                             <button
                               onClick={() => doCheckin(item)}
                               className="px-2 py-1 text-xs text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
@@ -418,30 +430,33 @@ export default function InventoryPage() {
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Notes</label>
             <textarea
+              disabled={!canEdit}
               value={editing.notes}
               onChange={(e) => setEditing({ ...editing, notes: e.target.value })}
               rows={2}
-              className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 resize-none"
+              className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 resize-none disabled:bg-slate-50"
               placeholder="Any additional notes..."
             />
           </div>
-          <div className="flex items-center gap-3 pt-2">
-            <button
-              onClick={saveItem}
-              disabled={!editing.name.trim()}
-              className="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white text-sm font-medium rounded-lg transition-colors"
-            >
-              {editing.id ? "Save Changes" : "Add Item"}
-            </button>
-            {editing.id && (
+          {canEdit && (
+            <div className="flex items-center gap-3 pt-2">
               <button
-                onClick={() => { deleteItem(editing.id); setModalOpen(false); setEditing(EMPTY); }}
-                className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 text-sm font-medium rounded-lg border border-rose-200 transition-colors"
+                onClick={saveItem}
+                disabled={!editing.name.trim()}
+                className="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white text-sm font-medium rounded-lg transition-colors"
               >
-                Delete
+                {editing.id ? "Save Changes" : "Add Item"}
               </button>
-            )}
-          </div>
+              {editing.id && (
+                <button
+                  onClick={() => { deleteItem(editing.id); setModalOpen(false); setEditing(EMPTY); }}
+                  className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 text-sm font-medium rounded-lg border border-rose-200 transition-colors"
+                >
+                  Delete
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </Modal>
 

@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { loadStore, saveStore, generateId } from "@/lib/store";
 import Modal from "@/components/Modal";
 import EmptyState from "@/components/EmptyState";
+import { getCurrentSession } from "@/app/actions/session";
+import type { Session } from "@/lib/auth";
 
 /* ─── Types ─── */
 type Priority = "low" | "medium" | "high";
@@ -56,11 +58,19 @@ export default function ProjectsPage() {
   const [filterPriority, setFilterPriority] = useState<Priority | "all">("all");
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragOverCol, setDragOverCol] = useState<Status | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
 
   // Load from localStorage
   useEffect(() => {
     setProjects(loadStore<Project>(STORE_KEY));
+    getCurrentSession().then(setSession);
   }, []);
+
+  const canEdit = session && (
+    session.role === "ADMIN" || 
+    session.role === "HEAD" || 
+    session.department === "Projects"
+  );
 
   const persist = (next: Project[]) => {
     setProjects(next);
@@ -96,9 +106,10 @@ export default function ProjectsPage() {
   };
 
   /* ─── Drag & Drop ─── */
-  const handleDragStart = (id: string) => setDragId(id);
+  const handleDragStart = (id: string) => { if (canEdit) setDragId(id); };
 
   const handleDragOver = (e: React.DragEvent, col: Status) => {
+    if (!canEdit) return;
     e.preventDefault();
     setDragOverCol(col);
   };
@@ -167,12 +178,14 @@ export default function ProjectsPage() {
               <option value="medium">Medium</option>
               <option value="low">Low</option>
             </select>
-            <button
-              onClick={() => openNew()}
-              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
-            >
-              + New Project
-            </button>
+            {canEdit && (
+              <button
+                onClick={() => openNew()}
+                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+              >
+                + New Project
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -188,7 +201,7 @@ export default function ProjectsPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
               </svg>
             }
-            action={{ label: "Create Project", onClick: () => openNew() }}
+            action={canEdit ? { label: "Create Project", onClick: () => openNew() } : undefined}
           />
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -212,15 +225,17 @@ export default function ProjectsPage() {
                         {items.length}
                       </span>
                     </div>
-                    <button
-                      onClick={() => openNew(col.id)}
-                      className="w-6 h-6 flex items-center justify-center rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
-                      title="Add here"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                      </svg>
-                    </button>
+                    {canEdit && (
+                      <button
+                        onClick={() => openNew(col.id)}
+                        className="w-6 h-6 flex items-center justify-center rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                        title="Add here"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                      </button>
+                    )}
                   </div>
 
                   {/* Cards */}
@@ -230,11 +245,11 @@ export default function ProjectsPage() {
                       return (
                         <div
                           key={p.id}
-                          draggable
+                          draggable={!!canEdit}
                           onDragStart={() => handleDragStart(p.id)}
                           onDragEnd={handleDragEnd}
                           onClick={() => openEdit(p)}
-                          className={`bg-white rounded-lg border border-slate-100 p-3 cursor-grab active:cursor-grabbing shadow-sm hover:shadow-md transition-all duration-150 hover:-translate-y-0.5 ${
+                          className={`bg-white rounded-lg border border-slate-100 p-3 ${canEdit ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"} shadow-sm hover:shadow-md transition-all duration-150 hover:-translate-y-0.5 ${
                             dragId === p.id ? "opacity-50" : ""
                           }`}
                         >
@@ -273,37 +288,37 @@ export default function ProjectsPage() {
       <Modal
         open={modalOpen}
         onClose={() => { setModalOpen(false); setEditing(EMPTY); }}
-        title={editing.id ? "Edit Project" : "New Project"}
+        title={editing.id ? (canEdit ? "Edit Project" : "View Project") : "New Project"}
       >
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Project Name *</label>
-            <input
+            <input disabled={!canEdit}
               type="text"
               value={editing.name}
               onChange={(e) => setEditing({ ...editing, name: e.target.value })}
-              className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400"
+              className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 disabled:bg-slate-50"
               placeholder="e.g., Youth Leadership Program"
             />
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
-            <textarea
+            <textarea disabled={!canEdit}
               value={editing.description}
               onChange={(e) => setEditing({ ...editing, description: e.target.value })}
               rows={3}
-              className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 resize-none"
+              className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 resize-none disabled:bg-slate-50"
               placeholder="Brief description of the project..."
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
-              <select
+              <select disabled={!canEdit}
                 value={editing.status}
                 onChange={(e) => setEditing({ ...editing, status: e.target.value as Status })}
                 title="Status"
-                className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300"
+                className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 disabled:bg-slate-50"
               >
                 {COLUMNS.map((c) => (
                   <option key={c.id} value={c.id}>{c.label}</option>
@@ -312,11 +327,11 @@ export default function ProjectsPage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Priority</label>
-              <select
+              <select disabled={!canEdit}
                 value={editing.priority}
                 onChange={(e) => setEditing({ ...editing, priority: e.target.value as Priority })}
                 title="Priority"
-                className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300"
+                className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 disabled:bg-slate-50"
               >
                 <option value="low">Low</option>
                 <option value="medium">Medium</option>
@@ -327,43 +342,45 @@ export default function ProjectsPage() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Deadline</label>
-              <input
+              <input disabled={!canEdit}
                 type="date"
                 value={editing.deadline}
                 onChange={(e) => setEditing({ ...editing, deadline: e.target.value })}
                 title="Deadline"
-                className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300"
+                className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 disabled:bg-slate-50"
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Team / Assignee</label>
-              <input
+              <input disabled={!canEdit}
                 type="text"
                 value={editing.team}
                 onChange={(e) => setEditing({ ...editing, team: e.target.value })}
-                className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300"
+                className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 disabled:bg-slate-50"
                 placeholder="e.g., PR Team"
               />
             </div>
           </div>
 
-          <div className="flex items-center gap-3 pt-2">
-            <button
-              onClick={saveProject}
-              disabled={!editing.name.trim()}
-              className="flex-1  px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white text-sm font-medium rounded-lg transition-colors"
-            >
-              {editing.id ? "Save Changes" : "Create Project"}
-            </button>
-            {editing.id && (
+          {canEdit && (
+            <div className="flex items-center gap-3 pt-2">
               <button
-                onClick={() => { deleteProject(editing.id); setModalOpen(false); setEditing(EMPTY); }}
-                className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 text-sm font-medium rounded-lg border border-rose-200 transition-colors"
+                onClick={saveProject}
+                disabled={!editing.name.trim()}
+                className="flex-1  px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white text-sm font-medium rounded-lg transition-colors"
               >
-                Delete
+                {editing.id ? "Save Changes" : "Create Project"}
               </button>
-            )}
-          </div>
+              {editing.id && (
+                <button
+                  onClick={() => { deleteProject(editing.id); setModalOpen(false); setEditing(EMPTY); }}
+                  className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 text-sm font-medium rounded-lg border border-rose-200 transition-colors"
+                >
+                  Delete
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </Modal>
     </div>

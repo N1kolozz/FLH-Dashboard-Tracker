@@ -11,8 +11,11 @@
     "scrape": "ts-node --project tsconfig.scripts.json scripts/scrapeFollowers.ts"
   },
   "dependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "bcryptjs": "^3.0.3",
     "chart.js": "^4.5.1",
     "dotenv": "^17.3.1",
+    "jose": "^6.2.2",
     "next": "14.2.35",
     "pg": "^8.20.0",
     "playwright": "^1.58.2",

@@ -10,6 +10,8 @@ import {
   holidayChipClass,
   holidayLabel,
 } from "@/lib/public-holidays";
+import { getCurrentSession } from "@/app/actions/session";
+import type { Session } from "@/lib/auth";
 
 /* ─── Types ─── */
 type Platform = "instagram" | "tiktok" | "facebook";
@@ -73,8 +75,18 @@ export default function ContentCalendarPage() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [publicHolidays, setPublicHolidays] = useState<PublicHoliday[]>([]);
   const holidaysCacheRef = useRef<Record<number, PublicHoliday[]>>({});
+  const [session, setSession] = useState<Session | null>(null);
 
-  useEffect(() => { setPosts(loadStore<ContentPost>(STORE_KEY)); }, []);
+  useEffect(() => { 
+    setPosts(loadStore<ContentPost>(STORE_KEY));
+    getCurrentSession().then(setSession);
+  }, []);
+
+  const canEdit = session && (
+    session.role === "ADMIN" || 
+    session.role === "HEAD" || 
+    session.department === "PR & Social"
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -148,10 +160,12 @@ export default function ContentCalendarPage() {
             </h1>
             <p className="text-xs text-slate-500 mt-0.5">Plan and schedule posts across platforms</p>
           </div>
-          <button
-            onClick={() => openNew()}
-            className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
-          >+ Plan Post</button>
+          {canEdit && (
+            <button
+              onClick={() => openNew()}
+              className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+            >+ Plan Post</button>
+          )}
         </div>
       </header>
 
@@ -233,7 +247,9 @@ export default function ContentCalendarPage() {
               <h3 className="text-sm font-semibold text-slate-700">
                 Posts for {new Date(selectedDate + "T00:00:00").toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
               </h3>
-              <button onClick={() => openNew(selectedDate)} className="text-xs text-purple-600 hover:underline font-medium">+ Add post</button>
+              {canEdit && (
+                <button onClick={() => openNew(selectedDate)} className="text-xs text-purple-600 hover:underline font-medium">+ Add post</button>
+              )}
             </div>
             {(holidaysByDate.get(selectedDate) ?? []).length > 0 && (
               <div className="mb-4 space-y-2">
@@ -270,44 +286,46 @@ export default function ContentCalendarPage() {
       </div>
 
       {/* Modal */}
-      <Modal open={modalOpen} onClose={() => { setModalOpen(false); setEditing(EMPTY); }} title={editing.id ? "Edit Post" : "Plan a Post"}>
+      <Modal open={modalOpen} onClose={() => { setModalOpen(false); setEditing(EMPTY); }} title={editing.id ? (canEdit ? "Edit Post" : "View Post") : "Plan a Post"}>
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Platform</label>
-            <select value={editing.platform} onChange={(e) => setEditing({ ...editing, platform: e.target.value as Platform })} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300">
+            <select disabled={!canEdit} value={editing.platform} onChange={(e) => setEditing({ ...editing, platform: e.target.value as Platform })} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 disabled:bg-slate-50">
               {(Object.keys(PLATFORM_CONFIG) as Platform[]).map((p) => (<option key={p} value={p}>{PLATFORM_CONFIG[p].label}</option>))}
             </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Caption / Content *</label>
-            <textarea value={editing.caption} onChange={(e) => setEditing({ ...editing, caption: e.target.value })} rows={3} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 resize-none" placeholder="Post caption or content idea..." />
+            <textarea disabled={!canEdit} value={editing.caption} onChange={(e) => setEditing({ ...editing, caption: e.target.value })} rows={3} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 resize-none disabled:bg-slate-50" placeholder="Post caption or content idea..." />
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Date *</label>
-              <input type="date" value={editing.date} onChange={(e) => setEditing({ ...editing, date: e.target.value })} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300" />
+              <input disabled={!canEdit} type="date" value={editing.date} onChange={(e) => setEditing({ ...editing, date: e.target.value })} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 disabled:bg-slate-50" />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Time</label>
-              <input type="time" value={editing.time} onChange={(e) => setEditing({ ...editing, time: e.target.value })} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300" />
+              <input disabled={!canEdit} type="time" value={editing.time} onChange={(e) => setEditing({ ...editing, time: e.target.value })} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 disabled:bg-slate-50" />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
-              <select value={editing.status} onChange={(e) => setEditing({ ...editing, status: e.target.value as PostStatus })} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300">
+              <select disabled={!canEdit} value={editing.status} onChange={(e) => setEditing({ ...editing, status: e.target.value as PostStatus })} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 disabled:bg-slate-50">
                 {(Object.keys(STATUS_CONFIG) as PostStatus[]).map((s) => (<option key={s} value={s}>{STATUS_CONFIG[s].label}</option>))}
               </select>
             </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Notes</label>
-            <textarea value={editing.notes} onChange={(e) => setEditing({ ...editing, notes: e.target.value })} rows={2} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 resize-none" placeholder="Internal notes..." />
+            <textarea disabled={!canEdit} value={editing.notes} onChange={(e) => setEditing({ ...editing, notes: e.target.value })} rows={2} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 resize-none disabled:bg-slate-50" placeholder="Internal notes..." />
           </div>
-          <div className="flex items-center gap-3 pt-2">
-            <button onClick={savePost} disabled={!editing.caption.trim() || !editing.date} className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 text-white text-sm font-medium rounded-lg transition-colors">{editing.id ? "Save Changes" : "Plan Post"}</button>
-            {editing.id && (
-              <button onClick={() => { deletePost(editing.id); setModalOpen(false); setEditing(EMPTY); }} className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 text-sm font-medium rounded-lg border border-rose-200 transition-colors">Delete</button>
-            )}
-          </div>
+          {canEdit && (
+            <div className="flex items-center gap-3 pt-2">
+              <button onClick={savePost} disabled={!editing.caption.trim() || !editing.date} className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 text-white text-sm font-medium rounded-lg transition-colors">{editing.id ? "Save Changes" : "Plan Post"}</button>
+              {editing.id && (
+                <button onClick={() => { deletePost(editing.id); setModalOpen(false); setEditing(EMPTY); }} className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 text-sm font-medium rounded-lg border border-rose-200 transition-colors">Delete</button>
+              )}
+            </div>
+          )}
         </div>
       </Modal>
     </div>

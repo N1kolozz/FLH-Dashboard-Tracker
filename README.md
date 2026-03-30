@@ -1,143 +1,50 @@
-# FLH Social Media Growth Dashboard
+# FLH Dashboard & Social Media Tracker
 
-A full-stack analytics dashboard for **Future Leaders Hub** that tracks daily follower growth across Instagram, TikTok and Facebook.
+A full-stack operational dashboard for the **Future Leaders Hub (FLH)**. It combines a secure Role-Based Access Control (RBAC) internal portal with automated social media growth tracking across Instagram, TikTok, and Facebook.
 
 ## Features
 
-- Daily automated follower counts: **Meta Graph API** for Instagram and Facebook, **Playwright** for TikTok (runs in **GitHub Actions**, not on Vercel)
-- Historical growth charts (30 days / 90 days / All time)
-- Per-platform stats: current followers, daily/weekly/monthly growth
-- Aggregate overview statistics
-- PostgreSQL data storage with daily snapshots
-- Optional: trigger scrape from API (dispatches GitHub Actions workflow)
+### Role-Based Access Control (RBAC)
+- **Authentication:** Secure JWT-based sessions (stored in HttpOnly cookies).
+- **Onboarding Flow:** Admins/Heads pre-add users via the dashboard. Users activate accounts via an email-linked `/create-password` flow.
+- **Roles & Permissions:**
+  - **ADMIN:** Full access. Can add/edit/delete any member and assign HEAD/ADMIN roles.
+  - **HEAD:** Department leadership access. Can add members (MEMBER role only) and edit member details (name, department, position). Cannot edit ADMINs.
+  - **MEMBER:** Read-only access to team directories and restricted department functionalities. Cannot add or edit members.
+- **Department Isolation:** Functional restrictions are enforced server-side based on the user's role and department.
 
-## Tracked Accounts
-
-| Platform  | Account |
-|-----------|---------|
-| Instagram | [@future_leaders_hub](https://www.instagram.com/future_leaders_hub/) |
-| TikTok    | [@future_leaders_hub](https://www.tiktok.com/@future_leaders_hub) |
-| Facebook  | [Future Leaders Hub](https://www.facebook.com/profile.php?id=61556110770300) |
+### Social Media Tracker
+- **Automated Scraping:** Daily follower counts using **Meta Graph API** (Instagram/Facebook) and **Playwright** (TikTok). Runs via GitHub Actions.
+- **Data Visualization:** Historical growth charts (30 days / 90 days / All time) and aggregate overview statistics.
+- **PostgreSQL Storage:** Daily snapshots and profile stats.
 
 ---
 
-## Setup
+## Setup & Deployment
 
-### 1. Configure environment variables
-
-Copy `.env.local.example` to `.env.local` and fill in your values:
-
-```bash
-cp .env.local.example .env.local
-```
-
-Edit `.env.local`:
-
+### 1. Environment Variables
+Copy `.env.local.example` to `.env.local` and add:
 ```
 DATABASE_URL=postgresql://USER:PASSWORD@HOST:PORT/DATABASE
+JWT_SECRET=your-secure-jwt-secret-key  # Required for production, has fallback for local dev
 CRON_SECRET=your-secret-key-here
-APP_TIMEZONE=Africa/Cairo
-META_ACCESS_TOKEN=...   # for local `npm run scrape` (Instagram + Facebook)
+APP_TIMEZONE=Asia/Tbilisi
+META_ACCESS_TOKEN=...
 FB_PAGE_ID=...
 IG_ACCOUNT_ID=...
 ```
 
-See [walkthrough.md](walkthrough.md) for Meta app permissions and how to obtain these IDs and token.
-
-**Recommended PostgreSQL providers:** [Neon](https://neon.tech) (free tier), [Railway](https://railway.app), [Render](https://render.com)
-
-### 2. Run database migration
-
-This creates the tables and seeds the 3 FLH accounts:
-
+### 2. Database Migration
+Creates required tables (`users`, `social_accounts`, `follower_history`) and seeds the default admin account:
 ```bash
 npm run migrate
 ```
+*Note: Ensure you update the default admin credentials in `scripts/migrate.ts` before running.*
 
-### 3. Start the development server
-
+### 3. Development Server
 ```bash
 npm run dev
 ```
-
-Open [http://localhost:3000/dashboard](http://localhost:3000/dashboard)
-
-### 4. Trigger your first scrape (local)
-
-Run the script directly:
-
-```bash
-npm run scrape
-```
-
----
-
-## GitHub Actions (scraping on deploy)
-
-Playwright/Chromium cannot run on Vercel’s serverless runtime, so the TikTok scrape runs in **GitHub Actions** together with Meta Graph API calls for Instagram and Facebook.
-
-### 1. Add repository secrets
-
-In your GitHub repo: **Settings → Secrets and variables → Actions**. Add:
-
-| Secret               | Description |
-|----------------------|-------------|
-| `DATABASE_URL`       | Same PostgreSQL connection string as in Vercel (e.g. Neon/Railway). The workflow uses it to save scraped data. |
-| `META_ACCESS_TOKEN`  | Long-lived Page access token from Meta (Graph API Explorer or your app). Needs `pages_read_engagement`, `pages_show_list`, `instagram_basic`. |
-| `FB_PAGE_ID`         | Facebook Page ID for the Graph API. |
-| `IG_ACCOUNT_ID`      | Instagram Business Account ID linked to that page. |
-| `APP_TIMEZONE`       | Optional timezone for recording dates (example: `Africa/Cairo`). Set this as a **Repository variable** in GitHub Actions (`Settings → Secrets and variables → Actions → Variables`). If missing, defaults to `UTC`. |
-
-### 2. Schedule and manual run
-
-- **Schedule:** The workflow runs **seven times daily** at **08:00, 12:00, 15:00, 17:00, 20:00, 22:00, and 00:00 (24:00) Asia/Tbilisi** (mapped to UTC in `.github/workflows/scrape.yml`; GitHub cron is always UTC).
-- **Manual run:** In GitHub go to **Actions → “Scrape followers” → Run workflow**.
-
-### 3. (Optional) Trigger from Vercel / cron
-
-To have your existing scrape URL trigger the workflow (e.g. from Vercel Cron or cron-job.org), set these in **Vercel → Project → Settings → Environment Variables**:
-
-| Variable               | Description |
-|------------------------|-------------|
-| `GITHUB_REPO`          | Repo in the form `owner/repo`, e.g. `myorg/flh-dashboard`. |
-| `GITHUB_ACTIONS_TOKEN` | A [Personal Access Token](https://github.com/settings/tokens) with `repo` scope (or fine-grained with “Actions: write”). |
-
-Then `POST /api/scrape?key=YOUR_CRON_SECRET` will trigger the “Scrape followers” workflow and return immediately; the actual scrape runs in GitHub Actions.
-
----
-
-## API Routes
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET`  | `/api/stats` | Current followers + daily/weekly/monthly growth |
-| `GET`  | `/api/history?platform=instagram&range=30` | Historical data for charts |
-| `POST` | `/api/scrape?key=CRON_SECRET` | Trigger scrape (dispatches GitHub Actions if `GITHUB_REPO` + `GITHUB_ACTIONS_TOKEN` are set) |
-
-**History query params:**
-- `platform`: `instagram` \| `tiktok` \| `facebook`
-- `range`: `30` \| `90` \| `all` (default: `30`)
-
----
-
-## Deployment (Vercel + Neon)
-
-### 1. Deploy to Vercel
-
-```bash
-npx vercel --prod
-```
-
-### 2. Add environment variables in Vercel Dashboard
-
-- `DATABASE_URL` — your Neon/Railway connection string
-- `CRON_SECRET` — your secret key
-- `APP_TIMEZONE` — your local timezone (example: `Africa/Cairo`) so `recorded_date` matches your day
-- (Optional) `GITHUB_REPO` and `GITHUB_ACTIONS_TOKEN` — to trigger the scrape workflow from `/api/scrape` (see GitHub Actions section above)
-
-### 3. Scraping (GitHub Actions)
-
-Scraping is handled by the **GitHub Actions** workflow (`.github/workflows/scrape.yml`), not by Vercel. Add `DATABASE_URL` as a repository secret and run the workflow on schedule or manually. If you set `GITHUB_REPO` and `GITHUB_ACTIONS_TOKEN` on Vercel, you can keep calling `/api/scrape` (e.g. from [cron-job.org](https://cron-job.org)); that endpoint will trigger the workflow.
 
 ---
 
@@ -146,28 +53,25 @@ Scraping is handled by the **GitHub Actions** workflow (`.github/workflows/scrap
 ```
 flh-dashboard/
 ├── app/
-│   ├── dashboard/
-│   │   └── page.tsx          # Main dashboard UI
-│   ├── api/
-│   │   ├── stats/route.ts    # GET follower stats + growth
-│   │   ├── history/route.ts  # GET historical data
-│   │   └── scrape/route.ts   # POST trigger scrape (dispatches GitHub Actions)
-│   ├── layout.tsx
-│   └── page.tsx              # Redirects to /dashboard
-├── components/
-│   ├── PlatformCard.tsx      # Per-platform stat card
-│   ├── GrowthChart.tsx       # Chart.js line chart
-│   └── DashboardStats.tsx    # Aggregate summary stats
+│   ├── (auth)/
+│   │   ├── login/page.tsx         # Login portal
+│   │   └── create-password/       # Account activation for pre-added users
+│   ├── actions/                   # Server Actions (Auth, Members, Session management)
+│   ├── dashboard/                 # Main stats overview
+│   ├── team/                      # Team directory & RBAC management
+│   ├── api/                       # REST endpoints (Stats, Scrape trigger)
+│   ├── events/                    # Shared department pages...
+│   ├── logistics/
+│   ├── projects/
+│   └── social/
+├── components/                    # Reusable UI components (Sidebar, TopNav, Modals, Charts)
 ├── lib/
-│   └── db.ts                 # PostgreSQL pool
+│   ├── auth.ts                    # JWT creation, verification, and session utilities
+│   └── db.ts                      # PostgreSQL connection pool
 ├── scripts/
-│   ├── migrate.ts            # DB schema + seed
-│   └── scrapeFollowers.ts    # Meta Graph API (IG/FB) + Playwright (TikTok)
-├── .github/workflows/
-│   └── scrape.yml            # Scheduled + manual scrape (Graph API + Playwright)
-├── .env.local.example
-├── vercel.json
-└── tsconfig.scripts.json     # TS config for Node scripts
+│   ├── migrate.ts                 # Database schema initialization
+│   └── scrapeFollowers.ts         # Social media scraping script
+└── middleware.ts                  # Route protection and RBAC enforcement
 ```
 
 ---
@@ -175,30 +79,47 @@ flh-dashboard/
 ## Database Schema
 
 ```sql
--- Tracked social accounts
-CREATE TABLE social_accounts (
-  id           SERIAL PRIMARY KEY,
-  platform     VARCHAR(50) NOT NULL,
-  name         VARCHAR(255),
-  url          TEXT NOT NULL,
-  created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+-- Internal Team Members (RBAC)
+CREATE TABLE users (
+  id SERIAL PRIMARY KEY,
+  email VARCHAR(255) UNIQUE NOT NULL,
+  password_hash VARCHAR(255),
+  full_name VARCHAR(255) NOT NULL,
+  role VARCHAR(50) NOT NULL,         -- System Role: ADMIN, HEAD, MEMBER
+  department VARCHAR(100) NOT NULL,  -- e.g., Logistics, PR & Social
+  position VARCHAR(255) DEFAULT '',  -- Job Title: e.g., Coordinator
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Daily follower snapshots
+-- Tracked Social Accounts
+CREATE TABLE social_accounts (
+  id SERIAL PRIMARY KEY,
+  platform VARCHAR(50) NOT NULL,
+  name VARCHAR(255),
+  url TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Daily Follower Snapshots
 CREATE TABLE follower_history (
-  id             SERIAL PRIMARY KEY,
-  account_id     INTEGER REFERENCES social_accounts(id),
-  followers      INTEGER NOT NULL,
-  recorded_date  DATE NOT NULL,
-  created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  id SERIAL PRIMARY KEY,
+  account_id INTEGER REFERENCES social_accounts(id),
+  followers INTEGER NOT NULL,
+  total_likes INTEGER,               -- Profile stats
+  posts_count INTEGER,
+  recorded_date DATE NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   UNIQUE(account_id, recorded_date)
 );
 ```
 
 ---
 
-## Notes on Scraping
+## Access Control Flow (How it works)
 
-Instagram and Facebook metrics come from the **Meta Graph API** (see [walkthrough.md](walkthrough.md) for setup). TikTok still uses a **Playwright** profile scrape; if TikTok blocks the run, that platform logs an error and may carry forward the last saved values.
+1. **Route Protection:** `middleware.ts` runs on every request. It skips auth routes (`/login`, `/create-password`) and API endpoints, but intercepts all other routes to verify the JWT session cookie. If missing or invalid, the user is redirected to `/login`.
+2. **Action Guards:** Database mutations via Server Actions (e.g., `app/actions/members.ts`) independently verify `getSession()` to ensure the user has the required `role` (ADMIN/HEAD) before executing queries.
+3. **UI Adapters:** Client components use the session state to conditionally render action buttons (like the "+ Add Member" button or Edit/Delete icons) ensuring a clean UI for restricted users.
 
-For TikTok, an official option is the [TikTok Research API](https://developers.tiktok.com/products/research-api/) (requires application).
+## Notes on Scraping (GitHub Actions)
+Playwright/Chromium cannot run on Vercel’s serverless runtime. Therefore, the daily social media scrape is executed via a scheduled **GitHub Actions** workflow (`.github/workflows/scrape.yml`). Ensure `DATABASE_URL` is set in your repository secrets so the workflow can save data remotely.

@@ -4,6 +4,8 @@ import { useState, useEffect, useMemo } from "react";
 import { loadStore, saveStore, generateId } from "@/lib/store";
 import Modal from "@/components/Modal";
 import EmptyState from "@/components/EmptyState";
+import { getCurrentSession } from "@/app/actions/session";
+import type { Session } from "@/lib/auth";
 
 /* ─── Types ─── */
 type ActivityType = "workshop" | "training" | "outreach" | "mentoring" | "event" | "other";
@@ -35,8 +37,18 @@ export default function ImpactPage() {
   const [records, setRecords] = useState<ImpactRecord[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<ImpactRecord>(EMPTY);
+  const [session, setSession] = useState<Session | null>(null);
 
-  useEffect(() => { setRecords(loadStore<ImpactRecord>(STORE_KEY)); }, []);
+  useEffect(() => { 
+    setRecords(loadStore<ImpactRecord>(STORE_KEY));
+    getCurrentSession().then(setSession);
+  }, []);
+
+  const canEdit = session && (
+    session.role === "ADMIN" || 
+    session.role === "HEAD" || 
+    session.department === "Projects"
+  );
   const persist = (next: ImpactRecord[]) => { setRecords(next); saveStore(STORE_KEY, next); };
 
   const saveRecord = () => {
@@ -93,10 +105,12 @@ export default function ImpactPage() {
             </h1>
             <p className="text-xs text-slate-500 mt-0.5">Track beneficiaries and measure project impact</p>
           </div>
-          <button
-            onClick={() => { setEditing({ ...EMPTY, date: new Date().toISOString().slice(0, 10) }); setModalOpen(true); }}
-            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
-          >+ Add Record</button>
+          {canEdit && (
+            <button
+              onClick={() => { setEditing({ ...EMPTY, date: new Date().toISOString().slice(0, 10) }); setModalOpen(true); }}
+              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+            >+ Add Record</button>
+          )}
         </div>
       </header>
 
@@ -173,7 +187,7 @@ export default function ImpactPage() {
             title="No impact records yet"
             description="Start tracking beneficiaries to measure your NGO's real-world impact."
             icon={<svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>}
-            action={{ label: "Add Impact Record", onClick: () => { setEditing({ ...EMPTY, date: new Date().toISOString().slice(0, 10) }); setModalOpen(true); } }}
+            action={canEdit ? { label: "Add Impact Record", onClick: () => { setEditing({ ...EMPTY, date: new Date().toISOString().slice(0, 10) }); setModalOpen(true); } } : undefined}
           />
         ) : (
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
@@ -197,7 +211,7 @@ export default function ImpactPage() {
                     </td>
                     <td className="px-4 py-3 text-right font-semibold text-blue-700">{r.peopleReached.toLocaleString()}</td>
                     <td className="px-4 py-3">
-                      <button onClick={() => { setEditing(r); setModalOpen(true); }} className="text-xs text-slate-500 hover:text-slate-700 hover:bg-slate-100 px-2 py-1 rounded transition-colors">Edit</button>
+                      <button onClick={() => { setEditing(r); setModalOpen(true); }} className="text-xs text-slate-500 hover:text-slate-700 hover:bg-slate-100 px-2 py-1 rounded transition-colors">{canEdit ? "Edit" : "View"}</button>
                     </td>
                   </tr>
                 ))}
@@ -208,34 +222,34 @@ export default function ImpactPage() {
       </div>
 
       {/* Modal */}
-      <Modal open={modalOpen} onClose={() => { setModalOpen(false); setEditing(EMPTY); }} title={editing.id ? "Edit Record" : "Add Impact Record"}>
+      <Modal open={modalOpen} onClose={() => { setModalOpen(false); setEditing(EMPTY); }} title={editing.id ? (canEdit ? "Edit Record" : "View Record") : "Add Impact Record"}>
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Project Name *</label>
-            <input type="text" value={editing.projectName} onChange={(e) => setEditing({ ...editing, projectName: e.target.value })} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400" placeholder="e.g., Youth Leadership Program" />
+            <input disabled={!canEdit} type="text" value={editing.projectName} onChange={(e) => setEditing({ ...editing, projectName: e.target.value })} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 disabled:bg-slate-50" placeholder="e.g., Youth Leadership Program" />
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">People Reached *</label>
-              <input type="number" min={1} value={editing.peopleReached || ""} onChange={(e) => setEditing({ ...editing, peopleReached: parseInt(e.target.value) || 0 })} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400" placeholder="50" />
+              <input disabled={!canEdit} type="number" min={1} value={editing.peopleReached || ""} onChange={(e) => setEditing({ ...editing, peopleReached: parseInt(e.target.value) || 0 })} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 disabled:bg-slate-50" placeholder="50" />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Date *</label>
-              <input
+              <input disabled={!canEdit}
                 type="date"
                 value={editing.date}
                 onChange={(e) => setEditing({ ...editing, date: e.target.value })}
                 title="Date"
-                className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400"
+                className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 disabled:bg-slate-50"
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Activity Type</label>
-              <select
+              <select disabled={!canEdit}
                 value={editing.activityType}
                 onChange={(e) => setEditing({ ...editing, activityType: e.target.value as ActivityType })}
                 title="Activity Type"
-                className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400"
+                className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 disabled:bg-slate-50"
               >
                 {(Object.keys(ACTIVITY_CONFIG) as ActivityType[]).map((a) => (<option key={a} value={a}>{ACTIVITY_CONFIG[a].label}</option>))}
               </select>
@@ -243,14 +257,16 @@ export default function ImpactPage() {
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Notes</label>
-            <textarea value={editing.notes} onChange={(e) => setEditing({ ...editing, notes: e.target.value })} rows={2} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 resize-none" placeholder="Details about the activity..." />
+            <textarea disabled={!canEdit} value={editing.notes} onChange={(e) => setEditing({ ...editing, notes: e.target.value })} rows={2} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 resize-none disabled:bg-slate-50" placeholder="Details about the activity..." />
           </div>
-          <div className="flex items-center gap-3 pt-2">
-            <button onClick={saveRecord} disabled={!editing.projectName.trim() || !editing.date || editing.peopleReached <= 0} className="flex-1  px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white text-sm font-medium rounded-lg transition-colors">{editing.id ? "Save Changes" : "Add Record"}</button>
-            {editing.id && (
-              <button onClick={() => { deleteRecord(editing.id); setModalOpen(false); setEditing(EMPTY); }} className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 text-sm font-medium rounded-lg border border-rose-200 transition-colors">Delete</button>
-            )}
-          </div>
+          {canEdit && (
+            <div className="flex items-center gap-3 pt-2">
+              <button onClick={saveRecord} disabled={!editing.projectName.trim() || !editing.date || editing.peopleReached <= 0} className="flex-1  px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white text-sm font-medium rounded-lg transition-colors">{editing.id ? "Save Changes" : "Add Record"}</button>
+              {editing.id && (
+                <button onClick={() => { deleteRecord(editing.id); setModalOpen(false); setEditing(EMPTY); }} className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 text-sm font-medium rounded-lg border border-rose-200 transition-colors">Delete</button>
+              )}
+            </div>
+          )}
         </div>
       </Modal>
     </div>
