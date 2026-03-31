@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { loadStore, saveStore, generateId } from "@/lib/store";
+import { getExpenses, createExpense, updateExpense, deleteExpense } from "@/app/actions/expenses";
+import type { ExpenseRow } from "@/app/actions/expenses";
 import Modal from "@/components/Modal";
 import EmptyState from "@/components/EmptyState";
 import { getCurrentSession } from "@/app/actions/session";
@@ -11,7 +12,7 @@ import type { Session } from "@/lib/auth";
 type ExpenseCategory = "supplies" | "transport" | "food" | "venue" | "printing" | "equipment" | "communication" | "other";
 
 interface Expense {
-  id: string;
+  id: number;
   description: string;
   amount: number;
   category: ExpenseCategory;
@@ -20,8 +21,6 @@ interface Expense {
   notes: string;
   createdAt: string;
 }
-
-const STORE_KEY = "flh_expenses";
 
 const CATEGORY_CONFIG: Record<ExpenseCategory, { label: string; color: string }> = {
   supplies: { label: "Supplies", color: "bg-blue-100 text-blue-700" },
@@ -39,7 +38,20 @@ const BAR_COLORS = [
   "bg-cyan-500", "bg-emerald-500", "bg-pink-500", "bg-slate-400",
 ];
 
-const EMPTY: Expense = { id: "", description: "", amount: 0, category: "other", date: "", paidBy: "", notes: "", createdAt: "" };
+const EMPTY: Expense = { id: 0, description: "", amount: 0, category: "other", date: "", paidBy: "", notes: "", createdAt: "" };
+
+function rowToExpense(row: ExpenseRow): Expense {
+  return {
+    id: row.id,
+    description: row.description,
+    amount: row.amount,
+    category: row.category as ExpenseCategory,
+    date: row.date,
+    paidBy: row.paid_by,
+    notes: row.notes,
+    createdAt: row.created_at,
+  };
+}
 
 export default function ExpensesPage() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -49,11 +61,21 @@ export default function ExpensesPage() {
   const [filterMonth, setFilterMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [session, setSession] = useState<Session | null>(null);
 
-  useEffect(() => { 
-    setExpenses(loadStore<Expense>(STORE_KEY)); 
-    getCurrentSession().then(setSession);
+  useEffect(() => {
+    async function init() {
+      const sess = await getCurrentSession();
+      setSession(sess);
+      await refreshExpenses();
+    }
+    init();
   }, []);
-  const persist = (next: Expense[]) => { setExpenses(next); saveStore(STORE_KEY, next); };
+
+  const refreshExpenses = async () => {
+    const res = await getExpenses();
+    if (res.success && res.expenses) {
+      setExpenses(res.expenses.map(rowToExpense));
+    }
+  };
 
   const canEdit = session && (
     session.role === "ADMIN" || 
@@ -61,20 +83,36 @@ export default function ExpensesPage() {
     session.department === "Logistics"
   );
 
-  const saveExpense = () => {
+  const saveExpenseHandler = async () => {
     if (!editing.description.trim() || !editing.date || editing.amount <= 0) return;
-    let next: Expense[];
     if (editing.id) {
-      next = expenses.map((e) => (e.id === editing.id ? editing : e));
+      await updateExpense(editing.id, {
+        description: editing.description,
+        amount: editing.amount,
+        category: editing.category,
+        date: editing.date,
+        paidBy: editing.paidBy,
+        notes: editing.notes,
+      });
     } else {
-      next = [...expenses, { ...editing, id: generateId(), createdAt: new Date().toISOString() }];
+      await createExpense({
+        description: editing.description,
+        amount: editing.amount,
+        category: editing.category,
+        date: editing.date,
+        paidBy: editing.paidBy,
+        notes: editing.notes,
+      });
     }
-    persist(next);
+    await refreshExpenses();
     setModalOpen(false);
     setEditing(EMPTY);
   };
 
-  const deleteExpense = (id: string) => { persist(expenses.filter((e) => e.id !== id)); };
+  const handleDeleteExpense = async (id: number) => {
+    await deleteExpense(id);
+    await refreshExpenses();
+  };
 
   const filtered = expenses
     .filter((e) => e.date.startsWith(filterMonth))
@@ -281,10 +319,10 @@ export default function ExpensesPage() {
           </div>
           {canEdit && (
             <div className="flex items-center gap-3 pt-2">
-              <button onClick={saveExpense} disabled={!editing.description.trim() || !editing.date || editing.amount <= 0} className="flex-1  px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white text-sm font-medium rounded-lg transition-colors">{editing.id ? "Save Changes" : "Add Expense"}</button>
-              {editing.id && (
-                <button onClick={() => { deleteExpense(editing.id); setModalOpen(false); setEditing(EMPTY); }} className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 text-sm font-medium rounded-lg border border-rose-200 transition-colors">Delete</button>
-              )}
+              <button onClick={saveExpenseHandler} disabled={!editing.description.trim() || !editing.date || editing.amount <= 0} className="flex-1  px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white text-sm font-medium rounded-lg transition-colors">{editing.id ? "Save Changes" : "Add Expense"}</button>
+              {editing.id ? (
+                <button onClick={() => { handleDeleteExpense(editing.id); setModalOpen(false); setEditing(EMPTY); }} className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 text-sm font-medium rounded-lg border border-rose-200 transition-colors">Delete</button>
+              ) : null}
             </div>
           )}
         </div>

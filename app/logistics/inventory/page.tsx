@@ -1,7 +1,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { loadStore, saveStore, generateId } from "@/lib/store";
+import {
+  getInventoryItems,
+  createInventoryItem,
+  updateInventoryItem,
+  deleteInventoryItem,
+  checkoutItem,
+  checkinItem,
+} from "@/app/actions/inventory";
+import type { InventoryItemRow, CheckoutRow } from "@/app/actions/inventory";
 import Modal from "@/components/Modal";
 import EmptyState from "@/components/EmptyState";
 import { getCurrentSession } from "@/app/actions/session";
@@ -11,14 +19,8 @@ import type { Session } from "@/lib/auth";
 type ItemStatus = "available" | "in_use" | "needs_repair" | "retired";
 type Category = "electronics" | "furniture" | "supplies" | "clothing" | "transport" | "other";
 
-interface CheckoutRecord {
-  person: string;
-  date: string;
-  returnDate?: string;
-}
-
 interface InventoryItem {
-  id: string;
+  id: number;
   name: string;
   category: Category;
   quantity: number;
@@ -26,11 +28,9 @@ interface InventoryItem {
   location: string;
   condition: string;
   notes: string;
-  checkouts: CheckoutRecord[];
+  checkouts: CheckoutRow[];
   createdAt: string;
 }
-
-const STORE_KEY = "flh_inventory";
 
 const STATUS_CONFIG: Record<ItemStatus, { label: string; dot: string; classes: string }> = {
   available: { label: "Available", dot: "bg-emerald-500", classes: "bg-emerald-50 text-emerald-700 border-emerald-200" },
@@ -49,7 +49,7 @@ const CATEGORY_LABELS: Record<Category, string> = {
 };
 
 const EMPTY: InventoryItem = {
-  id: "",
+  id: 0,
   name: "",
   category: "other",
   quantity: 1,
@@ -61,12 +61,27 @@ const EMPTY: InventoryItem = {
   createdAt: "",
 };
 
+function rowToItem(row: InventoryItemRow): InventoryItem {
+  return {
+    id: row.id,
+    name: row.name,
+    category: row.category as Category,
+    quantity: row.quantity,
+    status: row.status as ItemStatus,
+    location: row.location,
+    condition: row.condition,
+    notes: row.notes,
+    checkouts: row.checkouts,
+    createdAt: row.created_at,
+  };
+}
+
 export default function InventoryPage() {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [checkoutModalOpen, setCheckoutModalOpen] = useState(false);
   const [editing, setEditing] = useState<InventoryItem>(EMPTY);
-  const [checkoutItem, setCheckoutItem] = useState<InventoryItem | null>(null);
+  const [checkoutItemState, setCheckoutItemState] = useState<InventoryItem | null>(null);
   const [checkoutPerson, setCheckoutPerson] = useState("");
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<ItemStatus | "all">("all");
@@ -75,8 +90,12 @@ export default function InventoryPage() {
   const [session, setSession] = useState<Session | null>(null);
 
   useEffect(() => {
-    setItems(loadStore<InventoryItem>(STORE_KEY));
-    getCurrentSession().then(setSession);
+    async function init() {
+      const sess = await getCurrentSession();
+      setSession(sess);
+      await refreshItems();
+    }
+    init();
   }, []);
 
   const canEdit = session && (
@@ -85,58 +104,64 @@ export default function InventoryPage() {
     session.department === "Logistics"
   );
 
-  const persist = (next: InventoryItem[]) => {
-    setItems(next);
-    saveStore(STORE_KEY, next);
+  const refreshItems = async () => {
+    const res = await getInventoryItems();
+    if (res.success && res.items) {
+      setItems(res.items.map(rowToItem));
+    }
   };
 
   /* ─── CRUD ─── */
-  const saveItem = () => {
+  const saveItem = async () => {
     if (!editing.name.trim()) return;
-    let next: InventoryItem[];
     if (editing.id) {
-      next = items.map((i) => (i.id === editing.id ? editing : i));
+      await updateInventoryItem(editing.id, {
+        name: editing.name,
+        category: editing.category,
+        quantity: editing.quantity,
+        status: editing.status,
+        location: editing.location,
+        condition: editing.condition,
+        notes: editing.notes,
+      });
     } else {
-      next = [...items, { ...editing, id: generateId(), createdAt: new Date().toISOString() }];
+      await createInventoryItem({
+        name: editing.name,
+        category: editing.category,
+        quantity: editing.quantity,
+        status: editing.status,
+        location: editing.location,
+        condition: editing.condition,
+        notes: editing.notes,
+      });
     }
-    persist(next);
+    await refreshItems();
     setModalOpen(false);
     setEditing(EMPTY);
   };
 
-  const deleteItem = (id: string) => {
-    persist(items.filter((i) => i.id !== id));
+  const handleDeleteItem = async (id: number) => {
+    await deleteInventoryItem(id);
+    await refreshItems();
   };
 
   /* ─── Check-out / Check-in ─── */
   const openCheckout = (item: InventoryItem) => {
-    setCheckoutItem(item);
+    setCheckoutItemState(item);
     setCheckoutPerson("");
     setCheckoutModalOpen(true);
   };
 
-  const doCheckout = () => {
-    if (!checkoutItem || !checkoutPerson.trim()) return;
-    const record: CheckoutRecord = { person: checkoutPerson, date: new Date().toISOString().slice(0, 10) };
-    const updated: InventoryItem = {
-      ...checkoutItem,
-      status: "in_use",
-      checkouts: [...checkoutItem.checkouts, record],
-    };
-    persist(items.map((i) => (i.id === updated.id ? updated : i)));
+  const doCheckout = async () => {
+    if (!checkoutItemState || !checkoutPerson.trim()) return;
+    await checkoutItem(checkoutItemState.id, checkoutPerson);
+    await refreshItems();
     setCheckoutModalOpen(false);
   };
 
-  const doCheckin = (item: InventoryItem) => {
-    const checkouts = [...item.checkouts];
-    if (checkouts.length > 0) {
-      checkouts[checkouts.length - 1] = {
-        ...checkouts[checkouts.length - 1],
-        returnDate: new Date().toISOString().slice(0, 10),
-      };
-    }
-    const updated: InventoryItem = { ...item, status: "available", checkouts };
-    persist(items.map((i) => (i.id === updated.id ? updated : i)));
+  const doCheckin = async (item: InventoryItem) => {
+    await checkinItem(item.id);
+    await refreshItems();
   };
 
   /* ─── Filtering ─── */
@@ -263,9 +288,9 @@ export default function InventoryPage() {
                     <span>Qty: <strong className="text-slate-700">{item.quantity}</strong></span>
                     {item.location && <span>📍 {item.location}</span>}
                   </div>
-                  {lastCheckout && !lastCheckout.returnDate && (
+                  {lastCheckout && !lastCheckout.return_date && (
                     <p className="text-xs text-amber-600 mb-3">
-                      Checked out by <strong>{lastCheckout.person}</strong> on {lastCheckout.date}
+                      Checked out by <strong>{lastCheckout.person}</strong> on {lastCheckout.checkout_date}
                     </p>
                   )}
                   <div className="flex items-center gap-2">
@@ -447,14 +472,14 @@ export default function InventoryPage() {
               >
                 {editing.id ? "Save Changes" : "Add Item"}
               </button>
-              {editing.id && (
+              {editing.id ? (
                 <button
-                  onClick={() => { deleteItem(editing.id); setModalOpen(false); setEditing(EMPTY); }}
+                  onClick={() => { handleDeleteItem(editing.id); setModalOpen(false); setEditing(EMPTY); }}
                   className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 text-sm font-medium rounded-lg border border-rose-200 transition-colors"
                 >
                   Delete
                 </button>
-              )}
+              ) : null}
             </div>
           )}
         </div>
@@ -464,7 +489,7 @@ export default function InventoryPage() {
       <Modal
         open={checkoutModalOpen}
         onClose={() => setCheckoutModalOpen(false)}
-        title={`Check Out: ${checkoutItem?.name || ""}`}
+        title={`Check Out: ${checkoutItemState?.name || ""}`}
         maxWidth="max-w-sm"
       >
         <div className="space-y-4">

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { loadStore, saveStore, generateId } from "@/lib/store";
+import { getImpactRecords, createImpactRecord, updateImpactRecord, deleteImpactRecord } from "@/app/actions/impact";
+import type { ImpactRecordRow } from "@/app/actions/impact";
 import Modal from "@/components/Modal";
 import EmptyState from "@/components/EmptyState";
 import { getCurrentSession } from "@/app/actions/session";
@@ -11,7 +12,7 @@ import type { Session } from "@/lib/auth";
 type ActivityType = "workshop" | "training" | "outreach" | "mentoring" | "event" | "other";
 
 interface ImpactRecord {
-  id: string;
+  id: number;
   projectName: string;
   activityType: ActivityType;
   peopleReached: number;
@@ -19,8 +20,6 @@ interface ImpactRecord {
   notes: string;
   createdAt: string;
 }
-
-const STORE_KEY = "flh_impact";
 
 const ACTIVITY_CONFIG: Record<ActivityType, { label: string; color: string }> = {
   workshop: { label: "Workshop", color: "bg-purple-100 text-purple-700" },
@@ -31,7 +30,19 @@ const ACTIVITY_CONFIG: Record<ActivityType, { label: string; color: string }> = 
   other: { label: "Other", color: "bg-slate-100 text-slate-600" },
 };
 
-const EMPTY: ImpactRecord = { id: "", projectName: "", activityType: "other", peopleReached: 0, date: "", notes: "", createdAt: "" };
+const EMPTY: ImpactRecord = { id: 0, projectName: "", activityType: "other", peopleReached: 0, date: "", notes: "", createdAt: "" };
+
+function rowToRecord(row: ImpactRecordRow): ImpactRecord {
+  return {
+    id: row.id,
+    projectName: row.project_name,
+    activityType: row.activity_type as ActivityType,
+    peopleReached: row.people_reached,
+    date: row.date,
+    notes: row.notes,
+    createdAt: row.created_at,
+  };
+}
 
 export default function ImpactPage() {
   const [records, setRecords] = useState<ImpactRecord[]>([]);
@@ -39,9 +50,13 @@ export default function ImpactPage() {
   const [editing, setEditing] = useState<ImpactRecord>(EMPTY);
   const [session, setSession] = useState<Session | null>(null);
 
-  useEffect(() => { 
-    setRecords(loadStore<ImpactRecord>(STORE_KEY));
-    getCurrentSession().then(setSession);
+  useEffect(() => {
+    async function init() {
+      const sess = await getCurrentSession();
+      setSession(sess);
+      await refreshRecords();
+    }
+    init();
   }, []);
 
   const canEdit = session && (
@@ -49,22 +64,42 @@ export default function ImpactPage() {
     session.role === "HEAD" || 
     session.department === "Projects"
   );
-  const persist = (next: ImpactRecord[]) => { setRecords(next); saveStore(STORE_KEY, next); };
 
-  const saveRecord = () => {
-    if (!editing.projectName.trim() || !editing.date || editing.peopleReached <= 0) return;
-    let next: ImpactRecord[];
-    if (editing.id) {
-      next = records.map((r) => (r.id === editing.id ? editing : r));
-    } else {
-      next = [...records, { ...editing, id: generateId(), createdAt: new Date().toISOString() }];
+  const refreshRecords = async () => {
+    const res = await getImpactRecords();
+    if (res.success && res.records) {
+      setRecords(res.records.map(rowToRecord));
     }
-    persist(next);
+  };
+
+  const saveRecord = async () => {
+    if (!editing.projectName.trim() || !editing.date || editing.peopleReached <= 0) return;
+    if (editing.id) {
+      await updateImpactRecord(editing.id, {
+        projectName: editing.projectName,
+        activityType: editing.activityType,
+        peopleReached: editing.peopleReached,
+        date: editing.date,
+        notes: editing.notes,
+      });
+    } else {
+      await createImpactRecord({
+        projectName: editing.projectName,
+        activityType: editing.activityType,
+        peopleReached: editing.peopleReached,
+        date: editing.date,
+        notes: editing.notes,
+      });
+    }
+    await refreshRecords();
     setModalOpen(false);
     setEditing(EMPTY);
   };
 
-  const deleteRecord = (id: string) => { persist(records.filter((r) => r.id !== id)); };
+  const handleDeleteRecord = async (id: number) => {
+    await deleteImpactRecord(id);
+    await refreshRecords();
+  };
 
   const totalPeople = records.reduce((s, r) => s + r.peopleReached, 0);
   const totalActivities = records.length;
@@ -262,9 +297,9 @@ export default function ImpactPage() {
           {canEdit && (
             <div className="flex items-center gap-3 pt-2">
               <button onClick={saveRecord} disabled={!editing.projectName.trim() || !editing.date || editing.peopleReached <= 0} className="flex-1  px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white text-sm font-medium rounded-lg transition-colors">{editing.id ? "Save Changes" : "Add Record"}</button>
-              {editing.id && (
-                <button onClick={() => { deleteRecord(editing.id); setModalOpen(false); setEditing(EMPTY); }} className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 text-sm font-medium rounded-lg border border-rose-200 transition-colors">Delete</button>
-              )}
+              {editing.id ? (
+                <button onClick={() => { handleDeleteRecord(editing.id); setModalOpen(false); setEditing(EMPTY); }} className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 text-sm font-medium rounded-lg border border-rose-200 transition-colors">Delete</button>
+              ) : null}
             </div>
           )}
         </div>
