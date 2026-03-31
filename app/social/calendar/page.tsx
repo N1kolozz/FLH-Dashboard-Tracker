@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
-import { loadStore, saveStore, generateId } from "@/lib/store";
+import { getContentPosts, createContentPost, updateContentPost, deleteContentPost } from "@/app/actions/content-posts";
+import type { ContentPostRow } from "@/app/actions/content-posts";
 import Modal from "@/components/Modal";
 import {
   type PublicHoliday,
@@ -18,7 +19,7 @@ type Platform = "instagram" | "tiktok" | "facebook";
 type PostStatus = "draft" | "scheduled" | "published";
 
 interface ContentPost {
-  id: string;
+  id: number;
   platform: Platform;
   caption: string;
   date: string;
@@ -27,8 +28,6 @@ interface ContentPost {
   notes: string;
   createdAt: string;
 }
-
-const STORE_KEY = "flh_content_posts";
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const WEEKDAYS = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
@@ -45,7 +44,20 @@ const STATUS_CONFIG: Record<PostStatus, { label: string; classes: string }> = {
   published: { label: "Published", classes: "bg-emerald-100 text-emerald-700" },
 };
 
-const EMPTY: ContentPost = { id: "", platform: "instagram", caption: "", date: "", time: "", status: "draft", notes: "", createdAt: "" };
+const EMPTY: ContentPost = { id: 0, platform: "instagram", caption: "", date: "", time: "", status: "draft", notes: "", createdAt: "" };
+
+function rowToPost(row: ContentPostRow): ContentPost {
+  return {
+    id: row.id,
+    platform: row.platform as Platform,
+    caption: row.caption,
+    date: row.date,
+    time: row.time,
+    status: row.status as PostStatus,
+    notes: row.notes,
+    createdAt: row.created_at,
+  };
+}
 
 function getMonthDays(year: number, month: number) {
   const firstDay = new Date(year, month, 1);
@@ -77,9 +89,13 @@ export default function ContentCalendarPage() {
   const holidaysCacheRef = useRef<Record<number, PublicHoliday[]>>({});
   const [session, setSession] = useState<Session | null>(null);
 
-  useEffect(() => { 
-    setPosts(loadStore<ContentPost>(STORE_KEY));
-    getCurrentSession().then(setSession);
+  useEffect(() => {
+    async function init() {
+      const sess = await getCurrentSession();
+      setSession(sess);
+      await refreshPosts();
+    }
+    init();
   }, []);
 
   const canEdit = session && (
@@ -110,22 +126,43 @@ export default function ContentCalendarPage() {
 
   const holidaysByDate = useMemo(() => buildHolidaysByDate(publicHolidays), [publicHolidays]);
 
-  const persist = (next: ContentPost[]) => { setPosts(next); saveStore(STORE_KEY, next); };
-
-  const savePost = () => {
-    if (!editing.caption.trim() || !editing.date) return;
-    let next: ContentPost[];
-    if (editing.id) {
-      next = posts.map((p) => (p.id === editing.id ? editing : p));
-    } else {
-      next = [...posts, { ...editing, id: generateId(), createdAt: new Date().toISOString() }];
+  const refreshPosts = async () => {
+    const res = await getContentPosts();
+    if (res.success && res.posts) {
+      setPosts(res.posts.map(rowToPost));
     }
-    persist(next);
+  };
+
+  const savePost = async () => {
+    if (!editing.caption.trim() || !editing.date) return;
+    if (editing.id) {
+      await updateContentPost(editing.id, {
+        platform: editing.platform,
+        caption: editing.caption,
+        date: editing.date,
+        time: editing.time,
+        status: editing.status,
+        notes: editing.notes,
+      });
+    } else {
+      await createContentPost({
+        platform: editing.platform,
+        caption: editing.caption,
+        date: editing.date,
+        time: editing.time,
+        status: editing.status,
+        notes: editing.notes,
+      });
+    }
+    await refreshPosts();
     setModalOpen(false);
     setEditing(EMPTY);
   };
 
-  const deletePost = (id: string) => { persist(posts.filter((p) => p.id !== id)); };
+  const handleDeletePost = async (id: number) => {
+    await deleteContentPost(id);
+    await refreshPosts();
+  };
 
   const openNew = (date?: string) => {
     setEditing({ ...EMPTY, date: date || "" });
@@ -136,7 +173,6 @@ export default function ContentCalendarPage() {
   const nextMonth = () => { if (viewMonth === 11) { setViewMonth(0); setViewYear((y) => y + 1); } else setViewMonth((m) => m + 1); };
 
   const cells = getMonthDays(viewYear, viewMonth);
-  // Use local date (not UTC) so "today" matches the user's timezone.
   const today = getLocalISODate();
 
   const postsForDate = (dateStr: string) => posts.filter((p) => p.date === dateStr);
@@ -321,9 +357,9 @@ export default function ContentCalendarPage() {
           {canEdit && (
             <div className="flex items-center gap-3 pt-2">
               <button onClick={savePost} disabled={!editing.caption.trim() || !editing.date} className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 text-white text-sm font-medium rounded-lg transition-colors">{editing.id ? "Save Changes" : "Plan Post"}</button>
-              {editing.id && (
-                <button onClick={() => { deletePost(editing.id); setModalOpen(false); setEditing(EMPTY); }} className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 text-sm font-medium rounded-lg border border-rose-200 transition-colors">Delete</button>
-              )}
+              {editing.id ? (
+                <button onClick={() => { handleDeletePost(editing.id); setModalOpen(false); setEditing(EMPTY); }} className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 text-sm font-medium rounded-lg border border-rose-200 transition-colors">Delete</button>
+              ) : null}
             </div>
           )}
         </div>

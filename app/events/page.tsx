@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
-import { loadStore, saveStore, generateId } from "@/lib/store";
+import { getEvents, createEvent, updateEvent, deleteEvent } from "@/app/actions/events";
+import type { EventRow } from "@/app/actions/events";
 import Modal from "@/components/Modal";
 import EmptyState from "@/components/EmptyState";
 import { getCurrentSession } from "@/app/actions/session";
@@ -18,7 +19,7 @@ import {
 type Department = "pr" | "logistics" | "projects" | "other";
 
 interface CalEvent {
-  id: string;
+  id: number;
   title: string;
   date: string;
   time: string;
@@ -28,8 +29,6 @@ interface CalEvent {
   description: string;
   createdAt: string;
 }
-
-const STORE_KEY = "flh_events";
 
 const DEPT_CONFIG: Record<Department, { label: string; color: string; dot: string }> = {
   pr: { label: "PR & Social", color: "bg-purple-100 text-purple-700 border-purple-200", dot: "bg-purple-500" },
@@ -41,7 +40,21 @@ const DEPT_CONFIG: Record<Department, { label: string; color: string; dot: strin
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-const EMPTY: CalEvent = { id: "", title: "", date: "", time: "", endTime: "", location: "", department: "other", description: "", createdAt: "" };
+const EMPTY: CalEvent = { id: 0, title: "", date: "", time: "", endTime: "", location: "", department: "other", description: "", createdAt: "" };
+
+function rowToEvent(row: EventRow): CalEvent {
+  return {
+    id: row.id,
+    title: row.title,
+    date: row.date,
+    time: row.time,
+    endTime: row.end_time,
+    location: row.location,
+    department: row.department as Department,
+    description: row.description,
+    createdAt: row.created_at,
+  };
+}
 
 function getMonthDays(year: number, month: number) {
   const firstDay = new Date(year, month, 1);
@@ -74,9 +87,16 @@ export default function EventsPage() {
   const holidaysCacheRef = useRef<Record<number, PublicHoliday[]>>({});
   const [session, setSession] = useState<Session | null>(null);
 
-  useEffect(() => { 
-    setEvents(loadStore<CalEvent>(STORE_KEY)); 
-    getCurrentSession().then(setSession);
+  useEffect(() => {
+    async function init() {
+      const sess = await getCurrentSession();
+      setSession(sess);
+      const res = await getEvents();
+      if (res.success && res.events) {
+        setEvents(res.events.map(rowToEvent));
+      }
+    }
+    init();
   }, []);
 
   useEffect(() => {
@@ -101,22 +121,45 @@ export default function EventsPage() {
 
   const holidaysByDate = useMemo(() => buildHolidaysByDate(publicHolidays), [publicHolidays]);
 
-  const persist = (next: CalEvent[]) => { setEvents(next); saveStore(STORE_KEY, next); };
-
-  const saveEvent = () => {
-    if (!editing.title.trim() || !editing.date) return;
-    let next: CalEvent[];
-    if (editing.id) {
-      next = events.map((e) => (e.id === editing.id ? editing : e));
-    } else {
-      next = [...events, { ...editing, id: generateId(), createdAt: new Date().toISOString() }];
+  const refreshEvents = async () => {
+    const res = await getEvents();
+    if (res.success && res.events) {
+      setEvents(res.events.map(rowToEvent));
     }
-    persist(next);
+  };
+
+  const saveEvent = async () => {
+    if (!editing.title.trim() || !editing.date) return;
+    if (editing.id) {
+      await updateEvent(editing.id, {
+        title: editing.title,
+        date: editing.date,
+        time: editing.time,
+        endTime: editing.endTime,
+        location: editing.location,
+        department: editing.department,
+        description: editing.description,
+      });
+    } else {
+      await createEvent({
+        title: editing.title,
+        date: editing.date,
+        time: editing.time,
+        endTime: editing.endTime,
+        location: editing.location,
+        department: editing.department,
+        description: editing.description,
+      });
+    }
+    await refreshEvents();
     setModalOpen(false);
     setEditing(EMPTY);
   };
 
-  const deleteEvent = (id: string) => { persist(events.filter((e) => e.id !== id)); };
+  const handleDelete = async (id: number) => {
+    await deleteEvent(id);
+    await refreshEvents();
+  };
 
   const openNew = (date?: string) => {
     setEditing({ ...EMPTY, date: date || "" });
@@ -133,7 +176,6 @@ export default function EventsPage() {
   };
 
   const cells = getMonthDays(viewYear, viewMonth);
-  // Use local date (not UTC) to avoid off-by-one day in some timezones.
   const today = getLocalISODate();
 
   const eventsForDate = (dateStr: string) => events.filter((e) => e.date === dateStr);
@@ -380,9 +422,9 @@ export default function EventsPage() {
               <button onClick={saveEvent} disabled={!editing.title.trim() || !editing.date} className="flex-1  px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 text-white text-sm font-medium rounded-lg transition-colors">
                 {editing.id ? "Save Changes" : "Create Event"}
               </button>
-              {editing.id && (
-                <button onClick={() => { deleteEvent(editing.id); setModalOpen(false); setEditing(EMPTY); }} className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 text-sm font-medium rounded-lg border border-rose-200 transition-colors">Delete</button>
-              )}
+              {editing.id ? (
+                <button onClick={() => { handleDelete(editing.id); setModalOpen(false); setEditing(EMPTY); }} className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 text-sm font-medium rounded-lg border border-rose-200 transition-colors">Delete</button>
+              ) : null}
             </div>
           )}
         </div>

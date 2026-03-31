@@ -3,34 +3,7 @@
 import Link from "next/link";
 import { useState, useEffect, useCallback } from "react";
 import { StatsResponse } from "@/app/api/stats/route";
-import { loadStore } from "@/lib/store";
-
-/* ─── Types for localStorage modules ─── */
-interface Project {
-  id: string;
-  name: string;
-  status: string;
-}
-interface InventoryItem {
-  id: string;
-  name: string;
-  status: string;
-}
-interface CalEvent {
-  id: string;
-  title: string;
-  date: string;
-}
-interface Expense {
-  id: string;
-  amount: number;
-  date: string;
-}
-interface TeamMember {
-  id: string;
-  name: string;
-  department: string;
-}
+import { getDashboardCounts } from "@/app/actions/dashboard-stats";
 
 /* ─── Quick-stat card ─── */
 function QuickStat({
@@ -141,27 +114,14 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchSocial();
 
-    // Load localStorage stats
-    const projects = loadStore<Project>("flh_projects");
-    setProjectCount(projects.length);
-
-    const inventory = loadStore<InventoryItem>("flh_inventory");
-    setInventoryCount(inventory.length);
-
-    const events = loadStore<CalEvent>("flh_events");
-    // upcoming events only
-    const today = new Date().toISOString().slice(0, 10);
-    setEventCount(events.filter((e) => e.date >= today).length);
-
-    const expenses = loadStore<Expense>("flh_expenses");
-    const thisMonth = new Date().toISOString().slice(0, 7);
-    const monthTotal = expenses
-      .filter((e) => e.date.startsWith(thisMonth))
-      .reduce((sum, e) => sum + (e.amount || 0), 0);
-    setExpenseTotal(monthTotal);
-
-    const team = loadStore<TeamMember>("flh_team");
-    setTeamCount(team.length);
+    // Load stats from database
+    getDashboardCounts().then((counts) => {
+      setProjectCount(counts.projectCount);
+      setInventoryCount(counts.inventoryCount);
+      setEventCount(counts.eventCount);
+      setExpenseTotal(counts.expenseTotal);
+      setTeamCount(counts.teamCount);
+    });
   }, [fetchSocial]);
 
   return (

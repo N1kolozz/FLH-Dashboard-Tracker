@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { loadStore, saveStore, generateId } from "@/lib/store";
+import { getProjects, createProject, updateProject, deleteProject } from "@/app/actions/projects";
+import type { ProjectRow } from "@/app/actions/projects";
 import Modal from "@/components/Modal";
 import EmptyState from "@/components/EmptyState";
 import { getCurrentSession } from "@/app/actions/session";
@@ -12,7 +13,7 @@ type Priority = "low" | "medium" | "high";
 type Status = "planning" | "in_progress" | "review" | "completed";
 
 interface Project {
-  id: string;
+  id: number;
   name: string;
   description: string;
   status: Status;
@@ -22,8 +23,6 @@ interface Project {
   tags: string[];
   createdAt: string;
 }
-
-const STORE_KEY = "flh_projects";
 
 const COLUMNS: { id: Status; label: string; color: string }[] = [
   { id: "planning", label: "Planning", color: "border-t-slate-400" },
@@ -39,7 +38,7 @@ const PRIORITY_CONFIG: Record<Priority, { label: string; classes: string }> = {
 };
 
 const EMPTY: Project = {
-  id: "",
+  id: 0,
   name: "",
   description: "",
   status: "planning",
@@ -50,20 +49,41 @@ const EMPTY: Project = {
   createdAt: "",
 };
 
+function rowToProject(row: ProjectRow): Project {
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    status: row.status as Status,
+    priority: row.priority as Priority,
+    deadline: row.deadline || "",
+    team: row.team,
+    tags: row.tags || [],
+    createdAt: row.created_at,
+  };
+}
+
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Project>(EMPTY);
   const [search, setSearch] = useState("");
   const [filterPriority, setFilterPriority] = useState<Priority | "all">("all");
-  const [dragId, setDragId] = useState<string | null>(null);
+  const [dragId, setDragId] = useState<number | null>(null);
   const [dragOverCol, setDragOverCol] = useState<Status | null>(null);
   const [session, setSession] = useState<Session | null>(null);
 
-  // Load from localStorage
+  // Load from database
   useEffect(() => {
-    setProjects(loadStore<Project>(STORE_KEY));
-    getCurrentSession().then(setSession);
+    async function init() {
+      const sess = await getCurrentSession();
+      setSession(sess);
+      const res = await getProjects();
+      if (res.success && res.projects) {
+        setProjects(res.projects.map(rowToProject));
+      }
+    }
+    init();
   }, []);
 
   const canEdit = session && (
@@ -72,27 +92,45 @@ export default function ProjectsPage() {
     session.department === "Projects"
   );
 
-  const persist = (next: Project[]) => {
-    setProjects(next);
-    saveStore(STORE_KEY, next);
+  const refreshProjects = async () => {
+    const res = await getProjects();
+    if (res.success && res.projects) {
+      setProjects(res.projects.map(rowToProject));
+    }
   };
 
   /* ─── CRUD ─── */
-  const saveProject = () => {
+  const saveProject = async () => {
     if (!editing.name.trim()) return;
-    let next: Project[];
     if (editing.id) {
-      next = projects.map((p) => (p.id === editing.id ? editing : p));
+      await updateProject(editing.id, {
+        name: editing.name,
+        description: editing.description,
+        status: editing.status,
+        priority: editing.priority,
+        deadline: editing.deadline,
+        team: editing.team,
+        tags: editing.tags,
+      });
     } else {
-      next = [...projects, { ...editing, id: generateId(), createdAt: new Date().toISOString() }];
+      await createProject({
+        name: editing.name,
+        description: editing.description,
+        status: editing.status,
+        priority: editing.priority,
+        deadline: editing.deadline,
+        team: editing.team,
+        tags: editing.tags,
+      });
     }
-    persist(next);
+    await refreshProjects();
     setModalOpen(false);
     setEditing(EMPTY);
   };
 
-  const deleteProject = (id: string) => {
-    persist(projects.filter((p) => p.id !== id));
+  const handleDelete = async (id: number) => {
+    await deleteProject(id);
+    await refreshProjects();
   };
 
   const openNew = (status: Status = "planning") => {
@@ -106,7 +144,7 @@ export default function ProjectsPage() {
   };
 
   /* ─── Drag & Drop ─── */
-  const handleDragStart = (id: string) => { if (canEdit) setDragId(id); };
+  const handleDragStart = (id: number) => { if (canEdit) setDragId(id); };
 
   const handleDragOver = (e: React.DragEvent, col: Status) => {
     if (!canEdit) return;
@@ -114,10 +152,21 @@ export default function ProjectsPage() {
     setDragOverCol(col);
   };
 
-  const handleDrop = (col: Status) => {
+  const handleDrop = async (col: Status) => {
     if (dragId) {
-      const next = projects.map((p) => (p.id === dragId ? { ...p, status: col } : p));
-      persist(next);
+      const project = projects.find((p) => p.id === dragId);
+      if (project) {
+        await updateProject(dragId, {
+          name: project.name,
+          description: project.description,
+          status: col,
+          priority: project.priority,
+          deadline: project.deadline,
+          team: project.team,
+          tags: project.tags,
+        });
+        await refreshProjects();
+      }
     }
     setDragId(null);
     setDragOverCol(null);
@@ -371,14 +420,14 @@ export default function ProjectsPage() {
               >
                 {editing.id ? "Save Changes" : "Create Project"}
               </button>
-              {editing.id && (
+              {editing.id ? (
                 <button
-                  onClick={() => { deleteProject(editing.id); setModalOpen(false); setEditing(EMPTY); }}
+                  onClick={() => { handleDelete(editing.id); setModalOpen(false); setEditing(EMPTY); }}
                   className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 text-sm font-medium rounded-lg border border-rose-200 transition-colors"
                 >
                   Delete
                 </button>
-              )}
+              ) : null}
             </div>
           )}
         </div>

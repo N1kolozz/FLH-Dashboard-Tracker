@@ -71,6 +71,106 @@ async function migrate() {
     `);
     console.log("✓ follower_history profile stats columns ready");
 
+    // ── Department module tables ────────────────────────────────────
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS projects (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        description TEXT DEFAULT '',
+        status VARCHAR(50) NOT NULL DEFAULT 'planning',
+        priority VARCHAR(50) NOT NULL DEFAULT 'medium',
+        deadline DATE,
+        team VARCHAR(255) DEFAULT '',
+        tags TEXT[] DEFAULT '{}',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log("✓ projects table ready");
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS events (
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        date DATE NOT NULL,
+        time VARCHAR(10) DEFAULT '',
+        end_time VARCHAR(10) DEFAULT '',
+        location VARCHAR(255) DEFAULT '',
+        department VARCHAR(50) NOT NULL DEFAULT 'other',
+        description TEXT DEFAULT '',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log("✓ events table ready");
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS inventory_items (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        category VARCHAR(50) NOT NULL DEFAULT 'other',
+        quantity INTEGER NOT NULL DEFAULT 1,
+        status VARCHAR(50) NOT NULL DEFAULT 'available',
+        location VARCHAR(255) DEFAULT '',
+        condition VARCHAR(255) DEFAULT '',
+        notes TEXT DEFAULT '',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log("✓ inventory_items table ready");
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS inventory_checkouts (
+        id SERIAL PRIMARY KEY,
+        item_id INTEGER NOT NULL REFERENCES inventory_items(id) ON DELETE CASCADE,
+        person VARCHAR(255) NOT NULL,
+        checkout_date DATE NOT NULL,
+        return_date DATE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log("✓ inventory_checkouts table ready");
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS expenses (
+        id SERIAL PRIMARY KEY,
+        description VARCHAR(255) NOT NULL,
+        amount NUMERIC(12,2) NOT NULL DEFAULT 0,
+        category VARCHAR(50) NOT NULL DEFAULT 'other',
+        date DATE NOT NULL,
+        paid_by VARCHAR(255) DEFAULT '',
+        notes TEXT DEFAULT '',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log("✓ expenses table ready");
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS content_posts (
+        id SERIAL PRIMARY KEY,
+        platform VARCHAR(50) NOT NULL DEFAULT 'instagram',
+        caption TEXT NOT NULL,
+        date DATE NOT NULL,
+        time VARCHAR(10) DEFAULT '',
+        status VARCHAR(50) NOT NULL DEFAULT 'draft',
+        notes TEXT DEFAULT '',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log("✓ content_posts table ready");
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS impact_records (
+        id SERIAL PRIMARY KEY,
+        project_name VARCHAR(255) NOT NULL,
+        activity_type VARCHAR(50) NOT NULL DEFAULT 'other',
+        people_reached INTEGER NOT NULL DEFAULT 0,
+        date DATE NOT NULL,
+        notes TEXT DEFAULT '',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log("✓ impact_records table ready");
+
     // Seed accounts (upsert by URL to avoid duplicates)
     const accounts = [
       {
