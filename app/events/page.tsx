@@ -25,7 +25,7 @@ import {
 } from "@/lib/calendar-ui";
 
 /* ─── Types ─── */
-type Department = "pr" | "logistics" | "projects" | "other";
+type Department = "all" | "pr" | "logistics" | "projects" | "other";
 type CalendarView = "month" | "week";
 type CalendarLayout = "slide" | "fit";
 
@@ -43,12 +43,14 @@ interface CalEvent {
 }
 
 const DEPT_CONFIG: Record<Department, { label: string; color: string; dot: string }> = {
+  all: { label: "All Departments", color: "bg-violet-100 text-violet-700 border-violet-200", dot: "bg-violet-500" },
   pr: { label: "PR & Social", color: "bg-purple-100 text-purple-700 border-purple-200", dot: "bg-purple-500" },
   logistics: { label: "Logistics", color: "bg-blue-100 text-blue-700 border-blue-200", dot: "bg-blue-500" },
   projects: { label: "Projects", color: "bg-emerald-100 text-emerald-700 border-emerald-200", dot: "bg-emerald-500" },
   other: { label: "Other", color: "bg-slate-100 text-slate-600 border-slate-200", dot: "bg-slate-400" },
 };
 const DEPT_SHORT_LABEL: Record<Department, string> = {
+  all: "ALL",
   pr: "PR",
   logistics: "LOG",
   projects: "PRO",
