@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { getProjects, createProject, updateProject, deleteProject } from "@/app/actions/projects";
 import type { ProjectRow } from "@/app/actions/projects";
 import { getMembers } from "@/app/actions/members";
@@ -10,6 +10,7 @@ import Modal from "@/components/Modal";
 import EmptyState from "@/components/EmptyState";
 import { getCurrentSession } from "@/app/actions/session";
 import type { Session } from "@/lib/auth";
+import { getStoredSkeletonMap, setStoredSkeletonMap } from "@/lib/loading-skeleton";
 
 /* ─── Types ─── */
 type Priority = "low" | "medium" | "high";
@@ -60,6 +61,14 @@ const PRIORITY_ORDER: Record<Priority, number> = {
   high: 0,
   medium: 1,
   low: 2,
+};
+
+const PROJECT_SKELETON_STORAGE_KEY = "project-board-skeleton-counts";
+const EMPTY_COLUMN_COUNTS: Record<Status, number> = {
+  planning: 0,
+  in_progress: 0,
+  review: 0,
+  completed: 0,
 };
 
 function CardSection({
@@ -145,6 +154,56 @@ function getDropPreviewIndex(
   return previewItems.findIndex((project) => project.id === draggedProject.id);
 }
 
+function ProjectBoardSkeleton({
+  counts,
+}: {
+  counts: Record<Status, number>;
+}) {
+  return (
+    <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {COLUMNS.map((column) => (
+        <div
+          key={column.id}
+          className={`self-start overflow-visible rounded-xl border border-slate-200 bg-white/70 ${column.color} border-t-2`}
+        >
+          <div className="flex items-center justify-between px-4 py-3">
+            <div className="flex items-center gap-2">
+              <div className="h-4 w-24 animate-pulse rounded-full bg-slate-200" />
+              <div className="h-5 w-8 animate-pulse rounded-full bg-slate-100" />
+            </div>
+            <div className="h-6 w-6 animate-pulse rounded-md bg-slate-100" />
+          </div>
+          <div className="space-y-2 px-3 pb-3">
+            {Array.from({ length: counts[column.id] }).map((_, idx) => (
+              <div
+                key={idx}
+                className="animate-pulse rounded-2xl border border-slate-200/80 bg-gradient-to-b from-white via-white to-slate-50/80 p-4"
+              >
+                <div className="mb-4 flex items-start justify-between gap-3">
+                  <div className="h-5 w-14 rounded-full bg-slate-200" />
+                  <div className="h-5 w-16 rounded-full bg-slate-100" />
+                </div>
+                <div className="space-y-2.5">
+                  <div className="rounded-xl border border-slate-200/80 bg-slate-50/80 px-3 py-2.5">
+                    <div className="flex gap-2.5">
+                      <div className="h-7 w-7 rounded-lg bg-slate-100" />
+                      <div className="flex-1 space-y-2">
+                        <div className="h-3 w-20 rounded-full bg-slate-100" />
+                        <div className="h-4 w-32 rounded-full bg-slate-200" />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="h-16 rounded-xl bg-slate-100" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [members, setMembers] = useState<MemberChoice[]>([]);
@@ -156,24 +215,39 @@ export default function ProjectsPage() {
   const [dragPreviewHeight, setDragPreviewHeight] = useState<number | null>(null);
   const [dragOverCol, setDragOverCol] = useState<Status | null>(null);
   const [session, setSession] = useState<Session | null>(null);
+  const [isLoadingData, setIsLoadingData] = useState(true);
+  const [cachedColumnCounts, setCachedColumnCounts] = useState<Record<Status, number>>(
+    EMPTY_COLUMN_COUNTS
+  );
   const dragIdRef = useRef<number | null>(null);
 
   useEffect(() => {
+    setCachedColumnCounts(
+      getStoredSkeletonMap(PROJECT_SKELETON_STORAGE_KEY, EMPTY_COLUMN_COUNTS)
+    );
+  }, []);
+
+  useEffect(() => {
     async function init() {
-      const [sess, projectRes, memberRes] = await Promise.all([
-        getCurrentSession(),
-        getProjects(),
-        getMembers(),
-      ]);
-      setSession(sess);
-      if (projectRes.success && projectRes.projects) {
-        setProjects(projectRes.projects.map(rowToProject));
-      }
-      if (memberRes.success && memberRes.members) {
-        const nextMembers = (memberRes.members as { id: number; name: string }[])
-          .map((member) => ({ id: member.id, name: member.name }))
-          .sort((a, b) => a.name.localeCompare(b.name));
-        setMembers(nextMembers);
+      setIsLoadingData(true);
+      try {
+        const [sess, projectRes, memberRes] = await Promise.all([
+          getCurrentSession(),
+          getProjects(),
+          getMembers(),
+        ]);
+        setSession(sess);
+        if (projectRes.success && projectRes.projects) {
+          setProjects(projectRes.projects.map(rowToProject));
+        }
+        if (memberRes.success && memberRes.members) {
+          const nextMembers = (memberRes.members as { id: number; name: string }[])
+            .map((member) => ({ id: member.id, name: member.name }))
+            .sort((a, b) => a.name.localeCompare(b.name));
+          setMembers(nextMembers);
+        }
+      } finally {
+        setIsLoadingData(false);
       }
     }
     init();
@@ -186,9 +260,14 @@ export default function ProjectsPage() {
   );
 
   const refreshProjects = async () => {
-    const res = await getProjects();
-    if (res.success && res.projects) {
-      setProjects(res.projects.map(rowToProject));
+    setIsLoadingData(true);
+    try {
+      const res = await getProjects();
+      if (res.success && res.projects) {
+        setProjects(res.projects.map(rowToProject));
+      }
+    } finally {
+      setIsLoadingData(false);
     }
   };
 
@@ -328,6 +407,35 @@ export default function ProjectsPage() {
     return diff;
   };
 
+  const projectColumnCounts = useMemo(
+    () =>
+      COLUMNS.reduce<Record<Status, number>>((acc, column) => {
+        acc[column.id] = projects.filter((project) => project.status === column.id).length;
+        return acc;
+      }, { ...EMPTY_COLUMN_COUNTS }),
+    [projects]
+  );
+
+  useEffect(() => {
+    if (isLoadingData) return;
+
+    setCachedColumnCounts(projectColumnCounts);
+    setStoredSkeletonMap(PROJECT_SKELETON_STORAGE_KEY, projectColumnCounts);
+  }, [isLoadingData, projectColumnCounts]);
+
+  const skeletonColumnCounts = COLUMNS.reduce<Record<Status, number>>(
+    (acc, column) => {
+      acc[column.id] =
+        projectColumnCounts[column.id] > 0
+          ? projectColumnCounts[column.id]
+          : cachedColumnCounts[column.id] > 0
+            ? cachedColumnCounts[column.id]
+            : 1;
+      return acc;
+    },
+    { ...EMPTY_COLUMN_COUNTS }
+  );
+
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
@@ -341,7 +449,9 @@ export default function ProjectsPage() {
               </svg>
             </h1>
             <p className="text-xs text-slate-500 mt-0.5">
-              {projects.length} project{projects.length !== 1 ? "s" : ""} · Drag cards to change status
+              {isLoadingData
+                ? "Loading projects..."
+                : `${projects.length} project${projects.length !== 1 ? "s" : ""} · Drag cards to change status`}
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
@@ -377,7 +487,9 @@ export default function ProjectsPage() {
 
       {/* Kanban Board */}
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6">
-        {projects.length === 0 ? (
+        {isLoadingData ? (
+          <ProjectBoardSkeleton counts={skeletonColumnCounts} />
+        ) : projects.length === 0 ? (
           <EmptyState
             title="No projects yet"
             description="Create your first project to start tracking work on the kanban board."

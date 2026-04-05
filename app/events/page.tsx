@@ -100,6 +100,95 @@ function getMonthDays(year: number, month: number) {
   return cells;
 }
 
+function LoadingStatCards() {
+  return (
+    <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+      {Array.from({ length: 4 }).map((_, idx) => (
+        <div key={idx} className="animate-pulse rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm">
+          <div className="h-3 w-20 rounded-full bg-slate-200" />
+          <div className="mt-3 h-9 w-16 rounded-2xl bg-slate-200" />
+          <div className="mt-2 h-4 w-32 rounded-full bg-slate-100" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function CalendarDataSkeleton({
+  calendarView,
+  isFitLayout,
+}: {
+  calendarView: CalendarView;
+  isFitLayout: boolean;
+}) {
+  const isMonthView = calendarView === "month";
+  const containerClassName = isMonthView
+    ? (isFitLayout ? "w-full" : "min-w-[940px]")
+    : (isFitLayout ? "w-full" : "min-w-[1180px]");
+  const cellClassName = isMonthView
+    ? (isFitLayout ? "min-h-[82px] sm:min-h-[108px]" : "min-h-[150px]")
+    : (isFitLayout ? "min-h-[150px] sm:min-h-[200px]" : "min-h-[280px]");
+  const cellCount = isMonthView ? 35 : 7;
+
+  return (
+    <div className={isFitLayout ? "" : "overflow-x-auto pb-1"}>
+      <div className={`${containerClassName} overflow-hidden rounded-[28px] border border-slate-200/80 bg-gradient-to-b from-white via-white to-slate-50 shadow-sm`}>
+        <div className="grid grid-cols-7 border-b border-slate-200/80 bg-slate-100/90">
+          {WEEKDAYS.map((day) => (
+            <div key={day} className={`${isFitLayout ? "px-1 py-2 sm:px-2" : "px-4 py-3"} text-center`}>
+              <div className="mx-auto h-3 w-10 animate-pulse rounded-full bg-slate-200" />
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-7">
+          {Array.from({ length: cellCount }).map((_, idx) => (
+            <div
+              key={idx}
+              className={`${cellClassName} animate-pulse border-b border-r border-slate-200/70 bg-white px-3 py-3`}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="h-8 w-8 rounded-2xl bg-slate-200" />
+                <div className="space-y-1">
+                  <div className="h-3 w-10 rounded-full bg-slate-100" />
+                  <div className="h-3 w-8 rounded-full bg-slate-100" />
+                </div>
+              </div>
+              <div className="mt-3 space-y-2">
+                <div className="h-8 rounded-xl bg-slate-100" />
+                <div className="h-8 rounded-xl bg-slate-100/80" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EventListSkeleton() {
+  return (
+    <div className="space-y-3">
+      {Array.from({ length: 5 }).map((_, idx) => (
+        <div
+          key={idx}
+          className="flex animate-pulse items-center gap-4 rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm"
+        >
+          <div className="w-14 shrink-0 space-y-2 text-center">
+            <div className="mx-auto h-8 w-8 rounded-2xl bg-slate-200" />
+            <div className="mx-auto h-3 w-8 rounded-full bg-slate-100" />
+          </div>
+          <div className="min-w-0 flex-1 space-y-2">
+            <div className="h-4 w-40 rounded-full bg-slate-200" />
+            <div className="h-3 w-56 rounded-full bg-slate-100" />
+            <div className="h-3 w-32 rounded-full bg-slate-100" />
+          </div>
+          <div className="h-6 w-28 rounded-full bg-slate-100" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function EventsPage() {
   const [events, setEvents] = useState<CalEvent[]>([]);
   const [members, setMembers] = useState<MemberChoice[]>([]);
@@ -115,23 +204,29 @@ export default function EventsPage() {
   const [publicHolidays, setPublicHolidays] = useState<PublicHoliday[]>([]);
   const holidaysCacheRef = useRef<Record<number, PublicHoliday[]>>({});
   const [session, setSession] = useState<Session | null>(null);
+  const [isLoadingData, setIsLoadingData] = useState(true);
 
   useEffect(() => {
     async function init() {
-      const [sess, eventRes, memberRes] = await Promise.all([
-        getCurrentSession(),
-        getEvents(),
-        getMembers(),
-      ]);
-      setSession(sess);
-      if (eventRes.success && eventRes.events) {
-        setEvents(eventRes.events.map(rowToEvent));
-      }
-      if (memberRes.success && memberRes.members) {
-        const nextMembers = (memberRes.members as { id: number; name: string }[])
-          .map((member) => ({ id: member.id, name: member.name }))
-          .sort((a, b) => a.name.localeCompare(b.name));
-        setMembers(nextMembers);
+      setIsLoadingData(true);
+      try {
+        const [sess, eventRes, memberRes] = await Promise.all([
+          getCurrentSession(),
+          getEvents(),
+          getMembers(),
+        ]);
+        setSession(sess);
+        if (eventRes.success && eventRes.events) {
+          setEvents(eventRes.events.map(rowToEvent));
+        }
+        if (memberRes.success && memberRes.members) {
+          const nextMembers = (memberRes.members as { id: number; name: string }[])
+            .map((member) => ({ id: member.id, name: member.name }))
+            .sort((a, b) => a.name.localeCompare(b.name));
+          setMembers(nextMembers);
+        }
+      } finally {
+        setIsLoadingData(false);
       }
     }
     init();
@@ -160,9 +255,14 @@ export default function EventsPage() {
   const holidaysByDate = useMemo(() => buildHolidaysByDate(publicHolidays), [publicHolidays]);
 
   const refreshEvents = async () => {
-    const res = await getEvents();
-    if (res.success && res.events) {
-      setEvents(res.events.map(rowToEvent));
+    setIsLoadingData(true);
+    try {
+      const res = await getEvents();
+      if (res.success && res.events) {
+        setEvents(res.events.map(rowToEvent));
+      }
+    } finally {
+      setIsLoadingData(false);
     }
   };
 
@@ -308,7 +408,7 @@ export default function EventsPage() {
               </svg>
             </h1>
             <p className="text-xs text-slate-500 mt-0.5">
-              {events.length} event{events.length !== 1 ? "s" : ""} · {upcomingEvents.length} upcoming
+              {isLoadingData ? "Loading events..." : `${events.length} event${events.length !== 1 ? "s" : ""} · ${upcomingEvents.length} upcoming`}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -329,7 +429,9 @@ export default function EventsPage() {
       </header>
 
       <div className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6">
-        {events.length === 0 && view === "list" ? (
+        {isLoadingData && view === "list" ? (
+          <EventListSkeleton />
+        ) : events.length === 0 && view === "list" ? (
           <EmptyState
             title="No events yet"
             description="Create your first event to start organizing your calendar."
@@ -338,28 +440,32 @@ export default function EventsPage() {
           />
         ) : view === "calendar" ? (
           <div className="space-y-5">
-            <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-              <div className="rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">This Month</p>
-                <p className="mt-3 text-3xl font-semibold text-slate-900">{monthEvents.length}</p>
-                <p className="mt-1 text-sm text-slate-500">Events scheduled in {MONTHS[viewMonth]}</p>
+            {isLoadingData ? (
+              <LoadingStatCards />
+            ) : (
+              <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+                <div className="rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">This Month</p>
+                  <p className="mt-3 text-3xl font-semibold text-slate-900">{monthEvents.length}</p>
+                  <p className="mt-1 text-sm text-slate-500">Events scheduled in {MONTHS[viewMonth]}</p>
+                </div>
+                <div className="rounded-2xl border border-amber-200/70 bg-gradient-to-br from-white to-amber-50/70 p-4 shadow-sm">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-amber-500">Upcoming</p>
+                  <p className="mt-3 text-3xl font-semibold text-amber-600">{upcomingEvents.length}</p>
+                  <p className="mt-1 text-sm text-slate-500">Next events ready to track</p>
+                </div>
+                <div className="rounded-2xl border border-blue-200/70 bg-gradient-to-br from-white to-blue-50/70 p-4 shadow-sm">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-blue-500">Active Days</p>
+                  <p className="mt-3 text-3xl font-semibold text-blue-600">{activeDaysCount}</p>
+                  <p className="mt-1 text-sm text-slate-500">Days with at least one event</p>
+                </div>
+                <div className="rounded-2xl border border-emerald-200/70 bg-gradient-to-br from-white to-emerald-50/70 p-4 shadow-sm">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-500">Departments</p>
+                  <p className="mt-3 text-3xl font-semibold text-emerald-600">{departmentCount}</p>
+                  <p className="mt-1 text-sm text-slate-500">Teams represented this month</p>
+                </div>
               </div>
-              <div className="rounded-2xl border border-amber-200/70 bg-gradient-to-br from-white to-amber-50/70 p-4 shadow-sm">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-amber-500">Upcoming</p>
-                <p className="mt-3 text-3xl font-semibold text-amber-600">{upcomingEvents.length}</p>
-                <p className="mt-1 text-sm text-slate-500">Next events ready to track</p>
-              </div>
-              <div className="rounded-2xl border border-blue-200/70 bg-gradient-to-br from-white to-blue-50/70 p-4 shadow-sm">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-blue-500">Active Days</p>
-                <p className="mt-3 text-3xl font-semibold text-blue-600">{activeDaysCount}</p>
-                <p className="mt-1 text-sm text-slate-500">Days with at least one event</p>
-              </div>
-              <div className="rounded-2xl border border-emerald-200/70 bg-gradient-to-br from-white to-emerald-50/70 p-4 shadow-sm">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-500">Departments</p>
-                <p className="mt-3 text-3xl font-semibold text-emerald-600">{departmentCount}</p>
-                <p className="mt-1 text-sm text-slate-500">Teams represented this month</p>
-              </div>
-            </div>
+            )}
 
             <div className="rounded-[28px] border border-slate-200/80 bg-white/80 p-4 shadow-sm backdrop-blur-sm sm:p-5">
               <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
@@ -444,7 +550,9 @@ export default function EventsPage() {
               </div>
             </div>
 
-            {calendarView === "month" ? (
+            {isLoadingData ? (
+              <CalendarDataSkeleton calendarView={calendarView} isFitLayout={isFitLayout} />
+            ) : calendarView === "month" ? (
               <div className={isFitLayout ? "" : "overflow-x-auto pb-1"}>
                 <div className={`${isFitLayout ? "w-full" : "min-w-[940px]"} overflow-hidden rounded-[28px] border border-slate-200/80 bg-gradient-to-b from-white via-white to-slate-50 shadow-sm`}>
                   <div className="grid grid-cols-7 border-b border-slate-200/80 bg-slate-100/90">

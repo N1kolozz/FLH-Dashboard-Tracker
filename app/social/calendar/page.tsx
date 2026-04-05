@@ -100,6 +100,71 @@ function getMonthDays(year: number, month: number) {
   return cells;
 }
 
+function LoadingStatCards() {
+  return (
+    <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+      {Array.from({ length: 4 }).map((_, idx) => (
+        <div key={idx} className="animate-pulse rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm">
+          <div className="h-3 w-20 rounded-full bg-slate-200" />
+          <div className="mt-3 h-9 w-16 rounded-2xl bg-slate-200" />
+          <div className="mt-2 h-4 w-32 rounded-full bg-slate-100" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function CalendarDataSkeleton({
+  calendarView,
+  isFitLayout,
+}: {
+  calendarView: CalendarView;
+  isFitLayout: boolean;
+}) {
+  const isMonthView = calendarView === "month";
+  const containerClassName = isMonthView
+    ? (isFitLayout ? "w-full" : "min-w-[940px]")
+    : (isFitLayout ? "w-full" : "min-w-[1180px]");
+  const cellClassName = isMonthView
+    ? (isFitLayout ? "min-h-[82px] sm:min-h-[108px]" : "min-h-[150px]")
+    : (isFitLayout ? "min-h-[150px] sm:min-h-[200px]" : "min-h-[280px]");
+  const cellCount = isMonthView ? 35 : 7;
+
+  return (
+    <div className={isFitLayout ? "" : "overflow-x-auto pb-1"}>
+      <div className={`${containerClassName} overflow-hidden rounded-[28px] border border-slate-200/80 bg-gradient-to-b from-white via-white to-slate-50 shadow-sm`}>
+        <div className="grid grid-cols-7 border-b border-slate-200/80 bg-slate-100/90">
+          {WEEKDAYS.map((day) => (
+            <div key={day} className={`${isFitLayout ? "px-1 py-2 sm:px-2" : "px-4 py-3"} text-center`}>
+              <div className="mx-auto h-3 w-10 animate-pulse rounded-full bg-slate-200" />
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-7">
+          {Array.from({ length: cellCount }).map((_, idx) => (
+            <div
+              key={idx}
+              className={`${cellClassName} animate-pulse border-b border-r border-slate-200/70 bg-white px-3 py-3`}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="h-8 w-8 rounded-2xl bg-slate-200" />
+                <div className="space-y-1">
+                  <div className="h-3 w-10 rounded-full bg-slate-100" />
+                  <div className="h-3 w-8 rounded-full bg-slate-100" />
+                </div>
+              </div>
+              <div className="mt-3 space-y-2">
+                <div className="h-8 rounded-xl bg-slate-100" />
+                <div className="h-8 rounded-xl bg-slate-100/80" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ContentCalendarPage() {
   const [posts, setPosts] = useState<ContentPost[]>([]);
   const [members, setMembers] = useState<MemberChoice[]>([]);
@@ -114,23 +179,29 @@ export default function ContentCalendarPage() {
   const [publicHolidays, setPublicHolidays] = useState<PublicHoliday[]>([]);
   const holidaysCacheRef = useRef<Record<number, PublicHoliday[]>>({});
   const [session, setSession] = useState<Session | null>(null);
+  const [isLoadingData, setIsLoadingData] = useState(true);
 
   useEffect(() => {
     async function init() {
-      const [sess, postRes, memberRes] = await Promise.all([
-        getCurrentSession(),
-        getContentPosts(),
-        getMembers(),
-      ]);
-      setSession(sess);
-      if (postRes.success && postRes.posts) {
-        setPosts(postRes.posts.map(rowToPost));
-      }
-      if (memberRes.success && memberRes.members) {
-        const nextMembers = (memberRes.members as { id: number; name: string }[])
-          .map((member) => ({ id: member.id, name: member.name }))
-          .sort((a, b) => a.name.localeCompare(b.name));
-        setMembers(nextMembers);
+      setIsLoadingData(true);
+      try {
+        const [sess, postRes, memberRes] = await Promise.all([
+          getCurrentSession(),
+          getContentPosts(),
+          getMembers(),
+        ]);
+        setSession(sess);
+        if (postRes.success && postRes.posts) {
+          setPosts(postRes.posts.map(rowToPost));
+        }
+        if (memberRes.success && memberRes.members) {
+          const nextMembers = (memberRes.members as { id: number; name: string }[])
+            .map((member) => ({ id: member.id, name: member.name }))
+            .sort((a, b) => a.name.localeCompare(b.name));
+          setMembers(nextMembers);
+        }
+      } finally {
+        setIsLoadingData(false);
       }
     }
     init();
@@ -165,9 +236,14 @@ export default function ContentCalendarPage() {
   const holidaysByDate = useMemo(() => buildHolidaysByDate(publicHolidays), [publicHolidays]);
 
   const refreshPosts = async () => {
-    const res = await getContentPosts();
-    if (res.success && res.posts) {
-      setPosts(res.posts.map(rowToPost));
+    setIsLoadingData(true);
+    try {
+      const res = await getContentPosts();
+      if (res.success && res.posts) {
+        setPosts(res.posts.map(rowToPost));
+      }
+    } finally {
+      setIsLoadingData(false);
     }
   };
 
@@ -317,28 +393,32 @@ export default function ContentCalendarPage() {
 
       <div className="mx-auto max-w-[1400px] space-y-5 px-4 py-6 sm:px-6">
         {/* Stats */}
-        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-          <div className="rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Drafts</p>
-            <p className="mt-3 text-3xl font-semibold text-slate-900">{draftCount}</p>
-            <p className="mt-1 text-sm text-slate-500">Ideas still being shaped</p>
+        {isLoadingData ? (
+          <LoadingStatCards />
+        ) : (
+          <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+            <div className="rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Drafts</p>
+              <p className="mt-3 text-3xl font-semibold text-slate-900">{draftCount}</p>
+              <p className="mt-1 text-sm text-slate-500">Ideas still being shaped</p>
+            </div>
+            <div className="rounded-2xl border border-amber-200/70 bg-gradient-to-br from-white to-amber-50/70 p-4 shadow-sm">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-amber-500">Scheduled</p>
+              <p className="mt-3 text-3xl font-semibold text-amber-600">{scheduledCount}</p>
+              <p className="mt-1 text-sm text-slate-500">Ready to go live</p>
+            </div>
+            <div className="rounded-2xl border border-emerald-200/70 bg-gradient-to-br from-white to-emerald-50/70 p-4 shadow-sm">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-500">Published</p>
+              <p className="mt-3 text-3xl font-semibold text-emerald-600">{publishedCount}</p>
+              <p className="mt-1 text-sm text-slate-500">Already posted this month</p>
+            </div>
+            <div className="rounded-2xl border border-violet-200/70 bg-gradient-to-br from-white to-violet-50/70 p-4 shadow-sm">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-violet-500">Active Days</p>
+              <p className="mt-3 text-3xl font-semibold text-violet-600">{activeDaysCount}</p>
+              <p className="mt-1 text-sm text-slate-500">Days with planned content</p>
+            </div>
           </div>
-          <div className="rounded-2xl border border-amber-200/70 bg-gradient-to-br from-white to-amber-50/70 p-4 shadow-sm">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-amber-500">Scheduled</p>
-            <p className="mt-3 text-3xl font-semibold text-amber-600">{scheduledCount}</p>
-            <p className="mt-1 text-sm text-slate-500">Ready to go live</p>
-          </div>
-          <div className="rounded-2xl border border-emerald-200/70 bg-gradient-to-br from-white to-emerald-50/70 p-4 shadow-sm">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-500">Published</p>
-            <p className="mt-3 text-3xl font-semibold text-emerald-600">{publishedCount}</p>
-            <p className="mt-1 text-sm text-slate-500">Already posted this month</p>
-          </div>
-          <div className="rounded-2xl border border-violet-200/70 bg-gradient-to-br from-white to-violet-50/70 p-4 shadow-sm">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-violet-500">Active Days</p>
-            <p className="mt-3 text-3xl font-semibold text-violet-600">{activeDaysCount}</p>
-            <p className="mt-1 text-sm text-slate-500">Days with planned content</p>
-          </div>
-        </div>
+        )}
 
         <div className="rounded-[28px] border border-slate-200/80 bg-white/80 p-4 shadow-sm backdrop-blur-sm sm:p-5">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
@@ -432,7 +512,9 @@ export default function ContentCalendarPage() {
           </div>
         </div>
 
-        {calendarView === "month" ? (
+        {isLoadingData ? (
+          <CalendarDataSkeleton calendarView={calendarView} isFitLayout={isFitLayout} />
+        ) : calendarView === "month" ? (
           <div className={isFitLayout ? "" : "overflow-x-auto pb-1"}>
             <div className={`${isFitLayout ? "w-full" : "min-w-[940px]"} overflow-hidden rounded-[28px] border border-slate-200/80 bg-gradient-to-b from-white via-white to-slate-50 shadow-sm`}>
               <div className="grid grid-cols-7 border-b border-slate-200/80 bg-slate-100/90">

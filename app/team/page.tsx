@@ -6,6 +6,7 @@ import EmptyState from "@/components/EmptyState";
 import { getMembers, addMember, deleteMember, updateMember } from "@/app/actions/members";
 import { getCurrentSession } from "@/app/actions/session";
 import { avatarColor, getInitials } from "@/lib/member-avatar";
+import { getStoredSkeletonCount, resolveSkeletonCount, setStoredSkeletonCount } from "@/lib/loading-skeleton";
 
 import type { Session } from "@/lib/auth";
 
@@ -29,6 +30,36 @@ const DEPT_CONFIG: Record<string, { label: string; color: string; bg: string }> 
   Other: { label: "Other", color: "bg-slate-100 text-slate-600 border-slate-200", bg: "bg-slate-400" },
 };
 
+const TEAM_SKELETON_STORAGE_KEY = "team-directory-skeleton-count";
+
+function TeamDirectorySkeleton({ count }: { count: number }) {
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {Array.from({ length: count }).map((_, idx) => (
+        <div key={idx} className="animate-pulse rounded-xl border border-purple-200 bg-white p-5">
+          <div className="mb-3 flex items-center justify-between">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="h-12 w-12 rounded-full bg-slate-200" />
+              <div className="space-y-2">
+                <div className="h-4 w-28 rounded-full bg-slate-200" />
+                <div className="h-3 w-20 rounded-full bg-slate-100" />
+              </div>
+            </div>
+            <div className="h-8 w-16 rounded-lg bg-slate-100" />
+          </div>
+          <div className="flex gap-2">
+            <div className="h-5 w-24 rounded-full bg-slate-100" />
+            <div className="h-5 w-16 rounded-full bg-slate-100" />
+          </div>
+          <div className="mt-3 border-t border-slate-100 pt-3">
+            <div className="h-3 w-40 rounded-full bg-slate-100" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function TeamPage() {
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
@@ -36,6 +67,8 @@ export default function TeamPage() {
   const [search, setSearch] = useState("");
   const [filterDept, setFilterDept] = useState<string>("all");
   const [session, setSession] = useState<Session | null>(null);
+  const [isLoadingData, setIsLoadingData] = useState(true);
+  const [cachedMemberCount, setCachedMemberCount] = useState(0);
   
   // Add Form State
   const [formData, setFormData] = useState({ fullName: "", role: "", department: "Other", email: "", systemRole: "MEMBER" });
@@ -49,21 +82,42 @@ export default function TeamPage() {
   const [editLoading, setEditLoading] = useState(false);
 
   useEffect(() => {
+    setCachedMemberCount(getStoredSkeletonCount(TEAM_SKELETON_STORAGE_KEY, 0));
+  }, []);
+
+  useEffect(() => {
     async function init() {
-      const sess = await getCurrentSession();
-      setSession(sess);
-      
-      const res = await getMembers();
-      if (res.success && res.members) {
-        setMembers(res.members as TeamMember[]);
+      setIsLoadingData(true);
+      try {
+        const sess = await getCurrentSession();
+        setSession(sess);
+
+        const res = await getMembers();
+        if (res.success && res.members) {
+          setMembers(res.members as TeamMember[]);
+        }
+      } finally {
+        setIsLoadingData(false);
       }
     }
     init();
   }, []);
 
+  useEffect(() => {
+    if (isLoadingData) return;
+
+    setCachedMemberCount(members.length);
+    setStoredSkeletonCount(TEAM_SKELETON_STORAGE_KEY, members.length);
+  }, [isLoadingData, members.length]);
+
   const refreshMembers = async () => {
-    const current = await getMembers();
-    if (current.success && current.members) setMembers(current.members as TeamMember[]);
+    setIsLoadingData(true);
+    try {
+      const current = await getMembers();
+      if (current.success && current.members) setMembers(current.members as TeamMember[]);
+    } finally {
+      setIsLoadingData(false);
+    }
   };
 
   const handleAddMember = async (e: React.FormEvent) => {
@@ -128,6 +182,10 @@ export default function TeamPage() {
     if (search && !m.name.toLowerCase().includes(search.toLowerCase()) && !m.role.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
+  const memberSkeletonCount = resolveSkeletonCount(
+    members.length,
+    cachedMemberCount
+  );
 
   const canEdit = session && (session.role === "ADMIN" || session.role === "HEAD");
 
@@ -142,7 +200,9 @@ export default function TeamPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
             </h1>
-            <p className="text-xs text-slate-500 mt-0.5">{members.length} member{members.length !== 1 ? "s" : ""}</p>
+            <p className="text-xs text-slate-500 mt-0.5">
+              {isLoadingData ? "Loading members..." : `${members.length} member${members.length !== 1 ? "s" : ""}`}
+            </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <input
@@ -171,7 +231,9 @@ export default function TeamPage() {
       </header>
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
-        {members.length === 0 ? (
+        {isLoadingData ? (
+          <TeamDirectorySkeleton count={memberSkeletonCount} />
+        ) : members.length === 0 ? (
           <EmptyState
             title="No team members yet"
             description="Add your organization's team members to build your directory."

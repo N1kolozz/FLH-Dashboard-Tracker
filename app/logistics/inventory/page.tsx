@@ -14,6 +14,7 @@ import Modal from "@/components/Modal";
 import EmptyState from "@/components/EmptyState";
 import { getCurrentSession } from "@/app/actions/session";
 import type { Session } from "@/lib/auth";
+import { getStoredSkeletonCount, resolveSkeletonCount, setStoredSkeletonCount } from "@/lib/loading-skeleton";
 
 /* ─── Types ─── */
 type ItemStatus = "available" | "in_use" | "needs_repair" | "retired";
@@ -76,6 +77,65 @@ function rowToItem(row: InventoryItemRow): InventoryItem {
   };
 }
 
+const INVENTORY_SKELETON_STORAGE_KEY = "inventory-skeleton-count";
+
+function InventoryGridSkeleton({ count }: { count: number }) {
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {Array.from({ length: count }).map((_, idx) => (
+        <div key={idx} className="animate-pulse rounded-xl border border-slate-200 bg-white p-4">
+          <div className="mb-3 flex items-start justify-between">
+            <div className="space-y-2">
+              <div className="h-4 w-28 rounded-full bg-slate-200" />
+              <div className="h-3 w-20 rounded-full bg-slate-100" />
+            </div>
+            <div className="h-5 w-16 rounded-full bg-slate-100" />
+          </div>
+          <div className="mb-3 flex gap-4">
+            <div className="h-3 w-16 rounded-full bg-slate-100" />
+            <div className="h-3 w-20 rounded-full bg-slate-100" />
+          </div>
+          <div className="flex gap-2">
+            <div className="h-8 flex-1 rounded-lg bg-slate-100" />
+            <div className="h-8 flex-1 rounded-lg bg-slate-100" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function InventoryListSkeleton({ count }: { count: number }) {
+  return (
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <th className="px-4 py-3">Name</th>
+            <th className="px-4 py-3">Category</th>
+            <th className="px-4 py-3">Qty</th>
+            <th className="px-4 py-3">Status</th>
+            <th className="px-4 py-3">Location</th>
+            <th className="px-4 py-3">Actions</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100">
+          {Array.from({ length: count }).map((_, idx) => (
+            <tr key={idx} className="animate-pulse">
+              <td className="px-4 py-3"><div className="h-4 w-24 rounded-full bg-slate-200" /></td>
+              <td className="px-4 py-3"><div className="h-4 w-20 rounded-full bg-slate-100" /></td>
+              <td className="px-4 py-3"><div className="h-4 w-10 rounded-full bg-slate-100" /></td>
+              <td className="px-4 py-3"><div className="h-5 w-16 rounded-full bg-slate-100" /></td>
+              <td className="px-4 py-3"><div className="h-4 w-16 rounded-full bg-slate-100" /></td>
+              <td className="px-4 py-3"><div className="h-6 w-24 rounded-md bg-slate-100" /></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export default function InventoryPage() {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
@@ -88,15 +148,33 @@ export default function InventoryPage() {
   const [filterCategory, setFilterCategory] = useState<Category | "all">("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [session, setSession] = useState<Session | null>(null);
+  const [isLoadingData, setIsLoadingData] = useState(true);
+  const [cachedItemCount, setCachedItemCount] = useState(0);
+
+  useEffect(() => {
+    setCachedItemCount(getStoredSkeletonCount(INVENTORY_SKELETON_STORAGE_KEY, 0));
+  }, []);
 
   useEffect(() => {
     async function init() {
-      const sess = await getCurrentSession();
-      setSession(sess);
-      await refreshItems();
+      setIsLoadingData(true);
+      try {
+        const sess = await getCurrentSession();
+        setSession(sess);
+        await refreshItems(false);
+      } finally {
+        setIsLoadingData(false);
+      }
     }
     init();
   }, []);
+
+  useEffect(() => {
+    if (isLoadingData) return;
+
+    setCachedItemCount(items.length);
+    setStoredSkeletonCount(INVENTORY_SKELETON_STORAGE_KEY, items.length);
+  }, [isLoadingData, items.length]);
 
   const canEdit = session && (
     session.role === "ADMIN" || 
@@ -104,10 +182,15 @@ export default function InventoryPage() {
     session.department === "Logistics"
   );
 
-  const refreshItems = async () => {
-    const res = await getInventoryItems();
-    if (res.success && res.items) {
-      setItems(res.items.map(rowToItem));
+  const refreshItems = async (showLoading = true) => {
+    if (showLoading) setIsLoadingData(true);
+    try {
+      const res = await getInventoryItems();
+      if (res.success && res.items) {
+        setItems(res.items.map(rowToItem));
+      }
+    } finally {
+      if (showLoading) setIsLoadingData(false);
     }
   };
 
@@ -173,6 +256,7 @@ export default function InventoryPage() {
   });
 
   const lowStockItems = items.filter((i) => i.status === "available" && i.quantity <= 2 && i.quantity > 0);
+  const inventorySkeletonCount = resolveSkeletonCount(items.length, cachedItemCount);
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -187,7 +271,7 @@ export default function InventoryPage() {
               </svg>
             </h1>
             <p className="text-xs text-slate-500 mt-0.5">
-              {items.length} item{items.length !== 1 ? "s" : ""} tracked
+              {isLoadingData ? "Loading inventory..." : `${items.length} item${items.length !== 1 ? "s" : ""} tracked`}
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
@@ -244,7 +328,7 @@ export default function InventoryPage() {
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-4">
         {/* Low-stock alerts */}
-        {lowStockItems.length > 0 && (
+        {!isLoadingData && lowStockItems.length > 0 && (
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
             <p className="text-sm font-semibold text-amber-700 mb-1">⚠️ Low Stock Alert</p>
             <p className="text-sm text-amber-600">
@@ -253,7 +337,13 @@ export default function InventoryPage() {
           </div>
         )}
 
-        {items.length === 0 ? (
+        {isLoadingData ? (
+          viewMode === "grid" ? (
+            <InventoryGridSkeleton count={inventorySkeletonCount} />
+          ) : (
+            <InventoryListSkeleton count={inventorySkeletonCount} />
+          )
+        ) : items.length === 0 ? (
           <EmptyState
             title="No inventory items"
             description="Start tracking your NGO's assets, equipment, and supplies."

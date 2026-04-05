@@ -7,6 +7,7 @@ import Modal from "@/components/Modal";
 import EmptyState from "@/components/EmptyState";
 import { getCurrentSession } from "@/app/actions/session";
 import type { Session } from "@/lib/auth";
+import { getStoredSkeletonCount, resolveSkeletonCount, setStoredSkeletonCount } from "@/lib/loading-skeleton";
 
 /* ─── Types ─── */
 type ActivityType = "workshop" | "training" | "outreach" | "mentoring" | "event" | "other";
@@ -31,6 +32,9 @@ const ACTIVITY_CONFIG: Record<ActivityType, { label: string; color: string }> = 
 };
 
 const EMPTY: ImpactRecord = { id: 0, projectName: "", activityType: "other", peopleReached: 0, date: "", notes: "", createdAt: "" };
+const IMPACT_RECORD_SKELETON_STORAGE_KEY = "impact-record-skeleton-count";
+const IMPACT_PROJECT_SKELETON_STORAGE_KEY = "impact-project-skeleton-count";
+const IMPACT_TIMELINE_SKELETON_STORAGE_KEY = "impact-timeline-skeleton-count";
 
 function rowToRecord(row: ImpactRecordRow): ImpactRecord {
   return {
@@ -44,17 +48,115 @@ function rowToRecord(row: ImpactRecordRow): ImpactRecord {
   };
 }
 
+function ImpactSummarySkeleton() {
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      {Array.from({ length: 3 }).map((_, idx) => (
+        <div key={idx} className="animate-pulse rounded-xl border border-slate-100 bg-white p-5 text-center shadow-sm">
+          <div className="mx-auto h-8 w-24 rounded-2xl bg-slate-200" />
+          <div className="mx-auto mt-2 h-3 w-24 rounded-full bg-slate-100" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ImpactChartSkeleton({ count }: { count: number }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="mb-4 h-4 w-40 animate-pulse rounded-full bg-slate-200" />
+      <div className="space-y-4">
+        {Array.from({ length: count }).map((_, idx) => (
+          <div key={idx} className="animate-pulse">
+            <div className="mb-1 flex items-center justify-between">
+              <div className="h-4 w-28 rounded-full bg-slate-100" />
+              <div className="h-4 w-20 rounded-full bg-slate-100" />
+            </div>
+            <div className="h-2.5 rounded-full bg-slate-100" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ImpactTimelineSkeleton({ count }: { count: number }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="mb-4 h-4 w-44 animate-pulse rounded-full bg-slate-200" />
+      <div className="flex h-32 items-end gap-1">
+        {Array.from({ length: count }).map((_, idx) => (
+          <div key={idx} className="flex flex-1 items-end">
+            <div
+              className="w-full animate-pulse rounded-t-sm bg-slate-200"
+              style={{ height: `${30 + (idx % 5) * 12}%` }}
+            />
+          </div>
+        ))}
+      </div>
+      <div className="mt-1 flex justify-between">
+        <div className="h-3 w-20 animate-pulse rounded-full bg-slate-100" />
+        <div className="h-3 w-20 animate-pulse rounded-full bg-slate-100" />
+      </div>
+    </div>
+  );
+}
+
+function ImpactTableSkeleton({ count }: { count: number }) {
+  return (
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <th className="px-4 py-3">Date</th>
+            <th className="px-4 py-3">Project</th>
+            <th className="px-4 py-3">Activity</th>
+            <th className="px-4 py-3 text-right">People Reached</th>
+            <th className="px-4 py-3"></th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100">
+          {Array.from({ length: count }).map((_, idx) => (
+            <tr key={idx} className="animate-pulse">
+              <td className="px-4 py-3"><div className="h-4 w-20 rounded-full bg-slate-100" /></td>
+              <td className="px-4 py-3"><div className="h-4 w-36 rounded-full bg-slate-200" /></td>
+              <td className="px-4 py-3"><div className="h-5 w-20 rounded-full bg-slate-100" /></td>
+              <td className="px-4 py-3 text-right"><div className="ml-auto h-4 w-16 rounded-full bg-slate-100" /></td>
+              <td className="px-4 py-3"><div className="h-6 w-12 rounded-md bg-slate-100" /></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export default function ImpactPage() {
   const [records, setRecords] = useState<ImpactRecord[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<ImpactRecord>(EMPTY);
   const [session, setSession] = useState<Session | null>(null);
+  const [isLoadingData, setIsLoadingData] = useState(true);
+  const [cachedRecordCount, setCachedRecordCount] = useState(0);
+  const [cachedProjectCount, setCachedProjectCount] = useState(0);
+  const [cachedTimelineCount, setCachedTimelineCount] = useState(0);
+
+  useEffect(() => {
+    setCachedRecordCount(getStoredSkeletonCount(IMPACT_RECORD_SKELETON_STORAGE_KEY, 0));
+    setCachedProjectCount(getStoredSkeletonCount(IMPACT_PROJECT_SKELETON_STORAGE_KEY, 0));
+    setCachedTimelineCount(getStoredSkeletonCount(IMPACT_TIMELINE_SKELETON_STORAGE_KEY, 0));
+  }, []);
 
   useEffect(() => {
     async function init() {
-      const sess = await getCurrentSession();
-      setSession(sess);
-      await refreshRecords();
+      setIsLoadingData(true);
+      try {
+        const sess = await getCurrentSession();
+        setSession(sess);
+        await refreshRecords(false);
+      } finally {
+        setIsLoadingData(false);
+      }
     }
     init();
   }, []);
@@ -65,10 +167,15 @@ export default function ImpactPage() {
     session.department === "Projects"
   );
 
-  const refreshRecords = async () => {
-    const res = await getImpactRecords();
-    if (res.success && res.records) {
-      setRecords(res.records.map(rowToRecord));
+  const refreshRecords = async (showLoading = true) => {
+    if (showLoading) setIsLoadingData(true);
+    try {
+      const res = await getImpactRecords();
+      if (res.success && res.records) {
+        setRecords(res.records.map(rowToRecord));
+      }
+    } finally {
+      if (showLoading) setIsLoadingData(false);
     }
   };
 
@@ -126,6 +233,29 @@ export default function ImpactPage() {
   }, [records]);
 
   const sortedRecords = [...records].sort((a, b) => b.date.localeCompare(a.date));
+  const impactRecordSkeletonCount = resolveSkeletonCount(
+    records.length,
+    cachedRecordCount
+  );
+  const impactProjectSkeletonCount = resolveSkeletonCount(
+    byProject.length,
+    cachedProjectCount
+  );
+  const impactTimelineSkeletonCount = resolveSkeletonCount(
+    cumulativeData.length,
+    cachedTimelineCount
+  );
+
+  useEffect(() => {
+    if (isLoadingData) return;
+
+    setCachedRecordCount(records.length);
+    setStoredSkeletonCount(IMPACT_RECORD_SKELETON_STORAGE_KEY, records.length);
+    setCachedProjectCount(byProject.length);
+    setStoredSkeletonCount(IMPACT_PROJECT_SKELETON_STORAGE_KEY, byProject.length);
+    setCachedTimelineCount(cumulativeData.length);
+    setStoredSkeletonCount(IMPACT_TIMELINE_SKELETON_STORAGE_KEY, cumulativeData.length);
+  }, [byProject.length, cumulativeData.length, isLoadingData, records.length]);
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -138,7 +268,9 @@ export default function ImpactPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
               </svg>
             </h1>
-            <p className="text-xs text-slate-500 mt-0.5">Track beneficiaries and measure project impact</p>
+            <p className="text-xs text-slate-500 mt-0.5">
+              {isLoadingData ? "Loading impact data..." : "Track beneficiaries and measure project impact"}
+            </p>
           </div>
           {canEdit && (
             <button
@@ -151,23 +283,29 @@ export default function ImpactPage() {
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
         {/* Summary */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="bg-white rounded-xl border border-slate-100 p-5 shadow-sm text-center">
-            <p className="text-3xl font-bold text-blue-600">{totalPeople.toLocaleString()}</p>
-            <p className="text-xs text-slate-500 mt-1 uppercase font-semibold">People Reached</p>
+        {isLoadingData ? (
+          <ImpactSummarySkeleton />
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-white rounded-xl border border-slate-100 p-5 shadow-sm text-center">
+              <p className="text-3xl font-bold text-blue-600">{totalPeople.toLocaleString()}</p>
+              <p className="text-xs text-slate-500 mt-1 uppercase font-semibold">People Reached</p>
+            </div>
+            <div className="bg-white rounded-xl border border-slate-100 p-5 shadow-sm text-center">
+              <p className="text-3xl font-bold text-slate-900">{totalActivities}</p>
+              <p className="text-xs text-slate-500 mt-1 uppercase font-semibold">Activities</p>
+            </div>
+            <div className="bg-white rounded-xl border border-slate-100 p-5 shadow-sm text-center">
+              <p className="text-3xl font-bold text-purple-600">{byProject.length}</p>
+              <p className="text-xs text-slate-500 mt-1 uppercase font-semibold">Projects</p>
+            </div>
           </div>
-          <div className="bg-white rounded-xl border border-slate-100 p-5 shadow-sm text-center">
-            <p className="text-3xl font-bold text-slate-900">{totalActivities}</p>
-            <p className="text-xs text-slate-500 mt-1 uppercase font-semibold">Activities</p>
-          </div>
-          <div className="bg-white rounded-xl border border-slate-100 p-5 shadow-sm text-center">
-            <p className="text-3xl font-bold text-purple-600">{byProject.length}</p>
-            <p className="text-xs text-slate-500 mt-1 uppercase font-semibold">Projects</p>
-          </div>
-        </div>
+        )}
 
         {/* Impact by project */}
-        {byProject.length > 0 && (
+        {isLoadingData ? (
+          <ImpactChartSkeleton count={impactProjectSkeletonCount} />
+        ) : byProject.length > 0 && (
           <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
             <h3 className="text-sm font-semibold text-slate-600 uppercase tracking-wide mb-4">Impact by Project</h3>
             <div className="space-y-3">
@@ -190,7 +328,9 @@ export default function ImpactPage() {
         )}
 
         {/* Cumulative timeline */}
-        {cumulativeData.length > 1 && (
+        {isLoadingData ? (
+          <ImpactTimelineSkeleton count={impactTimelineSkeletonCount} />
+        ) : cumulativeData.length > 1 && (
           <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
             <h3 className="text-sm font-semibold text-slate-600 uppercase tracking-wide mb-4">Cumulative Reach Over Time</h3>
             <div className="flex items-end gap-1 h-32">
@@ -217,7 +357,9 @@ export default function ImpactPage() {
         )}
 
         {/* Records list */}
-        {records.length === 0 ? (
+        {isLoadingData ? (
+          <ImpactTableSkeleton count={impactRecordSkeletonCount} />
+        ) : records.length === 0 ? (
           <EmptyState
             title="No impact records yet"
             description="Start tracking beneficiaries to measure your NGO's real-world impact."

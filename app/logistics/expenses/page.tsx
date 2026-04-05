@@ -7,6 +7,7 @@ import Modal from "@/components/Modal";
 import EmptyState from "@/components/EmptyState";
 import { getCurrentSession } from "@/app/actions/session";
 import type { Session } from "@/lib/auth";
+import { getStoredSkeletonCount, resolveSkeletonCount, setStoredSkeletonCount } from "@/lib/loading-skeleton";
 
 /* ─── Types ─── */
 type ExpenseCategory = "supplies" | "transport" | "food" | "venue" | "printing" | "equipment" | "communication" | "other";
@@ -39,6 +40,8 @@ const BAR_COLORS = [
 ];
 
 const EMPTY: Expense = { id: 0, description: "", amount: 0, category: "other", date: "", paidBy: "", notes: "", createdAt: "" };
+const EXPENSE_TABLE_SKELETON_STORAGE_KEY = "expenses-table-skeleton-count";
+const EXPENSE_CHART_SKELETON_STORAGE_KEY = "expenses-chart-skeleton-count";
 
 function rowToExpense(row: ExpenseRow): Expense {
   return {
@@ -53,6 +56,69 @@ function rowToExpense(row: ExpenseRow): Expense {
   };
 }
 
+function ExpenseSummarySkeleton() {
+  return (
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      {Array.from({ length: 3 }).map((_, idx) => (
+        <div key={idx} className="animate-pulse rounded-xl border border-slate-100 bg-white p-5 text-center shadow-sm">
+          <div className="mx-auto h-8 w-28 rounded-2xl bg-slate-200" />
+          <div className="mx-auto mt-2 h-3 w-24 rounded-full bg-slate-100" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ExpenseChartSkeleton({ count }: { count: number }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="mb-4 h-4 w-40 animate-pulse rounded-full bg-slate-200" />
+      <div className="space-y-4">
+        {Array.from({ length: count }).map((_, idx) => (
+          <div key={idx} className="animate-pulse">
+            <div className="mb-1 flex items-center justify-between">
+              <div className="h-4 w-24 rounded-full bg-slate-100" />
+              <div className="h-4 w-16 rounded-full bg-slate-100" />
+            </div>
+            <div className="h-2.5 rounded-full bg-slate-100" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ExpenseTableSkeleton({ count }: { count: number }) {
+  return (
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <th className="px-4 py-3">Date</th>
+            <th className="px-4 py-3">Description</th>
+            <th className="px-4 py-3">Category</th>
+            <th className="px-4 py-3">Paid By</th>
+            <th className="px-4 py-3 text-right">Amount</th>
+            <th className="px-4 py-3"></th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100">
+          {Array.from({ length: count }).map((_, idx) => (
+            <tr key={idx} className="animate-pulse">
+              <td className="px-4 py-3"><div className="h-4 w-20 rounded-full bg-slate-100" /></td>
+              <td className="px-4 py-3"><div className="h-4 w-36 rounded-full bg-slate-200" /></td>
+              <td className="px-4 py-3"><div className="h-5 w-20 rounded-full bg-slate-100" /></td>
+              <td className="px-4 py-3"><div className="h-4 w-20 rounded-full bg-slate-100" /></td>
+              <td className="px-4 py-3 text-right"><div className="ml-auto h-4 w-16 rounded-full bg-slate-100" /></td>
+              <td className="px-4 py-3"><div className="h-6 w-12 rounded-md bg-slate-100" /></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export default function ExpensesPage() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
@@ -60,20 +126,38 @@ export default function ExpensesPage() {
   const [filterCategory, setFilterCategory] = useState<ExpenseCategory | "all">("all");
   const [filterMonth, setFilterMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [session, setSession] = useState<Session | null>(null);
+  const [isLoadingData, setIsLoadingData] = useState(true);
+  const [cachedExpenseCount, setCachedExpenseCount] = useState(0);
+  const [cachedCategoryCount, setCachedCategoryCount] = useState(0);
+
+  useEffect(() => {
+    setCachedExpenseCount(getStoredSkeletonCount(EXPENSE_TABLE_SKELETON_STORAGE_KEY, 0));
+    setCachedCategoryCount(getStoredSkeletonCount(EXPENSE_CHART_SKELETON_STORAGE_KEY, 0));
+  }, []);
 
   useEffect(() => {
     async function init() {
-      const sess = await getCurrentSession();
-      setSession(sess);
-      await refreshExpenses();
+      setIsLoadingData(true);
+      try {
+        const sess = await getCurrentSession();
+        setSession(sess);
+        await refreshExpenses(false);
+      } finally {
+        setIsLoadingData(false);
+      }
     }
     init();
   }, []);
 
-  const refreshExpenses = async () => {
-    const res = await getExpenses();
-    if (res.success && res.expenses) {
-      setExpenses(res.expenses.map(rowToExpense));
+  const refreshExpenses = async (showLoading = true) => {
+    if (showLoading) setIsLoadingData(true);
+    try {
+      const res = await getExpenses();
+      if (res.success && res.expenses) {
+        setExpenses(res.expenses.map(rowToExpense));
+      }
+    } finally {
+      if (showLoading) setIsLoadingData(false);
     }
   };
 
@@ -133,6 +217,11 @@ export default function ExpensesPage() {
   }, [filtered]);
 
   const maxCategoryTotal = Math.max(...categoryBreakdown.map((d) => d.total), 1);
+  const expenseSkeletonCount = resolveSkeletonCount(filtered.length, cachedExpenseCount);
+  const categorySkeletonCount = resolveSkeletonCount(
+    categoryBreakdown.length,
+    cachedCategoryCount
+  );
 
   // Month navigation
   const prevMonth = () => {
@@ -148,6 +237,15 @@ export default function ExpensesPage() {
 
   const monthLabel = new Date(filterMonth + "-01").toLocaleDateString(undefined, { month: "long", year: "numeric" });
 
+  useEffect(() => {
+    if (isLoadingData) return;
+
+    setCachedExpenseCount(filtered.length);
+    setStoredSkeletonCount(EXPENSE_TABLE_SKELETON_STORAGE_KEY, filtered.length);
+    setCachedCategoryCount(categoryBreakdown.length);
+    setStoredSkeletonCount(EXPENSE_CHART_SKELETON_STORAGE_KEY, categoryBreakdown.length);
+  }, [categoryBreakdown.length, filtered.length, isLoadingData]);
+
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="border-b border-purple-200/70 bg-emerald-100/80 backdrop-blur-md">
@@ -159,7 +257,9 @@ export default function ExpensesPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </h1>
-            <p className="text-xs text-slate-500 mt-0.5">{expenses.length} total record{expenses.length !== 1 ? "s" : ""}</p>
+            <p className="text-xs text-slate-500 mt-0.5">
+              {isLoadingData ? "Loading expenses..." : `${expenses.length} total record${expenses.length !== 1 ? "s" : ""}`}
+            </p>
           </div>
           {canEdit && (
             <button
@@ -178,24 +278,29 @@ export default function ExpensesPage() {
           <button onClick={nextMonth} className="px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">Next →</button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Total this month */}
-          <div className="bg-white rounded-xl border border-slate-100 p-5 shadow-sm text-center">
-            <p className="text-3xl font-bold text-slate-900">₾{monthTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
-            <p className="text-xs text-slate-500 mt-1 uppercase font-semibold">Total This Month</p>
+        {isLoadingData ? (
+          <ExpenseSummarySkeleton />
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-white rounded-xl border border-slate-100 p-5 shadow-sm text-center">
+              <p className="text-3xl font-bold text-slate-900">₾{monthTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+              <p className="text-xs text-slate-500 mt-1 uppercase font-semibold">Total This Month</p>
+            </div>
+            <div className="bg-white rounded-xl border border-slate-100 p-5 shadow-sm text-center">
+              <p className="text-3xl font-bold text-slate-900">{filtered.length}</p>
+              <p className="text-xs text-slate-500 mt-1 uppercase font-semibold">Transactions</p>
+            </div>
+            <div className="bg-white rounded-xl border border-slate-100 p-5 shadow-sm text-center">
+              <p className="text-3xl font-bold text-slate-900">{categoryBreakdown.length}</p>
+              <p className="text-xs text-slate-500 mt-1 uppercase font-semibold">Categories</p>
+            </div>
           </div>
-          <div className="bg-white rounded-xl border border-slate-100 p-5 shadow-sm text-center">
-            <p className="text-3xl font-bold text-slate-900">{filtered.length}</p>
-            <p className="text-xs text-slate-500 mt-1 uppercase font-semibold">Transactions</p>
-          </div>
-          <div className="bg-white rounded-xl border border-slate-100 p-5 shadow-sm text-center">
-            <p className="text-3xl font-bold text-slate-900">{categoryBreakdown.length}</p>
-            <p className="text-xs text-slate-500 mt-1 uppercase font-semibold">Categories</p>
-          </div>
-        </div>
+        )}
 
         {/* Breakdown chart */}
-        {categoryBreakdown.length > 0 && (
+        {isLoadingData ? (
+          <ExpenseChartSkeleton count={categorySkeletonCount} />
+        ) : categoryBreakdown.length > 0 && (
           <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
             <h3 className="text-sm font-semibold text-slate-600 uppercase tracking-wide mb-4">Spending by Category</h3>
             <div className="space-y-3">
@@ -232,7 +337,9 @@ export default function ExpensesPage() {
           </select>
         </div>
 
-        {expenses.length === 0 ? (
+        {isLoadingData ? (
+          <ExpenseTableSkeleton count={expenseSkeletonCount} />
+        ) : expenses.length === 0 ? (
           <EmptyState
             title="No expenses recorded"
             description="Start tracking your NGO's spending for full accountability."
