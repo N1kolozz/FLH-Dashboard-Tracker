@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 type TimeRange = "30" | "90" | "all";
 
 function getDateFilter(range: TimeRange, tzParamIndex: number): string {
