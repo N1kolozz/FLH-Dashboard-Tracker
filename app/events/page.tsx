@@ -3,6 +3,9 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { getEvents, createEvent, updateEvent, deleteEvent } from "@/app/actions/events";
 import type { EventRow } from "@/app/actions/events";
+import { getMembers } from "@/app/actions/members";
+import MemberAvatarStack from "@/components/MemberAvatarStack";
+import MemberMultiSelect, { type MemberChoice } from "@/components/MemberMultiSelect";
 import Modal from "@/components/Modal";
 import EmptyState from "@/components/EmptyState";
 import { getCurrentSession } from "@/app/actions/session";
@@ -27,6 +30,7 @@ interface CalEvent {
   location: string;
   department: Department;
   description: string;
+  ownerUserIds: number[];
   createdAt: string;
 }
 
@@ -40,7 +44,18 @@ const DEPT_CONFIG: Record<Department, { label: string; color: string; dot: strin
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-const EMPTY: CalEvent = { id: 0, title: "", date: "", time: "", endTime: "", location: "", department: "other", description: "", createdAt: "" };
+const EMPTY: CalEvent = {
+  id: 0,
+  title: "",
+  date: "",
+  time: "",
+  endTime: "",
+  location: "",
+  department: "other",
+  description: "",
+  ownerUserIds: [],
+  createdAt: "",
+};
 
 function rowToEvent(row: EventRow): CalEvent {
   return {
@@ -52,6 +67,7 @@ function rowToEvent(row: EventRow): CalEvent {
     location: row.location,
     department: row.department as Department,
     description: row.description,
+    ownerUserIds: (row.owner_user_ids || []).map(Number),
     createdAt: row.created_at,
   };
 }
@@ -77,6 +93,7 @@ function getLocalISODate(date = new Date()) {
 
 export default function EventsPage() {
   const [events, setEvents] = useState<CalEvent[]>([]);
+  const [members, setMembers] = useState<MemberChoice[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<CalEvent>(EMPTY);
   const [viewMonth, setViewMonth] = useState(() => new Date().getMonth());
@@ -89,11 +106,20 @@ export default function EventsPage() {
 
   useEffect(() => {
     async function init() {
-      const sess = await getCurrentSession();
+      const [sess, eventRes, memberRes] = await Promise.all([
+        getCurrentSession(),
+        getEvents(),
+        getMembers(),
+      ]);
       setSession(sess);
-      const res = await getEvents();
-      if (res.success && res.events) {
-        setEvents(res.events.map(rowToEvent));
+      if (eventRes.success && eventRes.events) {
+        setEvents(eventRes.events.map(rowToEvent));
+      }
+      if (memberRes.success && memberRes.members) {
+        const nextMembers = (memberRes.members as { id: number; name: string }[])
+          .map((member) => ({ id: member.id, name: member.name }))
+          .sort((a, b) => a.name.localeCompare(b.name));
+        setMembers(nextMembers);
       }
     }
     init();
@@ -139,6 +165,7 @@ export default function EventsPage() {
         location: editing.location,
         department: editing.department,
         description: editing.description,
+        ownerUserIds: editing.ownerUserIds,
       });
     } else {
       await createEvent({
@@ -149,6 +176,7 @@ export default function EventsPage() {
         location: editing.location,
         department: editing.department,
         description: editing.description,
+        ownerUserIds: editing.ownerUserIds,
       });
     }
     await refreshEvents();
@@ -162,7 +190,11 @@ export default function EventsPage() {
   };
 
   const openNew = (date?: string) => {
-    setEditing({ ...EMPTY, date: date || "" });
+    setEditing({
+      ...EMPTY,
+      date: date || "",
+      ownerUserIds: session?.userId ? [Number(session.userId)] : [],
+    });
     setModalOpen(true);
   };
 
@@ -179,6 +211,8 @@ export default function EventsPage() {
   const today = getLocalISODate();
 
   const eventsForDate = (dateStr: string) => events.filter((e) => e.date === dateStr);
+  const getOwnerMembers = (ownerUserIds: number[]) =>
+    members.filter((member) => ownerUserIds.includes(member.id));
 
   const upcomingEvents = [...events]
     .filter((e) => e.date >= today)
@@ -323,25 +357,40 @@ export default function EventsPage() {
                   </p>
                 ) : (
                   <div className="space-y-2">
-                    {eventsForDate(selectedDate).sort((a, b) => a.time.localeCompare(b.time)).map((ev) => (
-                      <div
-                        key={ev.id}
-                        onClick={() => { setEditing(ev); setModalOpen(true); }}
-                        className="flex items-center gap-3 p-3 rounded-lg border border-slate-100 hover:bg-slate-50 cursor-pointer transition-colors"
-                      >
-                        <div className={`w-2 h-2 rounded-full shrink-0 ${DEPT_CONFIG[ev.department].dot}`} />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-slate-800">{ev.title}</p>
-                          <p className="text-xs text-slate-500">
-                            {ev.time && `${ev.time}${ev.endTime ? ` – ${ev.endTime}` : ""}`}
-                            {ev.location && ` · 📍 ${ev.location}`}
-                          </p>
+                    {eventsForDate(selectedDate).sort((a, b) => a.time.localeCompare(b.time)).map((ev) => {
+                      const owners = getOwnerMembers(ev.ownerUserIds);
+
+                      return (
+                        <div
+                          key={ev.id}
+                          onClick={() => { setEditing(ev); setModalOpen(true); }}
+                          className="flex items-center gap-3 p-3 rounded-lg border border-slate-100 hover:bg-slate-50 cursor-pointer transition-colors"
+                        >
+                          <div className={`w-2 h-2 rounded-full shrink-0 ${DEPT_CONFIG[ev.department].dot}`} />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium text-slate-800">{ev.title}</p>
+                            <p className="text-xs text-slate-500">
+                              {ev.time && `${ev.time}${ev.endTime ? ` – ${ev.endTime}` : ""}`}
+                              {ev.location && ` · 📍 ${ev.location}`}
+                            </p>
+                            {owners.length > 0 && (
+                              <div className="mt-1 flex items-center gap-2">
+                                <MemberAvatarStack
+                                  names={owners.map((owner) => owner.name)}
+                                  size="sm"
+                                />
+                                <p className="text-xs text-slate-400 truncate">
+                                  {owners.map((owner) => owner.name).join(", ")}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border shrink-0 ${DEPT_CONFIG[ev.department].color}`}>
+                            {DEPT_CONFIG[ev.department].label}
+                          </span>
                         </div>
-                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border shrink-0 ${DEPT_CONFIG[ev.department].color}`}>
-                          {DEPT_CONFIG[ev.department].label}
-                        </span>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -353,28 +402,43 @@ export default function EventsPage() {
             {upcomingEvents.length === 0 ? (
               <p className="text-sm text-slate-500 text-center py-8">No upcoming events.</p>
             ) : (
-              upcomingEvents.map((ev) => (
-                <div
-                  key={ev.id}
-                  onClick={() => { setEditing(ev); setModalOpen(true); }}
-                  className="flex items-center gap-4 bg-white rounded-xl border border-slate-100 p-4 shadow-sm cursor-pointer"
-                >
-                  <div className="text-center shrink-0 w-14">
-                    <p className="text-2xl font-bold text-slate-900">{new Date(ev.date + "T00:00:00").getDate()}</p>
-                    <p className="text-[10px] font-semibold text-slate-400 uppercase">{MONTHS[new Date(ev.date + "T00:00:00").getMonth()].slice(0, 3)}</p>
+              upcomingEvents.map((ev) => {
+                const owners = getOwnerMembers(ev.ownerUserIds);
+
+                return (
+                  <div
+                    key={ev.id}
+                    onClick={() => { setEditing(ev); setModalOpen(true); }}
+                    className="flex items-center gap-4 bg-white rounded-xl border border-slate-100 p-4 shadow-sm cursor-pointer"
+                  >
+                    <div className="text-center shrink-0 w-14">
+                      <p className="text-2xl font-bold text-slate-900">{new Date(ev.date + "T00:00:00").getDate()}</p>
+                      <p className="text-[10px] font-semibold text-slate-400 uppercase">{MONTHS[new Date(ev.date + "T00:00:00").getMonth()].slice(0, 3)}</p>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-slate-800">{ev.title}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {ev.time && `${ev.time}${ev.endTime ? ` – ${ev.endTime}` : ""}`}
+                        {ev.location && ` · 📍 ${ev.location}`}
+                      </p>
+                      {owners.length > 0 && (
+                        <div className="mt-1 flex items-center gap-2">
+                          <MemberAvatarStack
+                            names={owners.map((owner) => owner.name)}
+                            size="sm"
+                          />
+                          <p className="text-xs text-slate-400 truncate">
+                            {owners.map((owner) => owner.name).join(", ")}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border shrink-0 ${DEPT_CONFIG[ev.department].color}`}>
+                      {DEPT_CONFIG[ev.department].label}
+                    </span>
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-slate-800">{ev.title}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      {ev.time && `${ev.time}${ev.endTime ? ` – ${ev.endTime}` : ""}`}
-                      {ev.location && ` · 📍 ${ev.location}`}
-                    </p>
-                  </div>
-                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border shrink-0 ${DEPT_CONFIG[ev.department].color}`}>
-                    {DEPT_CONFIG[ev.department].label}
-                  </span>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         )}
@@ -417,6 +481,12 @@ export default function EventsPage() {
             <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
             <textarea disabled={!canEdit} value={editing.description} onChange={(e) => setEditing({ ...editing, description: e.target.value })} rows={2} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 resize-none disabled:bg-slate-50" placeholder="Event details..." />
           </div>
+          <MemberMultiSelect
+            members={members}
+            selectedIds={editing.ownerUserIds}
+            onChange={(ownerUserIds) => setEditing({ ...editing, ownerUserIds })}
+            disabled={!canEdit}
+          />
           {canEdit && (
             <div className="flex items-center gap-3 pt-2">
               <button onClick={saveEvent} disabled={!editing.title.trim() || !editing.date} className="flex-1  px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 text-white text-sm font-medium rounded-lg transition-colors">

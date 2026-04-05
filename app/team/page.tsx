@@ -5,6 +5,7 @@ import Modal from "@/components/Modal";
 import EmptyState from "@/components/EmptyState";
 import { getMembers, addMember, deleteMember, updateMember } from "@/app/actions/members";
 import { getCurrentSession } from "@/app/actions/session";
+import { avatarColor, getInitials } from "@/lib/member-avatar";
 
 import type { Session } from "@/lib/auth";
 
@@ -27,25 +28,6 @@ const DEPT_CONFIG: Record<string, { label: string; color: string; bg: string }> 
   Management: { label: "Management", color: "bg-amber-100 text-amber-700 border-amber-200", bg: "bg-amber-500" },
   Other: { label: "Other", color: "bg-slate-100 text-slate-600 border-slate-200", bg: "bg-slate-400" },
 };
-
-function getInitials(name: string): string {
-  if (!name) return "";
-  const parts = name.split(" ").filter(Boolean);
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
-
-const AVATAR_COLORS = [
-  "bg-purple-500", "bg-blue-500", "bg-emerald-500", "bg-amber-500", "bg-rose-500",
-  "bg-cyan-500", "bg-indigo-500", "bg-pink-500", "bg-teal-500", "bg-orange-500",
-];
-
-function avatarColor(name: string): string {
-  if (!name) return AVATAR_COLORS[0];
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
-}
 
 export default function TeamPage() {
   const [members, setMembers] = useState<TeamMember[]>([]);

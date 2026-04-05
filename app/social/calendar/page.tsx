@@ -3,6 +3,9 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { getContentPosts, createContentPost, updateContentPost, deleteContentPost } from "@/app/actions/content-posts";
 import type { ContentPostRow } from "@/app/actions/content-posts";
+import { getMembers } from "@/app/actions/members";
+import MemberAvatarStack from "@/components/MemberAvatarStack";
+import MemberMultiSelect, { type MemberChoice } from "@/components/MemberMultiSelect";
 import Modal from "@/components/Modal";
 import {
   type PublicHoliday,
@@ -26,6 +29,7 @@ interface ContentPost {
   time: string;
   status: PostStatus;
   notes: string;
+  ownerUserIds: number[];
   createdAt: string;
 }
 
@@ -44,7 +48,17 @@ const STATUS_CONFIG: Record<PostStatus, { label: string; classes: string }> = {
   published: { label: "Published", classes: "bg-emerald-100 text-emerald-700" },
 };
 
-const EMPTY: ContentPost = { id: 0, platform: "instagram", caption: "", date: "", time: "", status: "draft", notes: "", createdAt: "" };
+const EMPTY: ContentPost = {
+  id: 0,
+  platform: "instagram",
+  caption: "",
+  date: "",
+  time: "",
+  status: "draft",
+  notes: "",
+  ownerUserIds: [],
+  createdAt: "",
+};
 
 function rowToPost(row: ContentPostRow): ContentPost {
   return {
@@ -55,6 +69,7 @@ function rowToPost(row: ContentPostRow): ContentPost {
     time: row.time,
     status: row.status as PostStatus,
     notes: row.notes,
+    ownerUserIds: (row.owner_user_ids || []).map(Number),
     createdAt: row.created_at,
   };
 }
@@ -80,6 +95,7 @@ function getLocalISODate(date = new Date()) {
 
 export default function ContentCalendarPage() {
   const [posts, setPosts] = useState<ContentPost[]>([]);
+  const [members, setMembers] = useState<MemberChoice[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<ContentPost>(EMPTY);
   const [viewMonth, setViewMonth] = useState(() => new Date().getMonth());
@@ -91,9 +107,21 @@ export default function ContentCalendarPage() {
 
   useEffect(() => {
     async function init() {
-      const sess = await getCurrentSession();
+      const [sess, postRes, memberRes] = await Promise.all([
+        getCurrentSession(),
+        getContentPosts(),
+        getMembers(),
+      ]);
       setSession(sess);
-      await refreshPosts();
+      if (postRes.success && postRes.posts) {
+        setPosts(postRes.posts.map(rowToPost));
+      }
+      if (memberRes.success && memberRes.members) {
+        const nextMembers = (memberRes.members as { id: number; name: string }[])
+          .map((member) => ({ id: member.id, name: member.name }))
+          .sort((a, b) => a.name.localeCompare(b.name));
+        setMembers(nextMembers);
+      }
     }
     init();
   }, []);
@@ -143,6 +171,7 @@ export default function ContentCalendarPage() {
         time: editing.time,
         status: editing.status,
         notes: editing.notes,
+        ownerUserIds: editing.ownerUserIds,
       });
     } else {
       await createContentPost({
@@ -152,6 +181,7 @@ export default function ContentCalendarPage() {
         time: editing.time,
         status: editing.status,
         notes: editing.notes,
+        ownerUserIds: editing.ownerUserIds,
       });
     }
     await refreshPosts();
@@ -165,7 +195,11 @@ export default function ContentCalendarPage() {
   };
 
   const openNew = (date?: string) => {
-    setEditing({ ...EMPTY, date: date || "" });
+    setEditing({
+      ...EMPTY,
+      date: date || "",
+      ownerUserIds: session?.userId ? [Number(session.userId)] : [],
+    });
     setModalOpen(true);
   };
 
@@ -176,6 +210,8 @@ export default function ContentCalendarPage() {
   const today = getLocalISODate();
 
   const postsForDate = (dateStr: string) => posts.filter((p) => p.date === dateStr);
+  const getOwnerMembers = (ownerUserIds: number[]) =>
+    members.filter((member) => ownerUserIds.includes(member.id));
 
   // Summary stats
   const monthPosts = posts.filter((p) => p.date.startsWith(`${viewYear}-${String(viewMonth + 1).padStart(2, "0")}`));
@@ -305,16 +341,31 @@ export default function ContentCalendarPage() {
               <p className="text-sm text-slate-500">No posts planned for this day.</p>
             ) : (
               <div className="space-y-2">
-                {postsForDate(selectedDate).sort((a, b) => a.time.localeCompare(b.time)).map((p) => (
-                  <div key={p.id} onClick={() => { setEditing(p); setModalOpen(true); }} className="flex items-center gap-3 p-3 rounded-lg border border-slate-100 hover:bg-slate-50 cursor-pointer transition-colors">
-                    <div className={`w-2 h-2 rounded-full shrink-0 ${PLATFORM_CONFIG[p.platform].dot}`} />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm text-slate-800 line-clamp-1">{p.caption}</p>
-                      <p className="text-xs text-slate-500">{PLATFORM_CONFIG[p.platform].label} {p.time && `· ${p.time}`}</p>
+                {postsForDate(selectedDate).sort((a, b) => a.time.localeCompare(b.time)).map((p) => {
+                  const owners = getOwnerMembers(p.ownerUserIds);
+
+                  return (
+                    <div key={p.id} onClick={() => { setEditing(p); setModalOpen(true); }} className="flex items-center gap-3 p-3 rounded-lg border border-slate-100 hover:bg-slate-50 cursor-pointer transition-colors">
+                      <div className={`w-2 h-2 rounded-full shrink-0 ${PLATFORM_CONFIG[p.platform].dot}`} />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm text-slate-800 line-clamp-1">{p.caption}</p>
+                        <p className="text-xs text-slate-500">{PLATFORM_CONFIG[p.platform].label} {p.time && `· ${p.time}`}</p>
+                        {owners.length > 0 && (
+                          <div className="mt-1 flex items-center gap-2">
+                            <MemberAvatarStack
+                              names={owners.map((owner) => owner.name)}
+                              size="sm"
+                            />
+                            <p className="text-xs text-slate-400 truncate">
+                              {owners.map((owner) => owner.name).join(", ")}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${STATUS_CONFIG[p.status].classes}`}>{STATUS_CONFIG[p.status].label}</span>
                     </div>
-                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${STATUS_CONFIG[p.status].classes}`}>{STATUS_CONFIG[p.status].label}</span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -354,6 +405,12 @@ export default function ContentCalendarPage() {
             <label className="block text-sm font-medium text-slate-700 mb-1">Notes</label>
             <textarea disabled={!canEdit} value={editing.notes} onChange={(e) => setEditing({ ...editing, notes: e.target.value })} rows={2} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 resize-none disabled:bg-slate-50" placeholder="Internal notes..." />
           </div>
+          <MemberMultiSelect
+            members={members}
+            selectedIds={editing.ownerUserIds}
+            onChange={(ownerUserIds) => setEditing({ ...editing, ownerUserIds })}
+            disabled={!canEdit}
+          />
           {canEdit && (
             <div className="flex items-center gap-3 pt-2">
               <button onClick={savePost} disabled={!editing.caption.trim() || !editing.date} className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 text-white text-sm font-medium rounded-lg transition-colors">{editing.id ? "Save Changes" : "Plan Post"}</button>

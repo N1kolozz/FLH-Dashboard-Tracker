@@ -1,8 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { getProjects, createProject, updateProject, deleteProject } from "@/app/actions/projects";
 import type { ProjectRow } from "@/app/actions/projects";
+import { getMembers } from "@/app/actions/members";
+import MemberAvatarStack from "@/components/MemberAvatarStack";
+import MemberMultiSelect, { type MemberChoice } from "@/components/MemberMultiSelect";
 import Modal from "@/components/Modal";
 import EmptyState from "@/components/EmptyState";
 import { getCurrentSession } from "@/app/actions/session";
@@ -21,6 +24,7 @@ interface Project {
   deadline: string;
   team: string;
   tags: string[];
+  ownerUserIds: number[];
   createdAt: string;
 }
 
@@ -31,11 +35,58 @@ const COLUMNS: { id: Status; label: string; color: string }[] = [
   { id: "completed", label: "Completed", color: "border-t-blue-500" },
 ];
 
-const PRIORITY_CONFIG: Record<Priority, { label: string; classes: string }> = {
-  high: { label: "High", classes: "bg-rose-100 text-rose-700 border-rose-200" },
-  medium: { label: "Medium", classes: "bg-amber-100 text-amber-700 border-amber-200" },
-  low: { label: "Low", classes: "bg-slate-100 text-slate-600 border-slate-200" },
+const PRIORITY_CONFIG: Record<
+  Priority,
+  { label: string; classes: string; accent: string }
+> = {
+  high: {
+    label: "High",
+    classes: "bg-rose-100 text-rose-700 border-rose-200",
+    accent: "bg-rose-400",
+  },
+  medium: {
+    label: "Medium",
+    classes: "bg-amber-100 text-amber-700 border-amber-200",
+    accent: "bg-amber-400",
+  },
+  low: {
+    label: "Low",
+    classes: "bg-slate-100 text-slate-600 border-slate-200",
+    accent: "bg-slate-400",
+  },
 };
+
+const PRIORITY_ORDER: Record<Priority, number> = {
+  high: 0,
+  medium: 1,
+  low: 2,
+};
+
+function CardSection({
+  label,
+  icon,
+  children,
+  className = "",
+}: {
+  label: string;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={`rounded-xl border border-slate-200/80 bg-slate-50/80 px-3 py-2.5 ${className}`}>
+      <div className="flex items-start gap-2.5">
+        <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white text-slate-400 shadow-sm ring-1 ring-slate-200/80">
+          {icon}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] font-semibold text-slate-500 mb-1">{label}</p>
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const EMPTY: Project = {
   id: 0,
@@ -46,6 +97,7 @@ const EMPTY: Project = {
   deadline: "",
   team: "",
   tags: [],
+  ownerUserIds: [],
   createdAt: "",
 };
 
@@ -59,36 +111,77 @@ function rowToProject(row: ProjectRow): Project {
     deadline: row.deadline || "",
     team: row.team,
     tags: row.tags || [],
+    ownerUserIds: (row.owner_user_ids || []).map(Number),
     createdAt: row.created_at,
   };
 }
 
+function sortProjectsByPriority(items: Project[]) {
+  return [...items].sort((a, b) => {
+    const priorityDiff = PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
+    if (priorityDiff !== 0) return priorityDiff;
+
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
+}
+
+function getDropPreviewIndex(
+  items: Project[],
+  draggedProject: Project | null,
+  targetStatus: Status
+) {
+  if (!draggedProject || draggedProject.status === targetStatus) {
+    return null;
+  }
+
+  const previewItems = sortProjectsByPriority([
+    ...items,
+    {
+      ...draggedProject,
+      status: targetStatus,
+    },
+  ]);
+
+  return previewItems.findIndex((project) => project.id === draggedProject.id);
+}
+
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
+  const [members, setMembers] = useState<MemberChoice[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Project>(EMPTY);
   const [search, setSearch] = useState("");
   const [filterPriority, setFilterPriority] = useState<Priority | "all">("all");
   const [dragId, setDragId] = useState<number | null>(null);
+  const [dragPreviewHeight, setDragPreviewHeight] = useState<number | null>(null);
   const [dragOverCol, setDragOverCol] = useState<Status | null>(null);
   const [session, setSession] = useState<Session | null>(null);
+  const dragIdRef = useRef<number | null>(null);
 
-  // Load from database
   useEffect(() => {
     async function init() {
-      const sess = await getCurrentSession();
+      const [sess, projectRes, memberRes] = await Promise.all([
+        getCurrentSession(),
+        getProjects(),
+        getMembers(),
+      ]);
       setSession(sess);
-      const res = await getProjects();
-      if (res.success && res.projects) {
-        setProjects(res.projects.map(rowToProject));
+      if (projectRes.success && projectRes.projects) {
+        setProjects(projectRes.projects.map(rowToProject));
+      }
+      if (memberRes.success && memberRes.members) {
+        const nextMembers = (memberRes.members as { id: number; name: string }[])
+          .map((member) => ({ id: member.id, name: member.name }))
+          .sort((a, b) => a.name.localeCompare(b.name));
+        setMembers(nextMembers);
       }
     }
     init();
   }, []);
 
   const canEdit = session && (
-    session.role === "ADMIN" || 
-    session.role === "HEAD" || 
+    session.role === "ADMIN" ||
+    session.role === "HEAD" ||
     session.department === "Projects"
   );
 
@@ -97,6 +190,13 @@ export default function ProjectsPage() {
     if (res.success && res.projects) {
       setProjects(res.projects.map(rowToProject));
     }
+  };
+
+  const clearDragState = () => {
+    dragIdRef.current = null;
+    setDragId(null);
+    setDragPreviewHeight(null);
+    setDragOverCol(null);
   };
 
   /* ─── CRUD ─── */
@@ -111,6 +211,7 @@ export default function ProjectsPage() {
         deadline: editing.deadline,
         team: editing.team,
         tags: editing.tags,
+        ownerUserIds: editing.ownerUserIds,
       });
     } else {
       await createProject({
@@ -121,6 +222,7 @@ export default function ProjectsPage() {
         deadline: editing.deadline,
         team: editing.team,
         tags: editing.tags,
+        ownerUserIds: editing.ownerUserIds,
       });
     }
     await refreshProjects();
@@ -134,7 +236,11 @@ export default function ProjectsPage() {
   };
 
   const openNew = (status: Status = "planning") => {
-    setEditing({ ...EMPTY, status });
+    setEditing({
+      ...EMPTY,
+      status,
+      ownerUserIds: session?.userId ? [Number(session.userId)] : [],
+    });
     setModalOpen(true);
   };
 
@@ -144,37 +250,57 @@ export default function ProjectsPage() {
   };
 
   /* ─── Drag & Drop ─── */
-  const handleDragStart = (id: number) => { if (canEdit) setDragId(id); };
+  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, id: number) => {
+    if (!canEdit) return;
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("application/x-project-id", String(id));
+    e.dataTransfer.setData("text/plain", String(id));
+    dragIdRef.current = id;
+    setDragPreviewHeight(e.currentTarget.getBoundingClientRect().height);
+    setDragId(id);
+  };
 
   const handleDragOver = (e: React.DragEvent, col: Status) => {
-    if (!canEdit) return;
+    if (!canEdit || dragIdRef.current === null) return;
     e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
     setDragOverCol(col);
   };
 
-  const handleDrop = async (col: Status) => {
-    if (dragId) {
-      const project = projects.find((p) => p.id === dragId);
-      if (project) {
-        await updateProject(dragId, {
-          name: project.name,
-          description: project.description,
-          status: col,
-          priority: project.priority,
-          deadline: project.deadline,
-          team: project.team,
-          tags: project.tags,
-        });
-        await refreshProjects();
-      }
+  const handleDrop = async (e: React.DragEvent, col: Status) => {
+    e.preventDefault();
+
+    const droppedId =
+      Number(e.dataTransfer.getData("application/x-project-id")) ||
+      Number(e.dataTransfer.getData("text/plain")) ||
+      dragIdRef.current ||
+      dragId;
+
+    const project = droppedId
+      ? projects.find((item) => item.id === droppedId) ?? null
+      : null;
+
+    clearDragState();
+
+    if (!project || project.status === col) {
+      return;
     }
-    setDragId(null);
-    setDragOverCol(null);
+
+    await updateProject(project.id, {
+      name: project.name,
+      description: project.description,
+      status: col,
+      priority: project.priority,
+      deadline: project.deadline,
+      team: project.team,
+      tags: project.tags,
+      ownerUserIds: project.ownerUserIds,
+    });
+    await refreshProjects();
   };
 
   const handleDragEnd = () => {
-    setDragId(null);
-    setDragOverCol(null);
+    window.setTimeout(clearDragState, 0);
   };
 
   /* ─── Filtering ─── */
@@ -184,7 +310,17 @@ export default function ProjectsPage() {
     return true;
   });
 
-  const columnProjects = (status: Status) => filtered.filter((p) => p.status === status);
+  const columnProjects = (status: Status) =>
+    sortProjectsByPriority(filtered.filter((p) => p.status === status));
+  const getOwnerMembers = (ownerUserIds: number[]) =>
+    members.filter((member) => ownerUserIds.includes(member.id));
+  const draggedProject = dragId
+    ? projects.find((project) => project.id === dragId) ?? null
+    : null;
+  const isDragging = dragId !== null;
+  const dropPreviewStyle = dragPreviewHeight
+    ? { height: `${dragPreviewHeight}px` }
+    : undefined;
 
   const daysUntilDeadline = (deadline: string) => {
     if (!deadline) return null;
@@ -253,17 +389,22 @@ export default function ProjectsPage() {
             action={canEdit ? { label: "Create Project", onClick: () => openNew() } : undefined}
           />
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 items-start sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {COLUMNS.map((col) => {
               const items = columnProjects(col.id);
+              const previewIndex =
+                dragOverCol === col.id
+                  ? getDropPreviewIndex(items, draggedProject, col.id)
+                  : null;
+
               return (
                 <div
                   key={col.id}
-                  onDragOver={(e) => handleDragOver(e, col.id)}
-                  onDrop={() => handleDrop(col.id)}
-                  onDragLeave={() => setDragOverCol(null)}
-                  className={`rounded-xl border border-slate-200 bg-white/70 ${col.color} border-t-2 min-h-[200px] transition-colors ${
-                    dragOverCol === col.id ? "bg-purple-50/50 border-purple-200" : ""
+                  onDragEnterCapture={(e) => handleDragOver(e, col.id)}
+                  onDragOverCapture={(e) => handleDragOver(e, col.id)}
+                  onDropCapture={(e) => { void handleDrop(e, col.id); }}
+                  className={`relative self-start overflow-visible rounded-xl border border-slate-200 bg-white/70 ${col.color} border-t-2 transition-colors ${
+                    dragOverCol === col.id ? "bg-blue-50/60 border-blue-200" : ""
                   }`}
                 >
                   {/* Column header */}
@@ -287,44 +428,147 @@ export default function ProjectsPage() {
                     )}
                   </div>
 
+                  {isDragging && (
+                    <div
+                      aria-hidden="true"
+                      className="absolute inset-x-0 top-[52px] z-0 h-[100vh] opacity-0"
+                    />
+                  )}
+
                   {/* Cards */}
-                  <div className="px-3 pb-3 space-y-2">
-                    {items.map((p) => {
+                  <div className="relative z-10 px-3 pb-3 space-y-2">
+                    {items.length === 0 && previewIndex === 0 && (
+                      <div
+                        aria-hidden="true"
+                        style={dropPreviewStyle}
+                        className="min-h-[112px] rounded-2xl border border-slate-300/70 bg-slate-200/45"
+                      />
+                    )}
+
+                    {items.map((p, index) => {
                       const dl = daysUntilDeadline(p.deadline);
+                      const owners = getOwnerMembers(p.ownerUserIds);
+
                       return (
-                        <div
-                          key={p.id}
-                          draggable={!!canEdit}
-                          onDragStart={() => handleDragStart(p.id)}
-                          onDragEnd={handleDragEnd}
-                          onClick={() => openEdit(p)}
-                          className={`bg-white rounded-lg border border-slate-100 p-3 ${canEdit ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"} shadow-sm hover:shadow-md transition-all duration-150 hover:-translate-y-0.5 ${
-                            dragId === p.id ? "opacity-50" : ""
-                          }`}
-                        >
-                          {/* Priority + Deadline */}
-                          <div className="flex items-center justify-between mb-2">
-                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${PRIORITY_CONFIG[p.priority].classes}`}>
-                              {PRIORITY_CONFIG[p.priority].label}
-                            </span>
-                            {dl !== null && (
-                              <span className={`text-[10px] font-medium ${dl < 0 ? "text-rose-600" : dl <= 3 ? "text-amber-600" : "text-slate-400"}`}>
-                                {dl < 0 ? `${Math.abs(dl)}d overdue` : dl === 0 ? "Today" : `${dl}d left`}
+                        <Fragment key={p.id}>
+                          {previewIndex === index && (
+                            <div
+                              aria-hidden="true"
+                              style={dropPreviewStyle}
+                              className="min-h-[112px] rounded-2xl border border-slate-300/70 bg-slate-200/45"
+                            />
+                          )}
+
+                          <div
+                            draggable={!!canEdit}
+                            onDragStart={(e) => handleDragStart(e, p.id)}
+                            onDragEnd={handleDragEnd}
+                            onClick={() => openEdit(p)}
+                            className={`group relative overflow-hidden rounded-2xl border border-slate-200/80 bg-gradient-to-b from-white via-white to-slate-50/80 p-4 ${canEdit ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"} hover:border-slate-300 transition-all duration-200 hover:-translate-y-0.5 ${
+                              dragId === p.id ? "opacity-50" : ""
+                            }`}
+                          >
+                            <div
+                              className={`absolute inset-x-0 top-0 h-1 ${PRIORITY_CONFIG[p.priority].accent}`}
+                            />
+
+                            {/* Priority + Deadline */}
+                            <div className="mb-4 flex items-start justify-between gap-3">
+                              <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold ${PRIORITY_CONFIG[p.priority].classes}`}>
+                                {PRIORITY_CONFIG[p.priority].label}
                               </span>
-                            )}
+                              {dl !== null && (
+                                <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold ${
+                                  dl < 0
+                                    ? "bg-rose-50 text-rose-600"
+                                    : dl <= 3
+                                      ? "bg-amber-50 text-amber-700"
+                                      : "bg-slate-100 text-slate-500"
+                                }`}>
+                                  <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                  </svg>
+                                  {dl < 0 ? `${Math.abs(dl)}d overdue` : dl === 0 ? "Due today" : `${dl}d left`}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="space-y-2.5">
+                              <CardSection
+                                label="Project Name"
+                                icon={
+                                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7a2 2 0 012-2h5l2 2h7a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
+                                  </svg>
+                                }
+                              >
+                                <h4 className="text-[15px] font-semibold text-slate-900 leading-snug break-words">
+                                  {p.name}
+                                </h4>
+                              </CardSection>
+
+                              {p.description && (
+                                <CardSection
+                                  label="Description"
+                                  icon={
+                                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h7m-7 4h10M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                    </svg>
+                                  }
+                                >
+                                  <p className="text-xs text-slate-600 line-clamp-3 leading-relaxed">
+                                    {p.description}
+                                  </p>
+                                </CardSection>
+                              )}
+
+                              {p.team && (
+                                <CardSection
+                                  label="Team / Assignee"
+                                  icon={
+                                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    </svg>
+                                  }
+                                >
+                                  <p className="text-sm font-medium text-slate-700 break-words">{p.team}</p>
+                                </CardSection>
+                              )}
+
+                              {owners.length > 0 && (
+                                <CardSection
+                                  label="Owners"
+                                  icon={
+                                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    </svg>
+                                  }
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <MemberAvatarStack
+                                      names={owners.map((owner) => owner.name)}
+                                      size="md"
+                                      maxVisible={4}
+                                    />
+                                    <p className="text-xs text-slate-600 truncate">
+                                      {owners.map((owner) => owner.name).join(", ")}
+                                    </p>
+                                  </div>
+                                </CardSection>
+                              )}
+                            </div>
                           </div>
-                          <h4 className="text-sm font-medium text-slate-800 leading-snug mb-1">{p.name}</h4>
-                          {p.description && (
-                            <p className="text-xs text-slate-500 line-clamp-2 mb-2">{p.description}</p>
-                          )}
-                          {p.team && (
-                            <p className="text-[10px] text-slate-400">
-                              <span className="font-medium text-slate-500">{p.team}</span>
-                            </p>
-                          )}
-                        </div>
+                        </Fragment>
                       );
                     })}
+
+                    {items.length > 0 && previewIndex === items.length && (
+                      <div
+                        aria-hidden="true"
+                        style={dropPreviewStyle}
+                        className="min-h-[112px] rounded-2xl border border-slate-300/70 bg-slate-200/45"
+                      />
+                    )}
                   </div>
                 </div>
               );
@@ -360,7 +604,7 @@ export default function ProjectsPage() {
               placeholder="Brief description of the project..."
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
               <select disabled={!canEdit}
@@ -410,6 +654,12 @@ export default function ProjectsPage() {
               />
             </div>
           </div>
+          <MemberMultiSelect
+            members={members}
+            selectedIds={editing.ownerUserIds}
+            onChange={(ownerUserIds) => setEditing({ ...editing, ownerUserIds })}
+            disabled={!canEdit}
+          />
 
           {canEdit && (
             <div className="flex items-center gap-3 pt-2">

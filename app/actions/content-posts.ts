@@ -11,6 +11,7 @@ export interface ContentPostRow {
   time: string;
   status: string;
   notes: string;
+  owner_user_ids: number[];
   created_at: string;
 }
 
@@ -30,7 +31,21 @@ async function assertCanEdit() {
 export async function getContentPosts() {
   try {
     const res = await pool.query(
-      "SELECT id, platform, caption, date::text, time, status, notes, created_at FROM content_posts ORDER BY date DESC, time ASC"
+      `SELECT
+         cp.id,
+         cp.platform,
+         cp.caption,
+         cp.date::text,
+         cp.time,
+         cp.status,
+         cp.notes,
+         COALESCE(
+           NULLIF(cp.owner_user_ids, '{}'),
+           CASE WHEN cp.owner_user_id IS NULL THEN '{}'::INTEGER[] ELSE ARRAY[cp.owner_user_id] END
+         ) AS owner_user_ids,
+         cp.created_at
+       FROM content_posts cp
+       ORDER BY cp.date DESC, cp.time ASC`
     );
     return { success: true, posts: res.rows as ContentPostRow[] };
   } catch (error) {
@@ -46,12 +61,13 @@ export async function createContentPost(data: {
   time: string;
   status: string;
   notes: string;
+  ownerUserIds: number[];
 }) {
   try {
     await assertCanEdit();
     const res = await pool.query(
-      `INSERT INTO content_posts (platform, caption, date, time, status, notes)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+      `INSERT INTO content_posts (platform, caption, date, time, status, notes, owner_user_ids)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
       [
         data.platform,
         data.caption,
@@ -59,6 +75,7 @@ export async function createContentPost(data: {
         data.time,
         data.status,
         data.notes,
+        Array.from(new Set(data.ownerUserIds)).filter((id) => Number.isInteger(id)),
       ]
     );
     return { success: true, id: res.rows[0].id };
@@ -77,12 +94,15 @@ export async function updateContentPost(
     time: string;
     status: string;
     notes: string;
+    ownerUserIds: number[];
   }
 ) {
   try {
     await assertCanEdit();
     await pool.query(
-      `UPDATE content_posts SET platform=$1, caption=$2, date=$3, time=$4, status=$5, notes=$6 WHERE id=$7`,
+      `UPDATE content_posts
+       SET platform=$1, caption=$2, date=$3, time=$4, status=$5, notes=$6, owner_user_ids=$7
+       WHERE id=$8`,
       [
         data.platform,
         data.caption,
@@ -90,6 +110,7 @@ export async function updateContentPost(
         data.time,
         data.status,
         data.notes,
+        Array.from(new Set(data.ownerUserIds)).filter((ownerId) => Number.isInteger(ownerId)),
         id,
       ]
     );

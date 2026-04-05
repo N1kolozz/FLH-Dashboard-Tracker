@@ -12,6 +12,7 @@ export interface ProjectRow {
   deadline: string | null;
   team: string;
   tags: string[];
+  owner_user_ids: number[];
   created_at: string;
 }
 
@@ -31,7 +32,36 @@ async function assertCanEdit() {
 export async function getProjects() {
   try {
     const res = await pool.query(
-      "SELECT id, name, description, status, priority, deadline::text, team, tags, created_at FROM projects ORDER BY created_at DESC"
+      `SELECT
+         p.id,
+         p.name,
+         p.description,
+         p.status,
+         p.priority,
+         p.deadline::text,
+         p.team,
+         p.tags,
+         COALESCE(
+           NULLIF(p.owner_user_ids, '{}'),
+           CASE WHEN p.owner_user_id IS NULL THEN '{}'::INTEGER[] ELSE ARRAY[p.owner_user_id] END
+         ) AS owner_user_ids,
+         p.created_at
+       FROM projects p
+       ORDER BY
+         CASE p.status
+           WHEN 'planning' THEN 0
+           WHEN 'in_progress' THEN 1
+           WHEN 'review' THEN 2
+           WHEN 'completed' THEN 3
+           ELSE 4
+         END,
+         CASE p.priority
+           WHEN 'high' THEN 0
+           WHEN 'medium' THEN 1
+           WHEN 'low' THEN 2
+           ELSE 3
+         END,
+         p.created_at DESC`
     );
     return { success: true, projects: res.rows as ProjectRow[] };
   } catch (error) {
@@ -48,12 +78,23 @@ export async function createProject(data: {
   deadline: string;
   team: string;
   tags: string[];
+  ownerUserIds: number[];
 }) {
   try {
     await assertCanEdit();
     const res = await pool.query(
-      `INSERT INTO projects (name, description, status, priority, deadline, team, tags)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+      `INSERT INTO projects (
+         name,
+         description,
+         status,
+         priority,
+         deadline,
+         team,
+         tags,
+         owner_user_ids
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING id`,
       [
         data.name,
         data.description,
@@ -62,6 +103,7 @@ export async function createProject(data: {
         data.deadline || null,
         data.team,
         data.tags,
+        Array.from(new Set(data.ownerUserIds)).filter((id) => Number.isInteger(id)),
       ]
     );
     return { success: true, id: res.rows[0].id };
@@ -81,12 +123,22 @@ export async function updateProject(
     deadline: string;
     team: string;
     tags: string[];
+    ownerUserIds: number[];
   }
 ) {
   try {
     await assertCanEdit();
     await pool.query(
-      `UPDATE projects SET name=$1, description=$2, status=$3, priority=$4, deadline=$5, team=$6, tags=$7 WHERE id=$8`,
+      `UPDATE projects
+       SET name=$1,
+           description=$2,
+           status=$3,
+           priority=$4,
+           deadline=$5,
+           team=$6,
+           tags=$7,
+           owner_user_ids=$8
+       WHERE id=$9`,
       [
         data.name,
         data.description,
@@ -95,6 +147,7 @@ export async function updateProject(
         data.deadline || null,
         data.team,
         data.tags,
+        Array.from(new Set(data.ownerUserIds)).filter((ownerId) => Number.isInteger(ownerId)),
         id,
       ]
     );

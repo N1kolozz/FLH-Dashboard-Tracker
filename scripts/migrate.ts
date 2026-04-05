@@ -89,6 +89,23 @@ async function migrate() {
     console.log("✓ projects table ready");
 
     await client.query(`
+      ALTER TABLE projects
+      ADD COLUMN IF NOT EXISTS owner_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL
+    `);
+    console.log("✓ projects owner column ready");
+
+    await client.query(`
+      ALTER TABLE projects
+      ADD COLUMN IF NOT EXISTS owner_user_ids INTEGER[] NOT NULL DEFAULT '{}'
+    `);
+    await client.query(`
+      UPDATE projects
+      SET owner_user_ids = ARRAY[owner_user_id]
+      WHERE owner_user_id IS NOT NULL AND cardinality(owner_user_ids) = 0
+    `);
+    console.log("✓ projects owners column ready");
+
+    await client.query(`
       CREATE TABLE IF NOT EXISTS events (
         id SERIAL PRIMARY KEY,
         title VARCHAR(255) NOT NULL,
@@ -102,6 +119,23 @@ async function migrate() {
       );
     `);
     console.log("✓ events table ready");
+
+    await client.query(`
+      ALTER TABLE events
+      ADD COLUMN IF NOT EXISTS owner_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL
+    `);
+    console.log("✓ events owner column ready");
+
+    await client.query(`
+      ALTER TABLE events
+      ADD COLUMN IF NOT EXISTS owner_user_ids INTEGER[] NOT NULL DEFAULT '{}'
+    `);
+    await client.query(`
+      UPDATE events
+      SET owner_user_ids = ARRAY[owner_user_id]
+      WHERE owner_user_id IS NOT NULL AND cardinality(owner_user_ids) = 0
+    `);
+    console.log("✓ events owners column ready");
 
     await client.query(`
       CREATE TABLE IF NOT EXISTS inventory_items (
@@ -157,6 +191,23 @@ async function migrate() {
       );
     `);
     console.log("✓ content_posts table ready");
+
+    await client.query(`
+      ALTER TABLE content_posts
+      ADD COLUMN IF NOT EXISTS owner_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL
+    `);
+    console.log("✓ content_posts owner column ready");
+
+    await client.query(`
+      ALTER TABLE content_posts
+      ADD COLUMN IF NOT EXISTS owner_user_ids INTEGER[] NOT NULL DEFAULT '{}'
+    `);
+    await client.query(`
+      UPDATE content_posts
+      SET owner_user_ids = ARRAY[owner_user_id]
+      WHERE owner_user_id IS NOT NULL AND cardinality(owner_user_ids) = 0
+    `);
+    console.log("✓ content_posts owners column ready");
 
     await client.query(`
       CREATE TABLE IF NOT EXISTS impact_records (
