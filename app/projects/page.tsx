@@ -1,6 +1,19 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import {
+  DndContext,
+  DragOverlay,
+  MouseSensor,
+  TouchSensor,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragOverEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
 import { getProjects, createProject, updateProject, deleteProject } from "@/app/actions/projects";
 import type { ProjectRow } from "@/app/actions/projects";
 import { getMembers } from "@/app/actions/members";
@@ -70,6 +83,10 @@ const EMPTY_COLUMN_COUNTS: Record<Status, number> = {
   review: 0,
   completed: 0,
 };
+
+function isStatus(value: string): value is Status {
+  return COLUMNS.some((column) => column.id === value);
+}
 
 function CardSection({
   label,
@@ -227,6 +244,250 @@ function ProjectBoardSkeleton({
   );
 }
 
+function ProjectCardContent({
+  project,
+  owners,
+  daysUntilDeadline,
+}: {
+  project: Project;
+  owners: MemberChoice[];
+  daysUntilDeadline: (deadline: string) => number | null;
+}) {
+  const dl = daysUntilDeadline(project.deadline);
+
+  return (
+    <>
+      <div
+        className={`absolute inset-x-0 top-0 h-1 ${PRIORITY_CONFIG[project.priority].accent}`}
+      />
+
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <span
+          className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold ${PRIORITY_CONFIG[project.priority].classes}`}
+        >
+          {PRIORITY_CONFIG[project.priority].label}
+        </span>
+        {dl !== null && (
+          <span
+            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold ${
+              dl < 0
+                ? "bg-rose-50 text-rose-600"
+                : dl <= 3
+                  ? "bg-amber-50 text-amber-700"
+                  : "bg-slate-100 text-slate-500"
+            }`}
+          >
+            <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+              />
+            </svg>
+            {dl < 0 ? `${Math.abs(dl)}d overdue` : dl === 0 ? "Due today" : `${dl}d left`}
+          </span>
+        )}
+      </div>
+
+      <div className="space-y-2.5">
+        <CardSection
+          label="Project Name"
+          icon={
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M3 7a2 2 0 012-2h5l2 2h7a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"
+              />
+            </svg>
+          }
+        >
+          <h4 className="text-[15px] font-semibold text-slate-900 leading-snug break-words">
+            {project.name}
+          </h4>
+        </CardSection>
+
+        {project.description && (
+          <CardSection
+            label="Description"
+            icon={
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M7 8h10M7 12h7m-7 4h10M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z"
+                />
+              </svg>
+            }
+          >
+            <p className="text-xs text-slate-600 line-clamp-3 leading-relaxed">
+              {project.description}
+            </p>
+          </CardSection>
+        )}
+
+        {project.team && (
+          <CardSection
+            label="Team / Assignee"
+            icon={
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"
+                />
+              </svg>
+            }
+          >
+            <p className="text-sm font-medium text-slate-700 break-words">{project.team}</p>
+          </CardSection>
+        )}
+
+        {owners.length > 0 && (
+          <CardSection
+            label="Owners"
+            icon={
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"
+                />
+              </svg>
+            }
+          >
+            <div className="flex items-center gap-2">
+              <MemberAvatarStack
+                names={owners.map((owner) => owner.name)}
+                size="md"
+                maxVisible={4}
+              />
+              <p className="text-xs text-slate-600 truncate">
+                {owners.map((owner) => owner.name).join(", ")}
+              </p>
+            </div>
+          </CardSection>
+        )}
+      </div>
+    </>
+  );
+}
+
+function DraggableProjectCard({
+  project,
+  owners,
+  canEdit,
+  isDimmed,
+  cardRefs,
+  onOpen,
+  daysUntilDeadline,
+}: {
+  project: Project;
+  owners: MemberChoice[];
+  canEdit: boolean;
+  isDimmed: boolean;
+  cardRefs: React.MutableRefObject<Record<number, HTMLDivElement | null>>;
+  onOpen: (project: Project) => void;
+  daysUntilDeadline: (deadline: string) => number | null;
+}) {
+  const { attributes, listeners, setNodeRef } = useDraggable({
+    id: project.id,
+    disabled: !canEdit,
+  });
+
+  const setCombinedRef = (node: HTMLDivElement | null) => {
+    setNodeRef(node);
+    cardRefs.current[project.id] = node;
+  };
+
+  return (
+    <div
+      ref={setCombinedRef}
+      onClick={() => onOpen(project)}
+      className={`group relative overflow-hidden rounded-2xl border border-slate-200/80 bg-gradient-to-b from-white via-white to-slate-50/80 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 ${
+        canEdit ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"
+      } ${isDimmed ? "opacity-50" : ""}`}
+      {...attributes}
+      {...(listeners ?? {})}
+    >
+      <ProjectCardContent
+        project={project}
+        owners={owners}
+        daysUntilDeadline={daysUntilDeadline}
+      />
+    </div>
+  );
+}
+
+function ProjectColumn({
+  column,
+  index,
+  columnRefs,
+  cardCount,
+  canEdit,
+  isActive,
+  onAdd,
+  children,
+}: {
+  column: { id: Status; label: string; color: string };
+  index: number;
+  columnRefs: React.MutableRefObject<Array<HTMLDivElement | null>>;
+  cardCount: number;
+  canEdit: boolean;
+  isActive: boolean;
+  onAdd: () => void;
+  children: React.ReactNode;
+}) {
+  const { isOver, setNodeRef } = useDroppable({
+    id: column.id,
+  });
+
+  const setCombinedRef = (node: HTMLDivElement | null) => {
+    setNodeRef(node);
+    columnRefs.current[index] = node;
+  };
+
+  const isHighlighted = isActive || isOver;
+
+  return (
+    <div
+      ref={setCombinedRef}
+      className={`relative flex min-h-0 w-full min-w-full shrink-0 snap-start flex-col overflow-hidden rounded-xl border border-slate-200 bg-white/70 ${column.color} border-t-2 transition-colors lg:w-auto lg:min-w-0 lg:max-w-none lg:flex-1 ${
+        isHighlighted ? "bg-blue-50/60 border-blue-200" : ""
+      }`}
+    >
+      <div className="flex shrink-0 items-center justify-between px-4 py-3">
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-semibold text-slate-700">{column.label}</h3>
+          <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">
+            {cardCount}
+          </span>
+        </div>
+        {canEdit && (
+          <button
+            onClick={onAdd}
+            className="w-6 h-6 flex items-center justify-center rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+            title="Add here"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+          </button>
+        )}
+      </div>
+
+      <div className="relative z-10 flex-1 min-h-0 space-y-2 overflow-y-auto px-3 pb-3 overscroll-contain">
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [members, setMembers] = useState<MemberChoice[]>([]);
@@ -236,6 +497,7 @@ export default function ProjectsPage() {
   const [filterPriority, setFilterPriority] = useState<Priority | "all">("all");
   const [dragId, setDragId] = useState<number | null>(null);
   const [dragPreviewHeight, setDragPreviewHeight] = useState<number | null>(null);
+  const [dragPreviewWidth, setDragPreviewWidth] = useState<number | null>(null);
   const [dragOverCol, setDragOverCol] = useState<Status | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoadingData, setIsLoadingData] = useState(true);
@@ -245,7 +507,23 @@ export default function ProjectsPage() {
   );
   const boardRef = useRef<HTMLDivElement | null>(null);
   const columnRefs = useRef<Array<HTMLDivElement | null>>([]);
-  const dragIdRef = useRef<number | null>(null);
+  const cardRefs = useRef<Record<number, HTMLDivElement | null>>({});
+  const suppressOpenAfterDragRef = useRef(false);
+  const suppressOpenTimeoutRef = useRef<number | null>(null);
+
+  const sensors = useSensors(
+    useSensor(MouseSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 180,
+        tolerance: 8,
+      },
+    })
+  );
 
   useEffect(() => {
     setCachedColumnCounts(
@@ -327,6 +605,14 @@ export default function ProjectsPage() {
     };
   }, [isLoadingData, projects.length]);
 
+  useEffect(() => {
+    return () => {
+      if (suppressOpenTimeoutRef.current !== null) {
+        window.clearTimeout(suppressOpenTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const canEdit = session && (
     session.role === "ADMIN" ||
     session.role === "HEAD" ||
@@ -351,10 +637,19 @@ export default function ProjectsPage() {
   };
 
   const clearDragState = () => {
-    dragIdRef.current = null;
     setDragId(null);
     setDragPreviewHeight(null);
+    setDragPreviewWidth(null);
     setDragOverCol(null);
+
+    if (suppressOpenTimeoutRef.current !== null) {
+      window.clearTimeout(suppressOpenTimeoutRef.current);
+    }
+
+    suppressOpenTimeoutRef.current = window.setTimeout(() => {
+      suppressOpenAfterDragRef.current = false;
+      suppressOpenTimeoutRef.current = null;
+    }, 120);
   };
 
   const scrollToMobileColumn = (index: number) => {
@@ -462,39 +757,8 @@ export default function ProjectsPage() {
   };
 
   /* ─── Drag & Drop ─── */
-  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, id: number) => {
-    if (!canEdit) return;
-    e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData("application/x-project-id", String(id));
-    e.dataTransfer.setData("text/plain", String(id));
-    dragIdRef.current = id;
-    setDragPreviewHeight(e.currentTarget.getBoundingClientRect().height);
-    setDragId(id);
-  };
-
-  const handleDragOver = (e: React.DragEvent, col: Status) => {
-    if (!canEdit || dragIdRef.current === null) return;
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-    setDragOverCol(col);
-  };
-
-  const handleDrop = async (e: React.DragEvent, col: Status) => {
-    e.preventDefault();
-
-    const droppedId =
-      Number(e.dataTransfer.getData("application/x-project-id")) ||
-      Number(e.dataTransfer.getData("text/plain")) ||
-      dragIdRef.current ||
-      dragId;
-
-    const project = droppedId
-      ? projects.find((item) => item.id === droppedId) ?? null
-      : null;
-
-    clearDragState();
-
-    if (!project || project.status === col) {
+  const moveProjectToColumn = async (project: Project, col: Status) => {
+    if (project.status === col) {
       return;
     }
 
@@ -519,8 +783,59 @@ export default function ProjectsPage() {
     void refreshProjects();
   };
 
-  const handleDragEnd = () => {
-    window.setTimeout(clearDragState, 0);
+  const handleDragStart = (event: DragStartEvent) => {
+    if (!canEdit) return;
+
+    const nextDragId = Number(event.active.id);
+    const cardNode = cardRefs.current[nextDragId];
+    const cardRect = cardNode?.getBoundingClientRect();
+
+    suppressOpenAfterDragRef.current = true;
+    if (suppressOpenTimeoutRef.current !== null) {
+      window.clearTimeout(suppressOpenTimeoutRef.current);
+      suppressOpenTimeoutRef.current = null;
+    }
+
+    setDragId(nextDragId);
+    setDragPreviewHeight(cardRect ? cardRect.height : null);
+    setDragPreviewWidth(cardRect ? cardRect.width : null);
+  };
+
+  const handleDragOver = (event: DragOverEvent) => {
+    const overId = event.over?.id;
+
+    if (typeof overId === "string" && isStatus(overId)) {
+      setDragOverCol(overId);
+      return;
+    }
+
+    setDragOverCol(null);
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const activeId = Number(event.active.id);
+    const overId = event.over?.id;
+    const project = projects.find((item) => item.id === activeId) ?? null;
+
+    clearDragState();
+
+    if (!project || typeof overId !== "string" || !isStatus(overId)) {
+      return;
+    }
+
+    await moveProjectToColumn(project, overId);
+  };
+
+  const handleDragCancel = () => {
+    clearDragState();
+  };
+
+  const handleOpenProject = (project: Project) => {
+    if (suppressOpenAfterDragRef.current) {
+      return;
+    }
+
+    openEdit(project);
   };
 
   /* ─── Filtering ─── */
@@ -537,6 +852,7 @@ export default function ProjectsPage() {
   const draggedProject = dragId
     ? projects.find((project) => project.id === dragId) ?? null
     : null;
+  const draggedOwners = draggedProject ? getOwnerMembers(draggedProject.ownerUserIds) : [];
   const isDragging = dragId !== null;
   const dropPreviewStyle = dragPreviewHeight
     ? { height: `${dragPreviewHeight}px` }
@@ -670,60 +986,38 @@ export default function ProjectsPage() {
             action={canEdit ? { label: "Create Project", onClick: () => openNew() } : undefined}
           />
         ) : (
-          <div
-            ref={boardRef}
-            className="hide-scrollbar flex flex-1 min-h-0 gap-4 overflow-x-auto overflow-y-hidden pb-2 scroll-smooth snap-x snap-mandatory lg:overflow-x-visible lg:pb-0"
+          <DndContext
+            autoScroll={!!canEdit}
+            sensors={sensors}
+            onDragStart={handleDragStart}
+            onDragOver={handleDragOver}
+            onDragEnd={handleDragEnd}
+            onDragCancel={handleDragCancel}
           >
-            {COLUMNS.map((col, index) => {
-              const items = columnProjects(col.id);
-              const previewIndex =
-                dragOverCol === col.id
-                  ? getDropPreviewIndex(items, draggedProject, col.id)
-                  : null;
+            <div
+              ref={boardRef}
+              className={`hide-scrollbar flex flex-1 min-h-0 gap-4 overflow-x-auto overflow-y-hidden pb-2 lg:overflow-x-visible lg:pb-0 ${
+                isDragging ? "" : "scroll-smooth snap-x snap-mandatory"
+              }`}
+            >
+              {COLUMNS.map((col, index) => {
+                const items = columnProjects(col.id);
+                const previewIndex =
+                  dragOverCol === col.id
+                    ? getDropPreviewIndex(items, draggedProject, col.id)
+                    : null;
 
-              return (
-                <div
-                  key={col.id}
-                  ref={(node) => {
-                    columnRefs.current[index] = node;
-                  }}
-                  onDragEnterCapture={(e) => handleDragOver(e, col.id)}
-                  onDragOverCapture={(e) => handleDragOver(e, col.id)}
-                  onDropCapture={(e) => { void handleDrop(e, col.id); }}
-                  className={`relative flex min-h-0 w-full min-w-full shrink-0 snap-start flex-col overflow-hidden rounded-xl border border-slate-200 bg-white/70 ${col.color} border-t-2 transition-colors lg:w-auto lg:min-w-0 lg:max-w-none lg:flex-1 ${
-                    dragOverCol === col.id ? "bg-blue-50/60 border-blue-200" : ""
-                  }`}
-                >
-                  {/* Column header */}
-                  <div className="flex shrink-0 items-center justify-between px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-sm font-semibold text-slate-700">{col.label}</h3>
-                      <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">
-                        {items.length}
-                      </span>
-                    </div>
-                    {canEdit && (
-                      <button
-                        onClick={() => openNew(col.id)}
-                        className="w-6 h-6 flex items-center justify-center rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
-                        title="Add here"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                        </svg>
-                      </button>
-                    )}
-                  </div>
-
-                  {isDragging && (
-                    <div
-                      aria-hidden="true"
-                      className="absolute inset-x-0 bottom-0 top-[52px] z-0 opacity-0"
-                    />
-                  )}
-
-                  {/* Cards */}
-                  <div className="relative z-10 flex-1 min-h-0 space-y-2 overflow-y-auto px-3 pb-3 overscroll-contain">
+                return (
+                  <ProjectColumn
+                    key={col.id}
+                    column={col}
+                    index={index}
+                    columnRefs={columnRefs}
+                    cardCount={items.length}
+                    canEdit={!!canEdit}
+                    isActive={dragOverCol === col.id}
+                    onAdd={() => openNew(col.id)}
+                  >
                     {items.length === 0 && previewIndex === 0 && (
                       <div
                         aria-hidden="true"
@@ -732,13 +1026,12 @@ export default function ProjectsPage() {
                       />
                     )}
 
-                    {items.map((p, index) => {
-                      const dl = daysUntilDeadline(p.deadline);
+                    {items.map((p, cardIndex) => {
                       const owners = getOwnerMembers(p.ownerUserIds);
 
                       return (
                         <Fragment key={p.id}>
-                          {previewIndex === index && (
+                          {previewIndex === cardIndex && (
                             <div
                               aria-hidden="true"
                               style={dropPreviewStyle}
@@ -746,105 +1039,15 @@ export default function ProjectsPage() {
                             />
                           )}
 
-                          <div
-                            draggable={!!canEdit}
-                            onDragStart={(e) => handleDragStart(e, p.id)}
-                            onDragEnd={handleDragEnd}
-                            onClick={() => openEdit(p)}
-                            className={`group relative overflow-hidden rounded-2xl border border-slate-200/80 bg-gradient-to-b from-white via-white to-slate-50/80 p-4 ${canEdit ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"} hover:border-slate-300 transition-all duration-200 hover:-translate-y-0.5 ${
-                              dragId === p.id ? "opacity-50" : ""
-                            }`}
-                          >
-                            <div
-                              className={`absolute inset-x-0 top-0 h-1 ${PRIORITY_CONFIG[p.priority].accent}`}
-                            />
-
-                            {/* Priority + Deadline */}
-                            <div className="mb-4 flex items-start justify-between gap-3">
-                              <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold ${PRIORITY_CONFIG[p.priority].classes}`}>
-                                {PRIORITY_CONFIG[p.priority].label}
-                              </span>
-                              {dl !== null && (
-                                <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold ${
-                                  dl < 0
-                                    ? "bg-rose-50 text-rose-600"
-                                    : dl <= 3
-                                      ? "bg-amber-50 text-amber-700"
-                                      : "bg-slate-100 text-slate-500"
-                                }`}>
-                                  <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                  </svg>
-                                  {dl < 0 ? `${Math.abs(dl)}d overdue` : dl === 0 ? "Due today" : `${dl}d left`}
-                                </span>
-                              )}
-                            </div>
-
-                            <div className="space-y-2.5">
-                              <CardSection
-                                label="Project Name"
-                                icon={
-                                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7a2 2 0 012-2h5l2 2h7a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
-                                  </svg>
-                                }
-                              >
-                                <h4 className="text-[15px] font-semibold text-slate-900 leading-snug break-words">
-                                  {p.name}
-                                </h4>
-                              </CardSection>
-
-                              {p.description && (
-                                <CardSection
-                                  label="Description"
-                                  icon={
-                                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h7m-7 4h10M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                                    </svg>
-                                  }
-                                >
-                                  <p className="text-xs text-slate-600 line-clamp-3 leading-relaxed">
-                                    {p.description}
-                                  </p>
-                                </CardSection>
-                              )}
-
-                              {p.team && (
-                                <CardSection
-                                  label="Team / Assignee"
-                                  icon={
-                                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-                                    </svg>
-                                  }
-                                >
-                                  <p className="text-sm font-medium text-slate-700 break-words">{p.team}</p>
-                                </CardSection>
-                              )}
-
-                              {owners.length > 0 && (
-                                <CardSection
-                                  label="Owners"
-                                  icon={
-                                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-                                    </svg>
-                                  }
-                                >
-                                  <div className="flex items-center gap-2">
-                                    <MemberAvatarStack
-                                      names={owners.map((owner) => owner.name)}
-                                      size="md"
-                                      maxVisible={4}
-                                    />
-                                    <p className="text-xs text-slate-600 truncate">
-                                      {owners.map((owner) => owner.name).join(", ")}
-                                    </p>
-                                  </div>
-                                </CardSection>
-                              )}
-                            </div>
-                          </div>
+                          <DraggableProjectCard
+                            project={p}
+                            owners={owners}
+                            canEdit={!!canEdit}
+                            isDimmed={dragId === p.id}
+                            cardRefs={cardRefs}
+                            onOpen={handleOpenProject}
+                            daysUntilDeadline={daysUntilDeadline}
+                          />
                         </Fragment>
                       );
                     })}
@@ -856,11 +1059,28 @@ export default function ProjectsPage() {
                         className="min-h-[112px] rounded-2xl border border-slate-300/70 bg-slate-200/45"
                       />
                     )}
+                  </ProjectColumn>
+                );
+              })}
+            </div>
+
+            <DragOverlay>
+              {draggedProject ? (
+                <div
+                  style={dragPreviewWidth ? { width: `${dragPreviewWidth}px` } : undefined}
+                  className="pointer-events-none"
+                >
+                  <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-gradient-to-b from-white via-white to-slate-50/80 p-4 shadow-2xl">
+                    <ProjectCardContent
+                      project={draggedProject}
+                      owners={draggedOwners}
+                      daysUntilDeadline={daysUntilDeadline}
+                    />
                   </div>
                 </div>
-              );
-            })}
-          </div>
+              ) : null}
+            </DragOverlay>
+          </DndContext>
         )}
       </div>
 
