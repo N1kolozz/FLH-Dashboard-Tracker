@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { Suspense, useState, useEffect, useMemo } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { getProjects } from "@/app/actions/projects";
 import type { ProjectRow } from "@/app/actions/projects";
@@ -191,7 +191,7 @@ function ImpactTableSkeleton({ count }: { count: number }) {
   );
 }
 
-export default function ImpactPage() {
+function ImpactPageContent() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -803,5 +803,17 @@ export default function ImpactPage() {
         </div>
       </Modal>
     </div>
+  );
+}
+
+export default function ImpactPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="animate-pulse text-sm text-slate-400">Loading...</div>
+      </div>
+    }>
+      <ImpactPageContent />
+    </Suspense>
   );
 }
