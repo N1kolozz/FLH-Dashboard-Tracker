@@ -14,6 +14,7 @@ export interface ProjectRow {
   tags: string[];
   owner_user_ids: number[];
   created_at: string;
+  updated_at: string;
 }
 
 async function assertCanEdit() {
@@ -45,7 +46,8 @@ export async function getProjects() {
            NULLIF(p.owner_user_ids, '{}'),
            CASE WHEN p.owner_user_id IS NULL THEN '{}'::INTEGER[] ELSE ARRAY[p.owner_user_id] END
          ) AS owner_user_ids,
-         p.created_at
+         p.created_at,
+         p.updated_at
        FROM projects p
        ORDER BY
          CASE p.status
@@ -94,7 +96,7 @@ export async function createProject(data: {
          owner_user_ids
        )
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       RETURNING id, created_at`,
+       RETURNING id, created_at, updated_at`,
       [
         data.name,
         data.description,
@@ -107,6 +109,7 @@ export async function createProject(data: {
       ]
     );
     const createdAt = res.rows[0].created_at;
+    const updatedAt = res.rows[0].updated_at;
 
     return {
       success: true,
@@ -115,6 +118,10 @@ export async function createProject(data: {
         createdAt instanceof Date
           ? createdAt.toISOString()
           : String(createdAt),
+      updatedAt:
+        updatedAt instanceof Date
+          ? updatedAt.toISOString()
+          : String(updatedAt),
     };
   } catch (error) {
     console.error("Error creating project:", error);
@@ -137,7 +144,7 @@ export async function updateProject(
 ) {
   try {
     await assertCanEdit();
-    await pool.query(
+    const res = await pool.query(
       `UPDATE projects
        SET name=$1,
            description=$2,
@@ -146,8 +153,10 @@ export async function updateProject(
            deadline=$5,
            team=$6,
            tags=$7,
-           owner_user_ids=$8
-       WHERE id=$9`,
+           owner_user_ids=$8,
+           updated_at=CURRENT_TIMESTAMP
+       WHERE id=$9
+       RETURNING updated_at`,
       [
         data.name,
         data.description,
@@ -160,7 +169,16 @@ export async function updateProject(
         id,
       ]
     );
-    return { success: true };
+    const updatedAt = res.rows[0]?.updated_at;
+    return {
+      success: true,
+      updatedAt:
+        updatedAt instanceof Date
+          ? updatedAt.toISOString()
+          : typeof updatedAt === "string"
+            ? updatedAt
+            : undefined,
+    };
   } catch (error) {
     console.error("Error updating project:", error);
     return { error: "Failed to update project" };

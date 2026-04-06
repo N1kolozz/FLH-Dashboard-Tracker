@@ -5,12 +5,24 @@ import { getSession } from "@/lib/auth";
 
 export interface ImpactRecordRow {
   id: number;
+  project_id: number | null;
   project_name: string;
   activity_type: string;
   people_reached: number;
   date: string;
-  notes: string;
+  result_summary: string;
+  evidence_link: string;
   created_at: string;
+}
+
+async function getProjectName(projectId: number) {
+  const res = await pool.query("SELECT name FROM projects WHERE id = $1", [projectId]);
+
+  if (res.rows.length === 0) {
+    return null;
+  }
+
+  return String(res.rows[0].name);
 }
 
 async function assertCanEdit() {
@@ -29,7 +41,19 @@ async function assertCanEdit() {
 export async function getImpactRecords() {
   try {
     const res = await pool.query(
-      "SELECT id, project_name, activity_type, people_reached, date::text, notes, created_at FROM impact_records ORDER BY date DESC, created_at DESC"
+      `SELECT
+         ir.id,
+         ir.project_id,
+         COALESCE(p.name, ir.project_name) AS project_name,
+         ir.activity_type,
+         ir.people_reached,
+         ir.date::text,
+         COALESCE(ir.result_summary, '') AS result_summary,
+         COALESCE(ir.evidence_link, '') AS evidence_link,
+         ir.created_at
+       FROM impact_records ir
+       LEFT JOIN projects p ON p.id = ir.project_id
+       ORDER BY ir.date DESC, ir.created_at DESC`
     );
     return { success: true, records: res.rows as ImpactRecordRow[] };
   } catch (error) {
@@ -39,23 +63,40 @@ export async function getImpactRecords() {
 }
 
 export async function createImpactRecord(data: {
-  projectName: string;
+  projectId: number;
   activityType: string;
   peopleReached: number;
   date: string;
-  notes: string;
+  resultSummary: string;
+  evidenceLink: string;
 }) {
   try {
     await assertCanEdit();
+    const projectName = await getProjectName(data.projectId);
+
+    if (!projectName) {
+      return { error: "Project not found" };
+    }
+
     const res = await pool.query(
-      `INSERT INTO impact_records (project_name, activity_type, people_reached, date, notes)
-       VALUES ($1, $2, $3, $4, $5) RETURNING id, created_at`,
+      `INSERT INTO impact_records (
+         project_id,
+         project_name,
+         activity_type,
+         people_reached,
+         date,
+         result_summary,
+         evidence_link
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, created_at`,
       [
-        data.projectName,
+        data.projectId,
+        projectName,
         data.activityType,
         data.peopleReached,
         data.date,
-        data.notes,
+        data.resultSummary,
+        data.evidenceLink,
       ]
     );
     const createdAt = res.rows[0].created_at;
@@ -77,23 +118,40 @@ export async function createImpactRecord(data: {
 export async function updateImpactRecord(
   id: number,
   data: {
-    projectName: string;
+    projectId: number;
     activityType: string;
     peopleReached: number;
     date: string;
-    notes: string;
+    resultSummary: string;
+    evidenceLink: string;
   }
 ) {
   try {
     await assertCanEdit();
+    const projectName = await getProjectName(data.projectId);
+
+    if (!projectName) {
+      return { error: "Project not found" };
+    }
+
     await pool.query(
-      `UPDATE impact_records SET project_name=$1, activity_type=$2, people_reached=$3, date=$4, notes=$5 WHERE id=$6`,
+      `UPDATE impact_records
+       SET project_id=$1,
+           project_name=$2,
+           activity_type=$3,
+           people_reached=$4,
+           date=$5,
+           result_summary=$6,
+           evidence_link=$7
+       WHERE id=$8`,
       [
-        data.projectName,
+        data.projectId,
+        projectName,
         data.activityType,
         data.peopleReached,
         data.date,
-        data.notes,
+        data.resultSummary,
+        data.evidenceLink,
         id,
       ]
     );

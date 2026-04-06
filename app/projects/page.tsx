@@ -21,6 +21,7 @@ import MemberAvatarStack from "@/components/MemberAvatarStack";
 import MemberMultiSelect, { type MemberChoice } from "@/components/MemberMultiSelect";
 import Modal from "@/components/Modal";
 import EmptyState from "@/components/EmptyState";
+import ProjectsSubnav from "@/components/ProjectsSubnav";
 import { getCurrentSession } from "@/app/actions/session";
 import type { Session } from "@/lib/auth";
 import { getStoredSkeletonMap, setStoredSkeletonMap } from "@/lib/loading-skeleton";
@@ -40,6 +41,7 @@ interface Project {
   tags: string[];
   ownerUserIds: number[];
   createdAt: string;
+  updatedAt: string;
 }
 
 const COLUMNS: { id: Status; label: string; color: string }[] = [
@@ -125,6 +127,7 @@ const EMPTY: Project = {
   tags: [],
   ownerUserIds: [],
   createdAt: "",
+  updatedAt: "",
 };
 
 function getProjectPayload(project: Project) {
@@ -152,6 +155,7 @@ function rowToProject(row: ProjectRow): Project {
     tags: row.tags || [],
     ownerUserIds: (row.owner_user_ids || []).map(Number),
     createdAt: row.created_at,
+    updatedAt: row.updated_at,
   };
 }
 
@@ -667,6 +671,7 @@ export default function ProjectsPage() {
 
   /* ─── CRUD ─── */
   const saveProject = async () => {
+    const nowIso = new Date().toISOString();
     const nextProject = {
       ...editing,
       name: editing.name.trim(),
@@ -683,6 +688,7 @@ export default function ProjectsPage() {
             ? {
                 ...nextProject,
                 createdAt: previousProject?.createdAt ?? project.createdAt,
+                updatedAt: nowIso,
               }
             : project
         )
@@ -715,6 +721,12 @@ export default function ProjectsPage() {
             typeof result.createdAt === "string" && result.createdAt
               ? result.createdAt
               : new Date().toISOString(),
+          updatedAt:
+            typeof result.updatedAt === "string" && result.updatedAt
+              ? result.updatedAt
+              : typeof result.createdAt === "string" && result.createdAt
+                ? result.createdAt
+                : new Date().toISOString(),
         },
         ...current,
       ]);
@@ -765,6 +777,7 @@ export default function ProjectsPage() {
     const nextProject = {
       ...project,
       status: col,
+      updatedAt: new Date().toISOString(),
     };
 
     setProjects((current) =>
@@ -864,6 +877,18 @@ export default function ProjectsPage() {
     return diff;
   };
 
+  const formatProjectUpdate = (value: string) => {
+    if (!value) return "Not updated yet";
+
+    return new Date(value).toLocaleString(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  };
+
   const projectColumnCounts = useMemo(
     () =>
       COLUMNS.reduce<Record<Status, number>>((acc, column) => {
@@ -898,48 +923,51 @@ export default function ProjectsPage() {
     <div className="flex h-[calc(100dvh-4rem)] min-h-0 flex-col overflow-hidden bg-slate-50 md:h-screen">
       {/* Header */}
       <header className="shrink-0 border-b border-purple-200/70 bg-blue-100/80 backdrop-blur-md">
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div>
-            <h1 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-              Project Board
-              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-              </svg>
-            </h1>
-            <p className="text-xs text-slate-500 mt-0.5">
-              {isLoadingData
-                ? "Loading projects..."
-                : `${projects.length} project${projects.length !== 1 ? "s" : ""} · Drag cards to change status`}
-            </p>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search projects..."
-              className="px-3 text-slate-500 py-1.5 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 w-44"
-            />
-            <select
-              value={filterPriority}
-              onChange={(e) => setFilterPriority(e.target.value as Priority | "all")}
-              title="Filter priority"
-              className="px-3 text-slate-500 py-1.5 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-300"
-            >
-              <option value="all">All priorities</option>
-              <option value="high">High</option>
-              <option value="medium">Medium</option>
-              <option value="low">Low</option>
-            </select>
-            {canEdit && (
-              <button
-                onClick={() => openNew()}
-                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <h1 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                Project Board
+                <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                </svg>
+              </h1>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {isLoadingData
+                  ? "Loading projects..."
+                  : `${projects.length} project${projects.length !== 1 ? "s" : ""} · Drag cards to change status`}
+              </p>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search projects..."
+                className="px-3 text-slate-500 py-1.5 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 w-44"
+              />
+              <select
+                value={filterPriority}
+                onChange={(e) => setFilterPriority(e.target.value as Priority | "all")}
+                title="Filter priority"
+                className="px-3 text-slate-500 py-1.5 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-300"
               >
-                + New Project
-              </button>
-            )}
+                <option value="all">All priorities</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </select>
+              {canEdit && (
+                <button
+                  onClick={() => openNew()}
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+                >
+                  + New Project
+                </button>
+              )}
+            </div>
           </div>
+          <ProjectsSubnav className="mt-4" />
         </div>
       </header>
 
@@ -1167,6 +1195,12 @@ export default function ProjectsPage() {
             onChange={(ownerUserIds) => setEditing({ ...editing, ownerUserIds })}
             disabled={!canEdit}
           />
+
+          {editing.id ? (
+            <div className="rounded-xl border border-slate-200/80 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+              Last updated: <span className="font-medium text-slate-700">{formatProjectUpdate(editing.updatedAt)}</span>
+            </div>
+          ) : null}
 
           {canEdit && (
             <div className="flex items-center gap-3 pt-2">

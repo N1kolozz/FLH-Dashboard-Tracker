@@ -46,6 +46,11 @@ const ICON = {
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
     </svg>
   ),
+  overview: (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M3 13h8V3H3v10zm10 8h8V3h-8v18zM3 21h8v-6H3v6z" />
+    </svg>
+  ),
   impact: (
     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
@@ -88,8 +93,9 @@ const NAV_SECTIONS: NavSection[] = [
   {
     title: "Projects",
     links: [
-      { label: "Kanban Board", href: "/projects", icon: ICON.projects },
-      { label: "Impact Tracker", href: "/projects/impact", icon: ICON.impact },
+      { label: "Overview", href: "/projects/overview", icon: ICON.overview },
+      { label: "Project Board", href: "/projects", icon: ICON.projects },
+      { label: "Project Outcomes", href: "/projects/impact", icon: ICON.impact },
     ],
   },
   {

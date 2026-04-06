@@ -1,10 +1,14 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { getProjects } from "@/app/actions/projects";
+import type { ProjectRow } from "@/app/actions/projects";
 import { getImpactRecords, createImpactRecord, updateImpactRecord, deleteImpactRecord } from "@/app/actions/impact";
 import type { ImpactRecordRow } from "@/app/actions/impact";
 import Modal from "@/components/Modal";
 import EmptyState from "@/components/EmptyState";
+import ProjectsSubnav from "@/components/ProjectsSubnav";
 import { getCurrentSession } from "@/app/actions/session";
 import type { Session } from "@/lib/auth";
 import { getStoredSkeletonCount, resolveSkeletonCount, setStoredSkeletonCount } from "@/lib/loading-skeleton";
@@ -14,12 +18,19 @@ type ActivityType = "workshop" | "training" | "outreach" | "mentoring" | "event"
 
 interface ImpactRecord {
   id: number;
+  projectId: number | null;
   projectName: string;
   activityType: ActivityType;
   peopleReached: number;
   date: string;
-  notes: string;
+  resultSummary: string;
+  evidenceLink: string;
   createdAt: string;
+}
+
+interface ProjectOption {
+  id: number;
+  name: string;
 }
 
 const ACTIVITY_CONFIG: Record<ActivityType, { label: string; color: string }> = {
@@ -31,31 +42,80 @@ const ACTIVITY_CONFIG: Record<ActivityType, { label: string; color: string }> = 
   other: { label: "Other", color: "bg-slate-100 text-slate-600" },
 };
 
-const EMPTY: ImpactRecord = { id: 0, projectName: "", activityType: "other", peopleReached: 0, date: "", notes: "", createdAt: "" };
+const EMPTY: ImpactRecord = {
+  id: 0,
+  projectId: null,
+  projectName: "",
+  activityType: "other",
+  peopleReached: 0,
+  date: "",
+  resultSummary: "",
+  evidenceLink: "",
+  createdAt: "",
+};
 const IMPACT_RECORD_SKELETON_STORAGE_KEY = "impact-record-skeleton-count";
 const IMPACT_PROJECT_SKELETON_STORAGE_KEY = "impact-project-skeleton-count";
-const IMPACT_TIMELINE_SKELETON_STORAGE_KEY = "impact-timeline-skeleton-count";
 
-function getImpactPayload(record: ImpactRecord) {
+function getImpactPayload(record: ImpactRecord): {
+  projectId: number;
+  activityType: ActivityType;
+  peopleReached: number;
+  date: string;
+  resultSummary: string;
+  evidenceLink: string;
+} {
+  if (!record.projectId) {
+    throw new Error("Project ID is required");
+  }
+
   return {
-    projectName: record.projectName.trim(),
+    projectId: record.projectId,
     activityType: record.activityType,
     peopleReached: record.peopleReached,
     date: record.date,
-    notes: record.notes,
+    resultSummary: record.resultSummary.trim(),
+    evidenceLink: record.evidenceLink.trim(),
+  };
+}
+
+function rowToProjectOption(row: ProjectRow): ProjectOption {
+  return {
+    id: row.id,
+    name: row.name,
   };
 }
 
 function rowToRecord(row: ImpactRecordRow): ImpactRecord {
   return {
     id: row.id,
+    projectId: row.project_id,
     projectName: row.project_name,
     activityType: row.activity_type as ActivityType,
     peopleReached: row.people_reached,
     date: row.date,
-    notes: row.notes,
+    resultSummary: row.result_summary || "",
+    evidenceLink: row.evidence_link || "",
     createdAt: row.created_at,
   };
+}
+
+function buildProjectTotals(items: ImpactRecord[]) {
+  const map: Record<string, number> = {};
+
+  items.forEach((record) => {
+    map[record.projectName] = (map[record.projectName] || 0) + record.peopleReached;
+  });
+
+  return Object.entries(map).sort((a, b) => b[1] - a[1]);
+}
+
+function getEvidenceHref(value: string) {
+  const trimmed = value.trim();
+
+  if (!trimmed) return null;
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+
+  return `https://${trimmed}`;
 }
 
 function sortRecords(items: ImpactRecord[]) {
@@ -98,28 +158,6 @@ function ImpactChartSkeleton({ count }: { count: number }) {
   );
 }
 
-function ImpactTimelineSkeleton({ count }: { count: number }) {
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="mb-4 h-4 w-44 animate-pulse rounded-full bg-slate-200" />
-      <div className="flex h-32 items-end gap-1">
-        {Array.from({ length: count }).map((_, idx) => (
-          <div key={idx} className="flex flex-1 items-end">
-            <div
-              className="w-full animate-pulse rounded-t-sm bg-slate-200"
-              style={{ height: `${30 + (idx % 5) * 12}%` }}
-            />
-          </div>
-        ))}
-      </div>
-      <div className="mt-1 flex justify-between">
-        <div className="h-3 w-20 animate-pulse rounded-full bg-slate-100" />
-        <div className="h-3 w-20 animate-pulse rounded-full bg-slate-100" />
-      </div>
-    </div>
-  );
-}
-
 function ImpactTableSkeleton({ count }: { count: number }) {
   return (
     <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
@@ -129,6 +167,8 @@ function ImpactTableSkeleton({ count }: { count: number }) {
             <th className="px-4 py-3">Date</th>
             <th className="px-4 py-3">Project</th>
             <th className="px-4 py-3">Activity</th>
+            <th className="px-4 py-3">Result</th>
+            <th className="px-4 py-3">Evidence</th>
             <th className="px-4 py-3 text-right">People Reached</th>
             <th className="px-4 py-3"></th>
           </tr>
@@ -139,6 +179,8 @@ function ImpactTableSkeleton({ count }: { count: number }) {
               <td className="px-4 py-3"><div className="h-4 w-20 rounded-full bg-slate-100" /></td>
               <td className="px-4 py-3"><div className="h-4 w-36 rounded-full bg-slate-200" /></td>
               <td className="px-4 py-3"><div className="h-5 w-20 rounded-full bg-slate-100" /></td>
+              <td className="px-4 py-3"><div className="h-4 w-40 rounded-full bg-slate-100" /></td>
+              <td className="px-4 py-3"><div className="h-4 w-20 rounded-full bg-slate-100" /></td>
               <td className="px-4 py-3 text-right"><div className="ml-auto h-4 w-16 rounded-full bg-slate-100" /></td>
               <td className="px-4 py-3"><div className="h-6 w-12 rounded-md bg-slate-100" /></td>
             </tr>
@@ -150,34 +192,69 @@ function ImpactTableSkeleton({ count }: { count: number }) {
 }
 
 export default function ImpactPage() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const projectIdFromUrl = searchParams.get("projectId");
   const [records, setRecords] = useState<ImpactRecord[]>([]);
+  const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<ImpactRecord>(EMPTY);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [cachedRecordCount, setCachedRecordCount] = useState(0);
   const [cachedProjectCount, setCachedProjectCount] = useState(0);
-  const [cachedTimelineCount, setCachedTimelineCount] = useState(0);
+  const [filterProjectId, setFilterProjectId] = useState(projectIdFromUrl ?? "all");
+  const [filterActivity, setFilterActivity] = useState<ActivityType | "all">("all");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
   useEffect(() => {
     setCachedRecordCount(getStoredSkeletonCount(IMPACT_RECORD_SKELETON_STORAGE_KEY, 0));
     setCachedProjectCount(getStoredSkeletonCount(IMPACT_PROJECT_SKELETON_STORAGE_KEY, 0));
-    setCachedTimelineCount(getStoredSkeletonCount(IMPACT_TIMELINE_SKELETON_STORAGE_KEY, 0));
   }, []);
 
   useEffect(() => {
     async function init() {
       setIsLoadingData(true);
       try {
-        const sess = await getCurrentSession();
+        const [sess, projectRes, recordRes] = await Promise.all([
+          getCurrentSession(),
+          getProjects(),
+          getImpactRecords(),
+        ]);
         setSession(sess);
-        await refreshRecords(false);
+
+        if (projectRes.success && projectRes.projects) {
+          const nextProjects = projectRes.projects
+            .map(rowToProjectOption)
+            .sort((a, b) => a.name.localeCompare(b.name));
+          setProjects(nextProjects);
+        }
+
+        if (recordRes.success && recordRes.records) {
+          setRecords(sortRecords(recordRes.records.map(rowToRecord)));
+        }
       } finally {
         setIsLoadingData(false);
       }
     }
     init();
   }, []);
+
+  useEffect(() => {
+    if (!projectIdFromUrl) {
+      setFilterProjectId("all");
+      return;
+    }
+
+    if (projects.length > 0 && !projects.some((project) => String(project.id) === projectIdFromUrl)) {
+      setFilterProjectId("all");
+      return;
+    }
+
+    setFilterProjectId(projectIdFromUrl);
+  }, [projectIdFromUrl, projects]);
 
   const canEdit = session && (
     session.role === "ADMIN" || 
@@ -197,13 +274,30 @@ export default function ImpactPage() {
     }
   };
 
+  const setEditingProject = (projectIdValue: string) => {
+    const nextProjectId = projectIdValue ? Number(projectIdValue) : null;
+    const selectedProject = nextProjectId
+      ? projects.find((project) => project.id === nextProjectId) ?? null
+      : null;
+
+    setEditing((current) => ({
+      ...current,
+      projectId: nextProjectId,
+      projectName: selectedProject?.name ?? current.projectName,
+    }));
+  };
+
   const saveRecord = async () => {
+    const selectedProject = editing.projectId
+      ? projects.find((project) => project.id === editing.projectId) ?? null
+      : null;
     const nextRecord = {
       ...editing,
-      projectName: editing.projectName.trim(),
+      projectId: selectedProject?.id ?? null,
+      projectName: selectedProject?.name ?? editing.projectName.trim(),
     };
 
-    if (!nextRecord.projectName || !nextRecord.date || nextRecord.peopleReached <= 0) return;
+    if (!selectedProject || !nextRecord.date || nextRecord.peopleReached <= 0) return;
 
     if (nextRecord.id) {
       const previousRecord = records.find((record) => record.id === nextRecord.id);
@@ -279,42 +373,52 @@ export default function ImpactPage() {
     void refreshRecords(false);
   };
 
-  const totalPeople = records.reduce((s, r) => s + r.peopleReached, 0);
-  const totalActivities = records.length;
+  const filteredRecords = useMemo(
+    () =>
+      records.filter((record) => {
+        if (filterProjectId !== "all" && String(record.projectId) !== filterProjectId) {
+          return false;
+        }
 
-  // Group by project
-  const byProject = useMemo(() => {
-    const map: Record<string, number> = {};
-    records.forEach((r) => {
-      map[r.projectName] = (map[r.projectName] || 0) + r.peopleReached;
-    });
-    return Object.entries(map).sort((a, b) => b[1] - a[1]);
-  }, [records]);
+        if (filterActivity !== "all" && record.activityType !== filterActivity) {
+          return false;
+        }
+
+        if (startDate && record.date < startDate) {
+          return false;
+        }
+
+        if (endDate && record.date > endDate) {
+          return false;
+        }
+
+        return true;
+      }),
+    [endDate, filterActivity, filterProjectId, records, startDate]
+  );
+
+  const totalPeople = filteredRecords.reduce((sum, record) => sum + record.peopleReached, 0);
+  const totalActivities = filteredRecords.length;
+  const unlinkedRecordCount = records.filter((record) => record.projectId === null).length;
+  const canAddOutcome = Boolean(canEdit && projects.length > 0);
+  const hasActiveFilters =
+    filterProjectId !== "all" || filterActivity !== "all" || Boolean(startDate) || Boolean(endDate);
+  const allByProject = useMemo(() => buildProjectTotals(records), [records]);
+  const byProject = useMemo(() => buildProjectTotals(filteredRecords), [filteredRecords]);
+  const selectedProject = useMemo(
+    () => projects.find((project) => String(project.id) === filterProjectId) ?? null,
+    [filterProjectId, projects]
+  );
 
   const maxProjectImpact = Math.max(...byProject.map(([, v]) => v), 1);
-
-  // Cumulative timeline data
-  const cumulativeData = useMemo(() => {
-    const sorted = [...records].sort((a, b) => a.date.localeCompare(b.date));
-    let cumulative = 0;
-    return sorted.map((r) => {
-      cumulative += r.peopleReached;
-      return { date: r.date, total: cumulative, label: r.projectName };
-    });
-  }, [records]);
-
-  const sortedRecords = [...records].sort((a, b) => b.date.localeCompare(a.date));
+  const sortedRecords = [...filteredRecords].sort((a, b) => b.date.localeCompare(a.date));
   const impactRecordSkeletonCount = resolveSkeletonCount(
     records.length,
     cachedRecordCount
   );
   const impactProjectSkeletonCount = resolveSkeletonCount(
-    byProject.length,
+    allByProject.length,
     cachedProjectCount
-  );
-  const impactTimelineSkeletonCount = resolveSkeletonCount(
-    cumulativeData.length,
-    cachedTimelineCount
   );
 
   useEffect(() => {
@@ -322,37 +426,152 @@ export default function ImpactPage() {
 
     setCachedRecordCount(records.length);
     setStoredSkeletonCount(IMPACT_RECORD_SKELETON_STORAGE_KEY, records.length);
-    setCachedProjectCount(byProject.length);
-    setStoredSkeletonCount(IMPACT_PROJECT_SKELETON_STORAGE_KEY, byProject.length);
-    setCachedTimelineCount(cumulativeData.length);
-    setStoredSkeletonCount(IMPACT_TIMELINE_SKELETON_STORAGE_KEY, cumulativeData.length);
-  }, [byProject.length, cumulativeData.length, isLoadingData, records.length]);
+    setCachedProjectCount(allByProject.length);
+    setStoredSkeletonCount(IMPACT_PROJECT_SKELETON_STORAGE_KEY, allByProject.length);
+  }, [allByProject.length, isLoadingData, records.length]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    const currentProjectId = params.get("projectId") ?? "all";
+
+    if (filterProjectId === currentProjectId) {
+      return;
+    }
+
+    if (filterProjectId === "all") {
+      params.delete("projectId");
+    } else {
+      params.set("projectId", filterProjectId);
+    }
+
+    const nextQuery = params.toString();
+    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false });
+  }, [filterProjectId, pathname, router, searchParams]);
+
+  const clearFilters = () => {
+    setFilterProjectId("all");
+    setFilterActivity("all");
+    setStartDate("");
+    setEndDate("");
+  };
 
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="border-b border-purple-200/70 bg-blue-100/80 backdrop-blur-md">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div>
-            <h1 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-              Impact Tracker
-              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-              </svg>
-            </h1>
-            <p className="text-xs text-slate-500 mt-0.5">
-              {isLoadingData ? "Loading impact data..." : "Track beneficiaries and measure project impact"}
-            </p>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <h1 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                Project Outcomes
+                <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                </svg>
+              </h1>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {isLoadingData
+                  ? "Loading project outcomes..."
+                  : "Track beneficiaries, activities, and results across projects"}
+              </p>
+            </div>
+            {canEdit && (
+              <button
+                disabled={!canAddOutcome}
+                title={!canAddOutcome ? "Create a project on the board first" : undefined}
+                onClick={() => { setEditing({ ...EMPTY, date: new Date().toISOString().slice(0, 10) }); setModalOpen(true); }}
+                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:hover:bg-slate-300 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+              >+ Add Outcome</button>
+            )}
           </div>
-          {canEdit && (
-            <button
-              onClick={() => { setEditing({ ...EMPTY, date: new Date().toISOString().slice(0, 10) }); setModalOpen(true); }}
-              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
-            >+ Add Record</button>
-          )}
+          <ProjectsSubnav className="mt-4" />
         </div>
       </header>
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+        {!isLoadingData && unlinkedRecordCount > 0 && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 shadow-sm">
+            {unlinkedRecordCount} outcome record{unlinkedRecordCount !== 1 ? "s still rely" : " still relies"} on
+            the old text-only project name. Open those records, choose the correct project, and save to fully link
+            them to the board.
+          </div>
+        )}
+
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Filters</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Filter Project Outcomes by project, activity type, and date range.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-5">
+              <select
+                value={filterProjectId}
+                onChange={(event) => setFilterProjectId(event.target.value)}
+                title="Filter by project"
+                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-purple-300"
+              >
+                <option value="all">All projects</option>
+                {projects.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.name}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={filterActivity}
+                onChange={(event) => setFilterActivity(event.target.value as ActivityType | "all")}
+                title="Filter by activity type"
+                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-purple-300"
+              >
+                <option value="all">All activity types</option>
+                {(Object.keys(ACTIVITY_CONFIG) as ActivityType[]).map((activity) => (
+                  <option key={activity} value={activity}>
+                    {ACTIVITY_CONFIG[activity].label}
+                  </option>
+                ))}
+              </select>
+
+              <input
+                type="date"
+                value={startDate}
+                onChange={(event) => setStartDate(event.target.value)}
+                title="Start date"
+                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-purple-300"
+              />
+
+              <input
+                type="date"
+                value={endDate}
+                onChange={(event) => setEndDate(event.target.value)}
+                title="End date"
+                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-purple-300"
+              />
+
+              <button
+                type="button"
+                onClick={clearFilters}
+                disabled={!hasActiveFilters}
+                className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
+              >
+                Clear Filters
+              </button>
+            </div>
+          </div>
+
+          <p className="mt-3 text-sm text-slate-500">
+            Showing <span className="font-semibold text-slate-700">{filteredRecords.length}</span> of{" "}
+            <span className="font-semibold text-slate-700">{records.length}</span> outcome records.
+          </p>
+          {selectedProject ? (
+            <p className="mt-2 text-sm text-slate-500">
+              Focused on <span className="font-semibold text-slate-700">{selectedProject.name}</span> from the
+              Project Portfolio view.
+            </p>
+          ) : null}
+        </div>
+
         {/* Summary */}
         {isLoadingData ? (
           <ImpactSummarySkeleton />
@@ -373,78 +592,69 @@ export default function ImpactPage() {
           </div>
         )}
 
-        {/* Impact by project */}
-        {isLoadingData ? (
-          <ImpactChartSkeleton count={impactProjectSkeletonCount} />
-        ) : byProject.length > 0 && (
-          <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-            <h3 className="text-sm font-semibold text-slate-600 uppercase tracking-wide mb-4">Impact by Project</h3>
-            <div className="space-y-3">
-              {byProject.map(([name, total]) => (
-                <div key={name}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm text-slate-700 font-medium">{name}</span>
-                    <span className="text-sm text-slate-900 font-semibold">{total.toLocaleString()} people</span>
-                  </div>
-                  <div className="w-full bg-slate-100 rounded-full h-2.5">
-                    <div
-                      className="h-2.5 rounded-full bg-blue-500 transition-all duration-500"
-                      style={{ width: `${(total / maxProjectImpact) * 100}%` }}
-                    />
-                  </div>
+        <div>
+          {isLoadingData ? (
+            <ImpactChartSkeleton count={impactProjectSkeletonCount} />
+          ) : (
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-600">
+                Outcome Reach by Project
+              </h3>
+              {byProject.length === 0 ? (
+                <div className="flex h-72 items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-500">
+                  No projects match the current filters.
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Cumulative timeline */}
-        {isLoadingData ? (
-          <ImpactTimelineSkeleton count={impactTimelineSkeletonCount} />
-        ) : cumulativeData.length > 1 && (
-          <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-            <h3 className="text-sm font-semibold text-slate-600 uppercase tracking-wide mb-4">Cumulative Reach Over Time</h3>
-            <div className="flex items-end gap-1 h-32">
-              {cumulativeData.map((point, idx) => {
-                const height = (point.total / cumulativeData[cumulativeData.length - 1].total) * 100;
-                return (
-                  <div key={idx} className="flex-1 flex flex-col items-center justify-end group relative">
-                    <div className="absolute -top-6 hidden group-hover:block bg-slate-900 text-white text-[10px] px-2 py-1 rounded shadow-lg whitespace-nowrap z-10">
-                      {point.date}: {point.total.toLocaleString()} total
+              ) : (
+                <div className="space-y-3">
+                  {byProject.map(([name, total]) => (
+                    <div key={name}>
+                      <div className="mb-1 flex items-center justify-between">
+                        <span className="text-sm font-medium text-slate-700">{name}</span>
+                        <span className="text-sm font-semibold text-slate-900">{total.toLocaleString()} people</span>
+                      </div>
+                      <div className="h-2.5 w-full rounded-full bg-slate-100">
+                        <div
+                          className="h-2.5 rounded-full bg-blue-500 transition-all duration-500"
+                          style={{ width: `${(total / maxProjectImpact) * 100}%` }}
+                        />
+                      </div>
                     </div>
-                    <div
-                      className="w-full bg-blue-400 rounded-t-sm transition-all duration-300 hover:bg-blue-500 min-h-[4px]"
-                      style={{ height: `${Math.max(height, 3)}%` }}
-                    />
-                  </div>
-                );
-              })}
+                  ))}
+                </div>
+              )}
             </div>
-            <div className="flex justify-between mt-1">
-              <span className="text-[10px] text-slate-400">{cumulativeData[0]?.date}</span>
-              <span className="text-[10px] text-slate-400">{cumulativeData[cumulativeData.length - 1]?.date}</span>
-            </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Records list */}
         {isLoadingData ? (
           <ImpactTableSkeleton count={impactRecordSkeletonCount} />
         ) : records.length === 0 ? (
           <EmptyState
-            title="No impact records yet"
-            description="Start tracking beneficiaries to measure your NGO's real-world impact."
+            title="No project outcomes yet"
+            description={
+              projects.length === 0
+                ? "Create a project on the board first, then log outcomes against that project."
+                : "Start logging beneficiaries and activities to measure each project's real-world results."
+            }
             icon={<svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>}
-            action={canEdit ? { label: "Add Impact Record", onClick: () => { setEditing({ ...EMPTY, date: new Date().toISOString().slice(0, 10) }); setModalOpen(true); } } : undefined}
+            action={canAddOutcome ? { label: "Add Outcome Record", onClick: () => { setEditing({ ...EMPTY, date: new Date().toISOString().slice(0, 10) }); setModalOpen(true); } } : undefined}
           />
+        ) : filteredRecords.length === 0 ? (
+          <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500 shadow-sm">
+            No outcome records match the current filters.
+          </div>
         ) : (
-          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-            <table className="w-full text-sm">
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+            <div className="overflow-x-auto">
+            <table className="min-w-[1100px] w-full text-sm">
               <thead>
                 <tr className="bg-slate-50 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">
                   <th className="px-4 py-3">Date</th>
                   <th className="px-4 py-3">Project</th>
                   <th className="px-4 py-3">Activity</th>
+                  <th className="px-4 py-3">Result</th>
+                  <th className="px-4 py-3">Evidence</th>
                   <th className="px-4 py-3 text-right">People Reached</th>
                   <th className="px-4 py-3"></th>
                 </tr>
@@ -453,9 +663,39 @@ export default function ImpactPage() {
                 {sortedRecords.map((r) => (
                   <tr key={r.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-4 py-3 text-slate-500 whitespace-nowrap">{r.date}</td>
-                    <td className="px-4 py-3 font-medium text-slate-800">{r.projectName}</td>
+                    <td className="px-4 py-3 font-medium text-slate-800">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span>{r.projectName}</span>
+                        {!r.projectId && (
+                          <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                            Needs relink
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-4 py-3">
                       <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${ACTIVITY_CONFIG[r.activityType].color}`}>{ACTIVITY_CONFIG[r.activityType].label}</span>
+                    </td>
+                    <td className="px-4 py-3 text-slate-600">
+                      {r.resultSummary ? (
+                        <span className="line-clamp-2">{r.resultSummary}</span>
+                      ) : (
+                        <span className="text-slate-400">No summary</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {r.evidenceLink.trim() ? (
+                        <a
+                          href={getEvidenceHref(r.evidenceLink) ?? "#"}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-sm font-medium text-blue-600 hover:text-blue-700"
+                        >
+                          Open link
+                        </a>
+                      ) : (
+                        <span className="text-slate-400">None</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right font-semibold text-blue-700">{r.peopleReached.toLocaleString()}</td>
                     <td className="px-4 py-3">
@@ -465,16 +705,43 @@ export default function ImpactPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         )}
       </div>
 
       {/* Modal */}
-      <Modal open={modalOpen} onClose={() => { setModalOpen(false); setEditing(EMPTY); }} title={editing.id ? (canEdit ? "Edit Record" : "View Record") : "Add Impact Record"}>
+      <Modal open={modalOpen} onClose={() => { setModalOpen(false); setEditing(EMPTY); }} title={editing.id ? (canEdit ? "Edit Outcome Record" : "View Outcome Record") : "Add Outcome Record"}>
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Project Name *</label>
-            <input disabled={!canEdit} type="text" value={editing.projectName} onChange={(e) => setEditing({ ...editing, projectName: e.target.value })} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 disabled:bg-slate-50" placeholder="e.g., Youth Leadership Program" />
+            <label className="block text-sm font-medium text-slate-700 mb-1">Project *</label>
+            <select
+              disabled={!canEdit || projects.length === 0}
+              value={editing.projectId ? String(editing.projectId) : ""}
+              onChange={(e) => setEditingProject(e.target.value)}
+              title="Project"
+              className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 disabled:bg-slate-50"
+            >
+              <option value="">
+                {projects.length === 0
+                  ? "Create a project first"
+                  : editing.id && editing.projectName && !editing.projectId
+                    ? "Legacy record not linked yet"
+                    : "Select a project"}
+              </option>
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.name}
+                </option>
+              ))}
+            </select>
+            {editing.projectId === null && editing.projectName ? (
+              <p className="mt-2 text-xs text-amber-700">
+                This record still uses the old project name{" "}
+                <span className="font-semibold">{editing.projectName}</span>. Choose the correct project and save to
+                upgrade it.
+              </p>
+            ) : null}
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div>
@@ -504,12 +771,30 @@ export default function ImpactPage() {
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Notes</label>
-            <textarea disabled={!canEdit} value={editing.notes} onChange={(e) => setEditing({ ...editing, notes: e.target.value })} rows={2} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 resize-none disabled:bg-slate-50" placeholder="Details about the activity..." />
+            <label className="block text-sm font-medium text-slate-700 mb-1">Result Summary</label>
+            <textarea
+              disabled={!canEdit}
+              value={editing.resultSummary}
+              onChange={(e) => setEditing({ ...editing, resultSummary: e.target.value })}
+              rows={3}
+              className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 resize-none disabled:bg-slate-50"
+              placeholder="What changed or what was achieved?"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Evidence Link</label>
+            <input
+              disabled={!canEdit}
+              type="url"
+              value={editing.evidenceLink}
+              onChange={(e) => setEditing({ ...editing, evidenceLink: e.target.value })}
+              className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 disabled:bg-slate-50"
+              placeholder="https://drive.google.com/... or other proof link"
+            />
           </div>
           {canEdit && (
             <div className="flex items-center gap-3 pt-2">
-              <button onClick={saveRecord} disabled={!editing.projectName.trim() || !editing.date || editing.peopleReached <= 0} className="flex-1  px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white text-sm font-medium rounded-lg transition-colors">{editing.id ? "Save Changes" : "Add Record"}</button>
+              <button onClick={saveRecord} disabled={!editing.projectId || !editing.date || editing.peopleReached <= 0} className="flex-1  px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white text-sm font-medium rounded-lg transition-colors">{editing.id ? "Save Changes" : "Add Outcome"}</button>
               {editing.id ? (
                 <button onClick={() => { void handleDeleteRecord(editing.id); setModalOpen(false); setEditing(EMPTY); }} className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 text-sm font-medium rounded-lg border border-rose-200 transition-colors">Delete</button>
               ) : null}

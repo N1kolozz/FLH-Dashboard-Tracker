@@ -83,7 +83,8 @@ async function migrate() {
         deadline DATE,
         team VARCHAR(255) DEFAULT '',
         tags TEXT[] DEFAULT '{}',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
     console.log("✓ projects table ready");
@@ -104,6 +105,17 @@ async function migrate() {
       WHERE owner_user_id IS NOT NULL AND cardinality(owner_user_ids) = 0
     `);
     console.log("✓ projects owners column ready");
+
+    await client.query(`
+      ALTER TABLE projects
+      ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    `);
+    await client.query(`
+      UPDATE projects
+      SET updated_at = created_at
+      WHERE updated_at IS NULL
+    `);
+    console.log("✓ projects updated_at column ready");
 
     await client.query(`
       CREATE TABLE IF NOT EXISTS events (
@@ -212,15 +224,61 @@ async function migrate() {
     await client.query(`
       CREATE TABLE IF NOT EXISTS impact_records (
         id SERIAL PRIMARY KEY,
+        project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL,
         project_name VARCHAR(255) NOT NULL,
         activity_type VARCHAR(50) NOT NULL DEFAULT 'other',
         people_reached INTEGER NOT NULL DEFAULT 0,
         date DATE NOT NULL,
+        result_summary TEXT DEFAULT '',
+        evidence_link TEXT DEFAULT '',
         notes TEXT DEFAULT '',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
     console.log("✓ impact_records table ready");
+
+    await client.query(`
+      ALTER TABLE impact_records
+      ADD COLUMN IF NOT EXISTS project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS impact_records_project_id_idx
+      ON impact_records (project_id)
+    `);
+    await client.query(`
+      WITH project_matches AS (
+        SELECT DISTINCT ON (LOWER(BTRIM(name)))
+          id,
+          name,
+          LOWER(BTRIM(name)) AS normalized_name
+        FROM projects
+        WHERE BTRIM(name) <> ''
+        ORDER BY LOWER(BTRIM(name)), created_at DESC, id DESC
+      )
+      UPDATE impact_records AS ir
+      SET project_id = pm.id,
+          project_name = pm.name
+      FROM project_matches AS pm
+      WHERE ir.project_id IS NULL
+        AND LOWER(BTRIM(ir.project_name)) = pm.normalized_name
+    `);
+    console.log("✓ impact_records project link ready");
+
+    await client.query(`
+      ALTER TABLE impact_records
+      ADD COLUMN IF NOT EXISTS result_summary TEXT DEFAULT ''
+    `);
+    await client.query(`
+      ALTER TABLE impact_records
+      ADD COLUMN IF NOT EXISTS evidence_link TEXT DEFAULT ''
+    `);
+    await client.query(`
+      UPDATE impact_records
+      SET result_summary = COALESCE(result_summary, ''),
+          evidence_link = COALESCE(evidence_link, '')
+      WHERE result_summary IS NULL OR evidence_link IS NULL
+    `);
+    console.log("✓ impact_records structured outcome columns ready");
 
     // Seed accounts (upsert by URL to avoid duplicates)
     const accounts = [
