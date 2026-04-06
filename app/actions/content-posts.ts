@@ -67,7 +67,7 @@ export async function createContentPost(data: {
     await assertCanEdit();
     const res = await pool.query(
       `INSERT INTO content_posts (platform, caption, date, time, status, notes, owner_user_ids)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, created_at`,
       [
         data.platform,
         data.caption,
@@ -78,7 +78,16 @@ export async function createContentPost(data: {
         Array.from(new Set(data.ownerUserIds)).filter((id) => Number.isInteger(id)),
       ]
     );
-    return { success: true, id: res.rows[0].id };
+    const createdAt = res.rows[0].created_at;
+
+    return {
+      success: true,
+      id: res.rows[0].id as number,
+      createdAt:
+        createdAt instanceof Date
+          ? createdAt.toISOString()
+          : String(createdAt),
+    };
   } catch (error) {
     console.error("Error creating content post:", error);
     return { error: "Failed to create content post" };

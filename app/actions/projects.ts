@@ -94,7 +94,7 @@ export async function createProject(data: {
          owner_user_ids
        )
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       RETURNING id`,
+       RETURNING id, created_at`,
       [
         data.name,
         data.description,
@@ -106,7 +106,16 @@ export async function createProject(data: {
         Array.from(new Set(data.ownerUserIds)).filter((id) => Number.isInteger(id)),
       ]
     );
-    return { success: true, id: res.rows[0].id };
+    const createdAt = res.rows[0].created_at;
+
+    return {
+      success: true,
+      id: res.rows[0].id as number,
+      createdAt:
+        createdAt instanceof Date
+          ? createdAt.toISOString()
+          : String(createdAt),
+    };
   } catch (error) {
     console.error("Error creating project:", error);
     return { error: "Failed to create project" };

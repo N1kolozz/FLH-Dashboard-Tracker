@@ -73,6 +73,19 @@ const EMPTY: CalEvent = {
   createdAt: "",
 };
 
+function getEventPayload(event: CalEvent) {
+  return {
+    title: event.title.trim(),
+    date: event.date,
+    time: event.time,
+    endTime: event.endTime,
+    location: event.location,
+    department: event.department,
+    description: event.description,
+    ownerUserIds: event.ownerUserIds,
+  };
+}
+
 function rowToEvent(row: EventRow): CalEvent {
   return {
     id: row.id,
@@ -86,6 +99,15 @@ function rowToEvent(row: EventRow): CalEvent {
     ownerUserIds: (row.owner_user_ids || []).map(Number),
     createdAt: row.created_at,
   };
+}
+
+function sortEvents(items: CalEvent[]) {
+  return [...items].sort(
+    (a, b) =>
+      b.date.localeCompare(a.date) ||
+      a.time.localeCompare(b.time) ||
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
 }
 
 function getMonthDays(year: number, month: number) {
@@ -217,7 +239,7 @@ export default function EventsPage() {
         ]);
         setSession(sess);
         if (eventRes.success && eventRes.events) {
-          setEvents(eventRes.events.map(rowToEvent));
+          setEvents(sortEvents(eventRes.events.map(rowToEvent)));
         }
         if (memberRes.success && memberRes.members) {
           const nextMembers = (memberRes.members as { id: number; name: string }[])
@@ -254,51 +276,103 @@ export default function EventsPage() {
 
   const holidaysByDate = useMemo(() => buildHolidaysByDate(publicHolidays), [publicHolidays]);
 
-  const refreshEvents = async () => {
-    setIsLoadingData(true);
+  const refreshEvents = async ({ showLoading = false }: { showLoading?: boolean } = {}) => {
+    if (showLoading) {
+      setIsLoadingData(true);
+    }
+
     try {
       const res = await getEvents();
       if (res.success && res.events) {
-        setEvents(res.events.map(rowToEvent));
+        setEvents(sortEvents(res.events.map(rowToEvent)));
       }
     } finally {
-      setIsLoadingData(false);
+      if (showLoading) {
+        setIsLoadingData(false);
+      }
     }
   };
 
   const saveEvent = async () => {
-    if (!editing.title.trim() || !editing.date) return;
-    if (editing.id) {
-      await updateEvent(editing.id, {
-        title: editing.title,
-        date: editing.date,
-        time: editing.time,
-        endTime: editing.endTime,
-        location: editing.location,
-        department: editing.department,
-        description: editing.description,
-        ownerUserIds: editing.ownerUserIds,
-      });
+    const nextEvent = {
+      ...editing,
+      title: editing.title.trim(),
+    };
+
+    if (!nextEvent.title || !nextEvent.date) return;
+
+    if (nextEvent.id) {
+      const previousEvent = events.find((event) => event.id === nextEvent.id);
+
+      setEvents((current) =>
+        sortEvents(
+          current.map((event) =>
+            event.id === nextEvent.id
+              ? {
+                  ...nextEvent,
+                  createdAt: previousEvent?.createdAt ?? event.createdAt,
+                }
+              : event
+          )
+        )
+      );
+
+      const result = await updateEvent(nextEvent.id, getEventPayload(nextEvent));
+
+      if (!result.success) {
+        if (previousEvent) {
+          setEvents((current) =>
+            sortEvents(
+              current.map((event) =>
+                event.id === previousEvent.id ? previousEvent : event
+              )
+            )
+          );
+        }
+        return;
+      }
     } else {
-      await createEvent({
-        title: editing.title,
-        date: editing.date,
-        time: editing.time,
-        endTime: editing.endTime,
-        location: editing.location,
-        department: editing.department,
-        description: editing.description,
-        ownerUserIds: editing.ownerUserIds,
-      });
+      const result = await createEvent(getEventPayload(nextEvent));
+
+      if (!result.success || typeof result.id !== "number") {
+        return;
+      }
+
+      setEvents((current) =>
+        sortEvents([
+          {
+            ...nextEvent,
+            id: result.id,
+            createdAt:
+              typeof result.createdAt === "string" && result.createdAt
+                ? result.createdAt
+                : new Date().toISOString(),
+          },
+          ...current,
+        ])
+      );
     }
-    await refreshEvents();
+
     setModalOpen(false);
     setEditing(EMPTY);
+    void refreshEvents();
   };
 
   const handleDelete = async (id: number) => {
-    await deleteEvent(id);
-    await refreshEvents();
+    const deletedEvent = events.find((event) => event.id === id);
+
+    setEvents((current) => current.filter((event) => event.id !== id));
+
+    const result = await deleteEvent(id);
+
+    if (!result.success) {
+      if (deletedEvent) {
+        setEvents((current) => sortEvents([deletedEvent, ...current]));
+      }
+      return;
+    }
+
+    void refreshEvents();
   };
 
   const openNew = (date?: string) => {
@@ -1065,7 +1139,7 @@ export default function EventsPage() {
                 {editing.id ? "Save Changes" : "Create Event"}
               </button>
               {editing.id ? (
-                <button onClick={() => { handleDelete(editing.id); setModalOpen(false); setEditing(EMPTY); }} className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 text-sm font-medium rounded-lg border border-rose-200 transition-colors">Delete</button>
+                <button onClick={() => { void handleDelete(editing.id); setModalOpen(false); setEditing(EMPTY); }} className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 text-sm font-medium rounded-lg border border-rose-200 transition-colors">Delete</button>
               ) : null}
             </div>
           )}

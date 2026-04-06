@@ -74,6 +74,18 @@ const EMPTY: ContentPost = {
   createdAt: "",
 };
 
+function getPostPayload(post: ContentPost) {
+  return {
+    platform: post.platform,
+    caption: post.caption.trim(),
+    date: post.date,
+    time: post.time,
+    status: post.status,
+    notes: post.notes,
+    ownerUserIds: post.ownerUserIds,
+  };
+}
+
 function rowToPost(row: ContentPostRow): ContentPost {
   return {
     id: row.id,
@@ -86,6 +98,15 @@ function rowToPost(row: ContentPostRow): ContentPost {
     ownerUserIds: (row.owner_user_ids || []).map(Number),
     createdAt: row.created_at,
   };
+}
+
+function sortPosts(items: ContentPost[]) {
+  return [...items].sort(
+    (a, b) =>
+      b.date.localeCompare(a.date) ||
+      a.time.localeCompare(b.time) ||
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
 }
 
 function getMonthDays(year: number, month: number) {
@@ -192,7 +213,7 @@ export default function ContentCalendarPage() {
         ]);
         setSession(sess);
         if (postRes.success && postRes.posts) {
-          setPosts(postRes.posts.map(rowToPost));
+          setPosts(sortPosts(postRes.posts.map(rowToPost)));
         }
         if (memberRes.success && memberRes.members) {
           const nextMembers = (memberRes.members as { id: number; name: string }[])
@@ -235,49 +256,103 @@ export default function ContentCalendarPage() {
 
   const holidaysByDate = useMemo(() => buildHolidaysByDate(publicHolidays), [publicHolidays]);
 
-  const refreshPosts = async () => {
-    setIsLoadingData(true);
+  const refreshPosts = async ({ showLoading = false }: { showLoading?: boolean } = {}) => {
+    if (showLoading) {
+      setIsLoadingData(true);
+    }
+
     try {
       const res = await getContentPosts();
       if (res.success && res.posts) {
-        setPosts(res.posts.map(rowToPost));
+        setPosts(sortPosts(res.posts.map(rowToPost)));
       }
     } finally {
-      setIsLoadingData(false);
+      if (showLoading) {
+        setIsLoadingData(false);
+      }
     }
   };
 
   const savePost = async () => {
-    if (!editing.caption.trim() || !editing.date) return;
-    if (editing.id) {
-      await updateContentPost(editing.id, {
-        platform: editing.platform,
-        caption: editing.caption,
-        date: editing.date,
-        time: editing.time,
-        status: editing.status,
-        notes: editing.notes,
-        ownerUserIds: editing.ownerUserIds,
-      });
+    const nextPost = {
+      ...editing,
+      caption: editing.caption.trim(),
+    };
+
+    if (!nextPost.caption || !nextPost.date) return;
+
+    if (nextPost.id) {
+      const previousPost = posts.find((post) => post.id === nextPost.id);
+
+      setPosts((current) =>
+        sortPosts(
+          current.map((post) =>
+            post.id === nextPost.id
+              ? {
+                  ...nextPost,
+                  createdAt: previousPost?.createdAt ?? post.createdAt,
+                }
+              : post
+          )
+        )
+      );
+
+      const result = await updateContentPost(nextPost.id, getPostPayload(nextPost));
+
+      if (!result.success) {
+        if (previousPost) {
+          setPosts((current) =>
+            sortPosts(
+              current.map((post) =>
+                post.id === previousPost.id ? previousPost : post
+              )
+            )
+          );
+        }
+        return;
+      }
     } else {
-      await createContentPost({
-        platform: editing.platform,
-        caption: editing.caption,
-        date: editing.date,
-        time: editing.time,
-        status: editing.status,
-        notes: editing.notes,
-        ownerUserIds: editing.ownerUserIds,
-      });
+      const result = await createContentPost(getPostPayload(nextPost));
+
+      if (!result.success || typeof result.id !== "number") {
+        return;
+      }
+
+      setPosts((current) =>
+        sortPosts([
+          {
+            ...nextPost,
+            id: result.id,
+            createdAt:
+              typeof result.createdAt === "string" && result.createdAt
+                ? result.createdAt
+                : new Date().toISOString(),
+          },
+          ...current,
+        ])
+      );
     }
-    await refreshPosts();
+
     setModalOpen(false);
     setEditing(EMPTY);
+    void refreshPosts();
   };
 
   const handleDeletePost = async (id: number) => {
-    await deleteContentPost(id);
-    await refreshPosts();
+    const deletedPost = posts.find((post) => post.id === id);
+
+    setPosts((current) => current.filter((post) => post.id !== id));
+
+    const result = await deleteContentPost(id);
+
+    if (!result.success) {
+      if (deletedPost) {
+        setPosts((current) => sortPosts([deletedPost, ...current]));
+      }
+      return;
+    }
+
+    void refreshPosts();
   };
 
   const openNew = (date?: string) => {
@@ -958,7 +1033,7 @@ export default function ContentCalendarPage() {
             <div className="flex items-center gap-3 pt-2">
               <button onClick={savePost} disabled={!editing.caption.trim() || !editing.date} className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 text-white text-sm font-medium rounded-lg transition-colors">{editing.id ? "Save Changes" : "Plan Post"}</button>
               {editing.id ? (
-                <button onClick={() => { handleDeletePost(editing.id); setModalOpen(false); setEditing(EMPTY); }} className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 text-sm font-medium rounded-lg border border-rose-200 transition-colors">Delete</button>
+                <button onClick={() => { void handleDeletePost(editing.id); setModalOpen(false); setEditing(EMPTY); }} className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 text-sm font-medium rounded-lg border border-rose-200 transition-colors">Delete</button>
               ) : null}
             </div>
           )}

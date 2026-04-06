@@ -36,6 +36,16 @@ const IMPACT_RECORD_SKELETON_STORAGE_KEY = "impact-record-skeleton-count";
 const IMPACT_PROJECT_SKELETON_STORAGE_KEY = "impact-project-skeleton-count";
 const IMPACT_TIMELINE_SKELETON_STORAGE_KEY = "impact-timeline-skeleton-count";
 
+function getImpactPayload(record: ImpactRecord) {
+  return {
+    projectName: record.projectName.trim(),
+    activityType: record.activityType,
+    peopleReached: record.peopleReached,
+    date: record.date,
+    notes: record.notes,
+  };
+}
+
 function rowToRecord(row: ImpactRecordRow): ImpactRecord {
   return {
     id: row.id,
@@ -46,6 +56,14 @@ function rowToRecord(row: ImpactRecordRow): ImpactRecord {
     notes: row.notes,
     createdAt: row.created_at,
   };
+}
+
+function sortRecords(items: ImpactRecord[]) {
+  return [...items].sort(
+    (a, b) =>
+      b.date.localeCompare(a.date) ||
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
 }
 
 function ImpactSummarySkeleton() {
@@ -172,7 +190,7 @@ export default function ImpactPage() {
     try {
       const res = await getImpactRecords();
       if (res.success && res.records) {
-        setRecords(res.records.map(rowToRecord));
+        setRecords(sortRecords(res.records.map(rowToRecord)));
       }
     } finally {
       if (showLoading) setIsLoadingData(false);
@@ -180,32 +198,85 @@ export default function ImpactPage() {
   };
 
   const saveRecord = async () => {
-    if (!editing.projectName.trim() || !editing.date || editing.peopleReached <= 0) return;
-    if (editing.id) {
-      await updateImpactRecord(editing.id, {
-        projectName: editing.projectName,
-        activityType: editing.activityType,
-        peopleReached: editing.peopleReached,
-        date: editing.date,
-        notes: editing.notes,
-      });
+    const nextRecord = {
+      ...editing,
+      projectName: editing.projectName.trim(),
+    };
+
+    if (!nextRecord.projectName || !nextRecord.date || nextRecord.peopleReached <= 0) return;
+
+    if (nextRecord.id) {
+      const previousRecord = records.find((record) => record.id === nextRecord.id);
+
+      setRecords((current) =>
+        sortRecords(
+          current.map((record) =>
+            record.id === nextRecord.id
+              ? {
+                  ...nextRecord,
+                  createdAt: previousRecord?.createdAt ?? record.createdAt,
+                }
+              : record
+          )
+        )
+      );
+
+      const result = await updateImpactRecord(nextRecord.id, getImpactPayload(nextRecord));
+
+      if (!result.success) {
+        if (previousRecord) {
+          setRecords((current) =>
+            sortRecords(
+              current.map((record) =>
+                record.id === previousRecord.id ? previousRecord : record
+              )
+            )
+          );
+        }
+        return;
+      }
     } else {
-      await createImpactRecord({
-        projectName: editing.projectName,
-        activityType: editing.activityType,
-        peopleReached: editing.peopleReached,
-        date: editing.date,
-        notes: editing.notes,
-      });
+      const result = await createImpactRecord(getImpactPayload(nextRecord));
+
+      if (!result.success || typeof result.id !== "number") {
+        return;
+      }
+
+      setRecords((current) =>
+        sortRecords([
+          {
+            ...nextRecord,
+            id: result.id,
+            createdAt:
+              typeof result.createdAt === "string" && result.createdAt
+                ? result.createdAt
+                : new Date().toISOString(),
+          },
+          ...current,
+        ])
+      );
     }
-    await refreshRecords();
+
     setModalOpen(false);
     setEditing(EMPTY);
+    void refreshRecords(false);
   };
 
   const handleDeleteRecord = async (id: number) => {
-    await deleteImpactRecord(id);
-    await refreshRecords();
+    const deletedRecord = records.find((record) => record.id === id);
+
+    setRecords((current) => current.filter((record) => record.id !== id));
+
+    const result = await deleteImpactRecord(id);
+
+    if (!result.success) {
+      if (deletedRecord) {
+        setRecords((current) => sortRecords([deletedRecord, ...current]));
+      }
+      return;
+    }
+
+    void refreshRecords(false);
   };
 
   const totalPeople = records.reduce((s, r) => s + r.peopleReached, 0);
@@ -440,7 +511,7 @@ export default function ImpactPage() {
             <div className="flex items-center gap-3 pt-2">
               <button onClick={saveRecord} disabled={!editing.projectName.trim() || !editing.date || editing.peopleReached <= 0} className="flex-1  px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white text-sm font-medium rounded-lg transition-colors">{editing.id ? "Save Changes" : "Add Record"}</button>
               {editing.id ? (
-                <button onClick={() => { handleDeleteRecord(editing.id); setModalOpen(false); setEditing(EMPTY); }} className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 text-sm font-medium rounded-lg border border-rose-200 transition-colors">Delete</button>
+                <button onClick={() => { void handleDeleteRecord(editing.id); setModalOpen(false); setEditing(EMPTY); }} className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 text-sm font-medium rounded-lg border border-rose-200 transition-colors">Delete</button>
               ) : null}
             </div>
           )}

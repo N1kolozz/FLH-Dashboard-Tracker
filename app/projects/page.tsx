@@ -110,6 +110,19 @@ const EMPTY: Project = {
   createdAt: "",
 };
 
+function getProjectPayload(project: Project) {
+  return {
+    name: project.name.trim(),
+    description: project.description,
+    status: project.status,
+    priority: project.priority,
+    deadline: project.deadline,
+    team: project.team,
+    tags: project.tags,
+    ownerUserIds: project.ownerUserIds,
+  };
+}
+
 function rowToProject(row: ProjectRow): Project {
   return {
     id: row.id,
@@ -156,24 +169,34 @@ function getDropPreviewIndex(
 
 function ProjectBoardSkeleton({
   counts,
+  boardRef,
+  columnRefs,
 }: {
   counts: Record<Status, number>;
+  boardRef: React.MutableRefObject<HTMLDivElement | null>;
+  columnRefs: React.MutableRefObject<Array<HTMLDivElement | null>>;
 }) {
   return (
-    <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      {COLUMNS.map((column) => (
+    <div
+      ref={boardRef}
+      className="hide-scrollbar flex flex-1 min-h-0 gap-4 overflow-x-auto overflow-y-hidden pb-2 scroll-smooth snap-x snap-mandatory lg:overflow-x-visible lg:pb-0"
+    >
+      {COLUMNS.map((column, index) => (
         <div
           key={column.id}
-          className={`self-start overflow-visible rounded-xl border border-slate-200 bg-white/70 ${column.color} border-t-2`}
+          ref={(node) => {
+            columnRefs.current[index] = node;
+          }}
+          className={`w-full min-w-full shrink-0 snap-start overflow-hidden rounded-xl border border-slate-200 bg-white/70 ${column.color} border-t-2 flex min-h-0 flex-col lg:w-auto lg:min-w-0 lg:max-w-none lg:flex-1`}
         >
-          <div className="flex items-center justify-between px-4 py-3">
+          <div className="flex shrink-0 items-center justify-between px-4 py-3">
             <div className="flex items-center gap-2">
               <div className="h-4 w-24 animate-pulse rounded-full bg-slate-200" />
               <div className="h-5 w-8 animate-pulse rounded-full bg-slate-100" />
             </div>
             <div className="h-6 w-6 animate-pulse rounded-md bg-slate-100" />
           </div>
-          <div className="space-y-2 px-3 pb-3">
+          <div className="flex-1 min-h-0 space-y-2 overflow-y-auto px-3 pb-3 overscroll-contain">
             {Array.from({ length: counts[column.id] }).map((_, idx) => (
               <div
                 key={idx}
@@ -216,9 +239,12 @@ export default function ProjectsPage() {
   const [dragOverCol, setDragOverCol] = useState<Status | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoadingData, setIsLoadingData] = useState(true);
+  const [activeMobileColumn, setActiveMobileColumn] = useState(0);
   const [cachedColumnCounts, setCachedColumnCounts] = useState<Record<Status, number>>(
     EMPTY_COLUMN_COUNTS
   );
+  const boardRef = useRef<HTMLDivElement | null>(null);
+  const columnRefs = useRef<Array<HTMLDivElement | null>>([]);
   const dragIdRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -253,21 +279,74 @@ export default function ProjectsPage() {
     init();
   }, []);
 
+  useEffect(() => {
+    const board = boardRef.current;
+    if (!board) return;
+
+    let frameId: number | null = null;
+
+    const updateActiveColumn = () => {
+      const boardCenter = board.scrollLeft + board.clientWidth / 2;
+      let nextIndex = 0;
+      let smallestDistance = Number.POSITIVE_INFINITY;
+
+      columnRefs.current.forEach((column, index) => {
+        if (!column) return;
+
+        const columnCenter = column.offsetLeft + column.offsetWidth / 2;
+        const distance = Math.abs(columnCenter - boardCenter);
+
+        if (distance < smallestDistance) {
+          smallestDistance = distance;
+          nextIndex = index;
+        }
+      });
+
+      setActiveMobileColumn(nextIndex);
+    };
+
+    const queueUpdate = () => {
+      if (frameId !== null) {
+        window.cancelAnimationFrame(frameId);
+      }
+
+      frameId = window.requestAnimationFrame(updateActiveColumn);
+    };
+
+    queueUpdate();
+    board.addEventListener("scroll", queueUpdate, { passive: true });
+    window.addEventListener("resize", queueUpdate);
+
+    return () => {
+      board.removeEventListener("scroll", queueUpdate);
+      window.removeEventListener("resize", queueUpdate);
+
+      if (frameId !== null) {
+        window.cancelAnimationFrame(frameId);
+      }
+    };
+  }, [isLoadingData, projects.length]);
+
   const canEdit = session && (
     session.role === "ADMIN" ||
     session.role === "HEAD" ||
     session.department === "Projects"
   );
 
-  const refreshProjects = async () => {
-    setIsLoadingData(true);
+  const refreshProjects = async ({ showSkeleton = false }: { showSkeleton?: boolean } = {}) => {
+    if (showSkeleton) {
+      setIsLoadingData(true);
+    }
+
     try {
       const res = await getProjects();
       if (res.success && res.projects) {
         setProjects(res.projects.map(rowToProject));
       }
     } finally {
-      setIsLoadingData(false);
+      if (showSkeleton) {
+        setIsLoadingData(false);
+      }
     }
   };
 
@@ -278,40 +357,94 @@ export default function ProjectsPage() {
     setDragOverCol(null);
   };
 
+  const scrollToMobileColumn = (index: number) => {
+    const board = boardRef.current;
+    const column = columnRefs.current[index];
+
+    if (!board || !column) return;
+
+    board.scrollTo({
+      left: column.offsetLeft,
+      behavior: "smooth",
+    });
+    setActiveMobileColumn(index);
+  };
+
   /* ─── CRUD ─── */
   const saveProject = async () => {
-    if (!editing.name.trim()) return;
-    if (editing.id) {
-      await updateProject(editing.id, {
-        name: editing.name,
-        description: editing.description,
-        status: editing.status,
-        priority: editing.priority,
-        deadline: editing.deadline,
-        team: editing.team,
-        tags: editing.tags,
-        ownerUserIds: editing.ownerUserIds,
-      });
+    const nextProject = {
+      ...editing,
+      name: editing.name.trim(),
+    };
+
+    if (!nextProject.name) return;
+
+    if (nextProject.id) {
+      const previousProject = projects.find((project) => project.id === nextProject.id);
+
+      setProjects((current) =>
+        current.map((project) =>
+          project.id === nextProject.id
+            ? {
+                ...nextProject,
+                createdAt: previousProject?.createdAt ?? project.createdAt,
+              }
+            : project
+        )
+      );
+
+      const result = await updateProject(nextProject.id, getProjectPayload(nextProject));
+
+      if (!result.success) {
+        if (previousProject) {
+          setProjects((current) =>
+            current.map((project) =>
+              project.id === previousProject.id ? previousProject : project
+            )
+          );
+        }
+        return;
+      }
     } else {
-      await createProject({
-        name: editing.name,
-        description: editing.description,
-        status: editing.status,
-        priority: editing.priority,
-        deadline: editing.deadline,
-        team: editing.team,
-        tags: editing.tags,
-        ownerUserIds: editing.ownerUserIds,
-      });
+      const result = await createProject(getProjectPayload(nextProject));
+
+      if (!result.success || typeof result.id !== "number") {
+        return;
+      }
+
+      setProjects((current) => [
+        {
+          ...nextProject,
+          id: result.id,
+          createdAt:
+            typeof result.createdAt === "string" && result.createdAt
+              ? result.createdAt
+              : new Date().toISOString(),
+        },
+        ...current,
+      ]);
     }
-    await refreshProjects();
+
     setModalOpen(false);
     setEditing(EMPTY);
+    void refreshProjects();
   };
 
   const handleDelete = async (id: number) => {
-    await deleteProject(id);
-    await refreshProjects();
+    const deletedProject = projects.find((project) => project.id === id);
+
+    setProjects((current) => current.filter((project) => project.id !== id));
+
+    const result = await deleteProject(id);
+
+    if (!result.success) {
+      if (deletedProject) {
+        setProjects((current) => [deletedProject, ...current]);
+      }
+      return;
+    }
+
+    void refreshProjects();
   };
 
   const openNew = (status: Status = "planning") => {
@@ -365,17 +498,25 @@ export default function ProjectsPage() {
       return;
     }
 
-    await updateProject(project.id, {
-      name: project.name,
-      description: project.description,
+    const nextProject = {
+      ...project,
       status: col,
-      priority: project.priority,
-      deadline: project.deadline,
-      team: project.team,
-      tags: project.tags,
-      ownerUserIds: project.ownerUserIds,
-    });
-    await refreshProjects();
+    };
+
+    setProjects((current) =>
+      current.map((item) => (item.id === nextProject.id ? nextProject : item))
+    );
+
+    const result = await updateProject(nextProject.id, getProjectPayload(nextProject));
+
+    if (!result.success) {
+      setProjects((current) =>
+        current.map((item) => (item.id === project.id ? project : item))
+      );
+      return;
+    }
+
+    void refreshProjects();
   };
 
   const handleDragEnd = () => {
@@ -435,11 +576,12 @@ export default function ProjectsPage() {
     },
     { ...EMPTY_COLUMN_COUNTS }
   );
+  const showMobileColumnDots = isLoadingData || projects.length > 0;
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="flex h-[calc(100dvh-4rem)] min-h-0 flex-col overflow-hidden bg-slate-50 md:h-screen">
       {/* Header */}
-      <header className="border-b border-purple-200/70 bg-blue-100/80 backdrop-blur-md">
+      <header className="shrink-0 border-b border-purple-200/70 bg-blue-100/80 backdrop-blur-md">
         <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <h1 className="text-lg font-bold text-slate-900 flex items-center gap-2">
@@ -486,9 +628,36 @@ export default function ProjectsPage() {
       </header>
 
       {/* Kanban Board */}
-      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6">
+      <div className="max-w-[1400px] mx-auto flex w-full flex-1 min-h-0 flex-col px-4 py-6 sm:px-6">
+        {showMobileColumnDots && (
+          <div className="mb-3 flex items-center justify-center gap-2 lg:hidden">
+            {COLUMNS.map((column, index) => {
+              const isActive = activeMobileColumn === index;
+
+              return (
+                <button
+                  key={column.id}
+                  type="button"
+                  onClick={() => scrollToMobileColumn(index)}
+                  aria-label={`Go to ${column.label}`}
+                  aria-pressed={isActive}
+                  className={`h-2.5 w-2.5 rounded-full transition-all duration-200 ${
+                    isActive
+                      ? "bg-blue-600 ring-4 ring-blue-100"
+                      : "bg-slate-300 hover:bg-slate-400"
+                  }`}
+                />
+              );
+            })}
+          </div>
+        )}
+
         {isLoadingData ? (
-          <ProjectBoardSkeleton counts={skeletonColumnCounts} />
+          <ProjectBoardSkeleton
+            counts={skeletonColumnCounts}
+            boardRef={boardRef}
+            columnRefs={columnRefs}
+          />
         ) : projects.length === 0 ? (
           <EmptyState
             title="No projects yet"
@@ -501,8 +670,11 @@ export default function ProjectsPage() {
             action={canEdit ? { label: "Create Project", onClick: () => openNew() } : undefined}
           />
         ) : (
-          <div className="grid grid-cols-1 items-start sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {COLUMNS.map((col) => {
+          <div
+            ref={boardRef}
+            className="hide-scrollbar flex flex-1 min-h-0 gap-4 overflow-x-auto overflow-y-hidden pb-2 scroll-smooth snap-x snap-mandatory lg:overflow-x-visible lg:pb-0"
+          >
+            {COLUMNS.map((col, index) => {
               const items = columnProjects(col.id);
               const previewIndex =
                 dragOverCol === col.id
@@ -512,15 +684,18 @@ export default function ProjectsPage() {
               return (
                 <div
                   key={col.id}
+                  ref={(node) => {
+                    columnRefs.current[index] = node;
+                  }}
                   onDragEnterCapture={(e) => handleDragOver(e, col.id)}
                   onDragOverCapture={(e) => handleDragOver(e, col.id)}
                   onDropCapture={(e) => { void handleDrop(e, col.id); }}
-                  className={`relative self-start overflow-visible rounded-xl border border-slate-200 bg-white/70 ${col.color} border-t-2 transition-colors ${
+                  className={`relative flex min-h-0 w-full min-w-full shrink-0 snap-start flex-col overflow-hidden rounded-xl border border-slate-200 bg-white/70 ${col.color} border-t-2 transition-colors lg:w-auto lg:min-w-0 lg:max-w-none lg:flex-1 ${
                     dragOverCol === col.id ? "bg-blue-50/60 border-blue-200" : ""
                   }`}
                 >
                   {/* Column header */}
-                  <div className="px-4 py-3 flex items-center justify-between">
+                  <div className="flex shrink-0 items-center justify-between px-4 py-3">
                     <div className="flex items-center gap-2">
                       <h3 className="text-sm font-semibold text-slate-700">{col.label}</h3>
                       <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">
@@ -543,12 +718,12 @@ export default function ProjectsPage() {
                   {isDragging && (
                     <div
                       aria-hidden="true"
-                      className="absolute inset-x-0 top-[52px] z-0 h-[100vh] opacity-0"
+                      className="absolute inset-x-0 bottom-0 top-[52px] z-0 opacity-0"
                     />
                   )}
 
                   {/* Cards */}
-                  <div className="relative z-10 px-3 pb-3 space-y-2">
+                  <div className="relative z-10 flex-1 min-h-0 space-y-2 overflow-y-auto px-3 pb-3 overscroll-contain">
                     {items.length === 0 && previewIndex === 0 && (
                       <div
                         aria-hidden="true"
@@ -784,7 +959,11 @@ export default function ProjectsPage() {
               </button>
               {editing.id ? (
                 <button
-                  onClick={() => { handleDelete(editing.id); setModalOpen(false); setEditing(EMPTY); }}
+                  onClick={() => {
+                    void handleDelete(editing.id);
+                    setModalOpen(false);
+                    setEditing(EMPTY);
+                  }}
                   className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 text-sm font-medium rounded-lg border border-rose-200 transition-colors"
                 >
                   Delete

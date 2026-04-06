@@ -30,12 +30,21 @@ export async function addMember(formData: {
       return { error: "Email already exists" };
     }
 
-    await pool.query(
-      "INSERT INTO users (email, full_name, role, department, position) VALUES ($1, $2, $3, $4, $5)",
+    const insertRes = await pool.query(
+      "INSERT INTO users (email, full_name, role, department, position) VALUES ($1, $2, $3, $4, $5) RETURNING id, created_at",
       [formData.email, formData.fullName, targetRole, formData.department, formData.role || ""]
     );
 
-    return { success: true };
+    const createdAt = insertRes.rows[0].created_at;
+
+    return {
+      success: true,
+      id: insertRes.rows[0].id as number,
+      createdAt:
+        createdAt instanceof Date
+          ? createdAt.toISOString()
+          : String(createdAt),
+    };
   } catch (error) {
     console.error("Error adding member:", error);
     return { error: "Failed to add member" };

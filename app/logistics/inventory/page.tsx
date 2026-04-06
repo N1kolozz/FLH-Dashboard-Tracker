@@ -62,6 +62,18 @@ const EMPTY: InventoryItem = {
   createdAt: "",
 };
 
+function getItemPayload(item: InventoryItem) {
+  return {
+    name: item.name.trim(),
+    category: item.category,
+    quantity: item.quantity,
+    status: item.status,
+    location: item.location,
+    condition: item.condition,
+    notes: item.notes,
+  };
+}
+
 function rowToItem(row: InventoryItemRow): InventoryItem {
   return {
     id: row.id,
@@ -75,6 +87,13 @@ function rowToItem(row: InventoryItemRow): InventoryItem {
     checkouts: row.checkouts,
     createdAt: row.created_at,
   };
+}
+
+function sortItems(items: InventoryItem[]) {
+  return [...items].sort(
+    (a, b) =>
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
 }
 
 const INVENTORY_SKELETON_STORAGE_KEY = "inventory-skeleton-count";
@@ -187,7 +206,7 @@ export default function InventoryPage() {
     try {
       const res = await getInventoryItems();
       if (res.success && res.items) {
-        setItems(res.items.map(rowToItem));
+        setItems(sortItems(res.items.map(rowToItem)));
       }
     } finally {
       if (showLoading) setIsLoadingData(false);
@@ -196,36 +215,87 @@ export default function InventoryPage() {
 
   /* ─── CRUD ─── */
   const saveItem = async () => {
-    if (!editing.name.trim()) return;
-    if (editing.id) {
-      await updateInventoryItem(editing.id, {
-        name: editing.name,
-        category: editing.category,
-        quantity: editing.quantity,
-        status: editing.status,
-        location: editing.location,
-        condition: editing.condition,
-        notes: editing.notes,
-      });
+    const nextItem = {
+      ...editing,
+      name: editing.name.trim(),
+    };
+
+    if (!nextItem.name) return;
+
+    if (nextItem.id) {
+      const previousItem = items.find((item) => item.id === nextItem.id);
+
+      setItems((current) =>
+        sortItems(
+          current.map((item) =>
+            item.id === nextItem.id
+              ? {
+                  ...nextItem,
+                  checkouts: previousItem?.checkouts ?? item.checkouts,
+                  createdAt: previousItem?.createdAt ?? item.createdAt,
+                }
+              : item
+          )
+        )
+      );
+
+      const result = await updateInventoryItem(nextItem.id, getItemPayload(nextItem));
+
+      if (!result.success) {
+        if (previousItem) {
+          setItems((current) =>
+            sortItems(
+              current.map((item) =>
+                item.id === previousItem.id ? previousItem : item
+              )
+            )
+          );
+        }
+        return;
+      }
     } else {
-      await createInventoryItem({
-        name: editing.name,
-        category: editing.category,
-        quantity: editing.quantity,
-        status: editing.status,
-        location: editing.location,
-        condition: editing.condition,
-        notes: editing.notes,
-      });
+      const result = await createInventoryItem(getItemPayload(nextItem));
+
+      if (!result.success || typeof result.id !== "number") {
+        return;
+      }
+
+      setItems((current) =>
+        sortItems([
+          {
+            ...nextItem,
+            id: result.id,
+            checkouts: [],
+            createdAt:
+              typeof result.createdAt === "string" && result.createdAt
+                ? result.createdAt
+                : new Date().toISOString(),
+          },
+          ...current,
+        ])
+      );
     }
-    await refreshItems();
+
     setModalOpen(false);
     setEditing(EMPTY);
+    void refreshItems(false);
   };
 
   const handleDeleteItem = async (id: number) => {
-    await deleteInventoryItem(id);
-    await refreshItems();
+    const deletedItem = items.find((item) => item.id === id);
+
+    setItems((current) => current.filter((item) => item.id !== id));
+
+    const result = await deleteInventoryItem(id);
+
+    if (!result.success) {
+      if (deletedItem) {
+        setItems((current) => sortItems([deletedItem, ...current]));
+      }
+      return;
+    }
+
+    void refreshItems(false);
   };
 
   /* ─── Check-out / Check-in ─── */
@@ -237,14 +307,60 @@ export default function InventoryPage() {
 
   const doCheckout = async () => {
     if (!checkoutItemState || !checkoutPerson.trim()) return;
-    await checkoutItem(checkoutItemState.id, checkoutPerson);
-    await refreshItems();
+    const person = checkoutPerson.trim();
+    const result = await checkoutItem(checkoutItemState.id, person);
+
+    if (!result.success) {
+      return;
+    }
+
+    setItems((current) =>
+      current.map((item) =>
+        item.id === checkoutItemState.id
+          ? {
+              ...item,
+              status: "in_use",
+              checkouts: result.checkout
+                ? [...item.checkouts, result.checkout]
+                : item.checkouts,
+            }
+          : item
+      )
+    );
+
     setCheckoutModalOpen(false);
+    setCheckoutItemState(null);
+    setCheckoutPerson("");
+    void refreshItems(false);
   };
 
   const doCheckin = async (item: InventoryItem) => {
-    await checkinItem(item.id);
-    await refreshItems();
+    const result = await checkinItem(item.id);
+
+    if (!result.success) {
+      return;
+    }
+
+    setItems((current) =>
+      current.map((currentItem) =>
+        currentItem.id === item.id
+          ? {
+              ...currentItem,
+              status: "available",
+              checkouts: currentItem.checkouts.map((checkout) =>
+                checkout.id === result.checkoutId
+                  ? {
+                      ...checkout,
+                      return_date: result.returnDate || checkout.return_date,
+                    }
+                  : checkout
+              ),
+            }
+          : currentItem
+      )
+    );
+
+    void refreshItems(false);
   };
 
   /* ─── Filtering ─── */
@@ -564,7 +680,7 @@ export default function InventoryPage() {
               </button>
               {editing.id ? (
                 <button
-                  onClick={() => { handleDeleteItem(editing.id); setModalOpen(false); setEditing(EMPTY); }}
+                  onClick={() => { void handleDeleteItem(editing.id); setModalOpen(false); setEditing(EMPTY); }}
                   className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 text-sm font-medium rounded-lg border border-rose-200 transition-colors"
                 >
                   Delete

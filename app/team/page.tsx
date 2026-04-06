@@ -32,6 +32,13 @@ const DEPT_CONFIG: Record<string, { label: string; color: string; bg: string }> 
 
 const TEAM_SKELETON_STORAGE_KEY = "team-directory-skeleton-count";
 
+function sortMembers(items: TeamMember[]) {
+  return [...items].sort(
+    (a, b) =>
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
+}
+
 function TeamDirectorySkeleton({ count }: { count: number }) {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -94,7 +101,7 @@ export default function TeamPage() {
 
         const res = await getMembers();
         if (res.success && res.members) {
-          setMembers(res.members as TeamMember[]);
+          setMembers(sortMembers(res.members as TeamMember[]));
         }
       } finally {
         setIsLoadingData(false);
@@ -110,13 +117,20 @@ export default function TeamPage() {
     setStoredSkeletonCount(TEAM_SKELETON_STORAGE_KEY, members.length);
   }, [isLoadingData, members.length]);
 
-  const refreshMembers = async () => {
-    setIsLoadingData(true);
+  const refreshMembers = async ({ showLoading = false }: { showLoading?: boolean } = {}) => {
+    if (showLoading) {
+      setIsLoadingData(true);
+    }
+
     try {
       const current = await getMembers();
-      if (current.success && current.members) setMembers(current.members as TeamMember[]);
+      if (current.success && current.members) {
+        setMembers(sortMembers(current.members as TeamMember[]));
+      }
     } finally {
-      setIsLoadingData(false);
+      if (showLoading) {
+        setIsLoadingData(false);
+      }
     }
   };
 
@@ -132,9 +146,28 @@ export default function TeamPage() {
     if (res.error) {
       setError(res.error);
     } else {
+      if (typeof res.id === "number") {
+        setMembers((current) =>
+          sortMembers([
+            {
+              id: res.id,
+              name: formData.fullName.trim(),
+              role: formData.systemRole || "MEMBER",
+              department: formData.department,
+              email: formData.email.trim(),
+              position: formData.role.trim(),
+              created_at:
+                typeof res.createdAt === "string" && res.createdAt
+                  ? res.createdAt
+                  : new Date().toISOString(),
+            },
+            ...current,
+          ])
+        );
+      }
       setModalOpen(false);
       setFormData({ fullName: "", role: "", department: "Other", email: "", systemRole: "MEMBER" });
-      await refreshMembers();
+      void refreshMembers();
     }
     setLoading(false);
   };
@@ -159,22 +192,64 @@ export default function TeamPage() {
     setEditLoading(true);
     setEditError("");
 
+    const previousMember = members.find((member) => member.id === editingMember.id);
+
+    if (previousMember) {
+      setMembers((current) =>
+        sortMembers(
+          current.map((member) =>
+            member.id === editingMember.id
+              ? {
+                  ...member,
+                  name: editData.fullName.trim(),
+                  email: editData.email.trim(),
+                  department: editData.department,
+                  role: editData.systemRole || "MEMBER",
+                  position: editData.position.trim(),
+                }
+              : member
+          )
+        )
+      );
+    }
+
     const res = await updateMember(editingMember.id, editData);
 
     if (res.error) {
+      if (previousMember) {
+        setMembers((current) =>
+          sortMembers(
+            current.map((member) =>
+              member.id === previousMember.id ? previousMember : member
+            )
+          )
+        );
+      }
       setEditError(res.error);
     } else {
       setEditModalOpen(false);
       setEditingMember(null);
-      await refreshMembers();
+      void refreshMembers();
     }
     setEditLoading(false);
   };
 
   const handleDeleteMember = async (id: number) => {
     if (!confirm("Are you sure you want to delete this member?")) return;
-    await deleteMember(id);
-    await refreshMembers();
+    const deletedMember = members.find((member) => member.id === id);
+
+    setMembers((current) => current.filter((member) => member.id !== id));
+
+    const res = await deleteMember(id);
+
+    if (res.error) {
+      if (deletedMember) {
+        setMembers((current) => sortMembers([deletedMember, ...current]));
+      }
+      return;
+    }
+
+    void refreshMembers();
   };
 
   const filtered = members.filter((m) => {

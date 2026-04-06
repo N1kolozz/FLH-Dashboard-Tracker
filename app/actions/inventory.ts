@@ -83,7 +83,7 @@ export async function createInventoryItem(data: {
     await assertCanEdit();
     const res = await pool.query(
       `INSERT INTO inventory_items (name, category, quantity, status, location, condition, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, created_at`,
       [
         data.name,
         data.category,
@@ -94,7 +94,16 @@ export async function createInventoryItem(data: {
         data.notes,
       ]
     );
-    return { success: true, id: res.rows[0].id };
+    const createdAt = res.rows[0].created_at;
+
+    return {
+      success: true,
+      id: res.rows[0].id as number,
+      createdAt:
+        createdAt instanceof Date
+          ? createdAt.toISOString()
+          : String(createdAt),
+    };
   } catch (error) {
     console.error("Error creating inventory item:", error);
     return { error: "Failed to create inventory item" };
@@ -152,8 +161,10 @@ export async function checkoutItem(itemId: number, person: string) {
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
-      await client.query(
-        `INSERT INTO inventory_checkouts (item_id, person, checkout_date) VALUES ($1, $2, CURRENT_DATE)`,
+      const checkoutRes = await client.query(
+        `INSERT INTO inventory_checkouts (item_id, person, checkout_date)
+         VALUES ($1, $2, CURRENT_DATE)
+         RETURNING id, checkout_date::text`,
         [itemId, person]
       );
       await client.query(
@@ -161,13 +172,22 @@ export async function checkoutItem(itemId: number, person: string) {
         [itemId]
       );
       await client.query("COMMIT");
+
+      return {
+        success: true,
+        checkout: {
+          id: checkoutRes.rows[0].id as number,
+          person,
+          checkout_date: String(checkoutRes.rows[0].checkout_date),
+          return_date: null,
+        },
+      };
     } catch (e) {
       await client.query("ROLLBACK");
       throw e;
     } finally {
       client.release();
     }
-    return { success: true };
   } catch (error) {
     console.error("Error checking out item:", error);
     return { error: "Failed to check out item" };
@@ -180,14 +200,14 @@ export async function checkinItem(itemId: number) {
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
-      // Close the most recent open checkout
-      await client.query(
+      const checkinRes = await client.query(
         `UPDATE inventory_checkouts SET return_date = CURRENT_DATE
          WHERE id = (
            SELECT id FROM inventory_checkouts
            WHERE item_id = $1 AND return_date IS NULL
            ORDER BY created_at DESC LIMIT 1
-         )`,
+         )
+         RETURNING id, return_date::text`,
         [itemId]
       );
       await client.query(
@@ -195,13 +215,20 @@ export async function checkinItem(itemId: number) {
         [itemId]
       );
       await client.query("COMMIT");
+
+      return {
+        success: true,
+        checkoutId: checkinRes.rows[0]?.id as number | undefined,
+        returnDate: checkinRes.rows[0]?.return_date
+          ? String(checkinRes.rows[0].return_date)
+          : null,
+      };
     } catch (e) {
       await client.query("ROLLBACK");
       throw e;
     } finally {
       client.release();
     }
-    return { success: true };
   } catch (error) {
     console.error("Error checking in item:", error);
     return { error: "Failed to check in item" };

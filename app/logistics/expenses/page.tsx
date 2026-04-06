@@ -43,6 +43,17 @@ const EMPTY: Expense = { id: 0, description: "", amount: 0, category: "other", d
 const EXPENSE_TABLE_SKELETON_STORAGE_KEY = "expenses-table-skeleton-count";
 const EXPENSE_CHART_SKELETON_STORAGE_KEY = "expenses-chart-skeleton-count";
 
+function getExpensePayload(expense: Expense) {
+  return {
+    description: expense.description.trim(),
+    amount: expense.amount,
+    category: expense.category,
+    date: expense.date,
+    paidBy: expense.paidBy,
+    notes: expense.notes,
+  };
+}
+
 function rowToExpense(row: ExpenseRow): Expense {
   return {
     id: row.id,
@@ -54,6 +65,14 @@ function rowToExpense(row: ExpenseRow): Expense {
     notes: row.notes,
     createdAt: row.created_at,
   };
+}
+
+function sortExpenses(items: Expense[]) {
+  return [...items].sort(
+    (a, b) =>
+      b.date.localeCompare(a.date) ||
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
 }
 
 function ExpenseSummarySkeleton() {
@@ -154,7 +173,7 @@ export default function ExpensesPage() {
     try {
       const res = await getExpenses();
       if (res.success && res.expenses) {
-        setExpenses(res.expenses.map(rowToExpense));
+        setExpenses(sortExpenses(res.expenses.map(rowToExpense)));
       }
     } finally {
       if (showLoading) setIsLoadingData(false);
@@ -168,34 +187,85 @@ export default function ExpensesPage() {
   );
 
   const saveExpenseHandler = async () => {
-    if (!editing.description.trim() || !editing.date || editing.amount <= 0) return;
-    if (editing.id) {
-      await updateExpense(editing.id, {
-        description: editing.description,
-        amount: editing.amount,
-        category: editing.category,
-        date: editing.date,
-        paidBy: editing.paidBy,
-        notes: editing.notes,
-      });
+    const nextExpense = {
+      ...editing,
+      description: editing.description.trim(),
+    };
+
+    if (!nextExpense.description || !nextExpense.date || nextExpense.amount <= 0) return;
+
+    if (nextExpense.id) {
+      const previousExpense = expenses.find((expense) => expense.id === nextExpense.id);
+
+      setExpenses((current) =>
+        sortExpenses(
+          current.map((expense) =>
+            expense.id === nextExpense.id
+              ? {
+                  ...nextExpense,
+                  createdAt: previousExpense?.createdAt ?? expense.createdAt,
+                }
+              : expense
+          )
+        )
+      );
+
+      const result = await updateExpense(nextExpense.id, getExpensePayload(nextExpense));
+
+      if (!result.success) {
+        if (previousExpense) {
+          setExpenses((current) =>
+            sortExpenses(
+              current.map((expense) =>
+                expense.id === previousExpense.id ? previousExpense : expense
+              )
+            )
+          );
+        }
+        return;
+      }
     } else {
-      await createExpense({
-        description: editing.description,
-        amount: editing.amount,
-        category: editing.category,
-        date: editing.date,
-        paidBy: editing.paidBy,
-        notes: editing.notes,
-      });
+      const result = await createExpense(getExpensePayload(nextExpense));
+
+      if (!result.success || typeof result.id !== "number") {
+        return;
+      }
+
+      setExpenses((current) =>
+        sortExpenses([
+          {
+            ...nextExpense,
+            id: result.id,
+            createdAt:
+              typeof result.createdAt === "string" && result.createdAt
+                ? result.createdAt
+                : new Date().toISOString(),
+          },
+          ...current,
+        ])
+      );
     }
-    await refreshExpenses();
+
     setModalOpen(false);
     setEditing(EMPTY);
+    void refreshExpenses(false);
   };
 
   const handleDeleteExpense = async (id: number) => {
-    await deleteExpense(id);
-    await refreshExpenses();
+    const deletedExpense = expenses.find((expense) => expense.id === id);
+
+    setExpenses((current) => current.filter((expense) => expense.id !== id));
+
+    const result = await deleteExpense(id);
+
+    if (!result.success) {
+      if (deletedExpense) {
+        setExpenses((current) => sortExpenses([deletedExpense, ...current]));
+      }
+      return;
+    }
+
+    void refreshExpenses(false);
   };
 
   const filtered = expenses
@@ -428,7 +498,7 @@ export default function ExpensesPage() {
             <div className="flex items-center gap-3 pt-2">
               <button onClick={saveExpenseHandler} disabled={!editing.description.trim() || !editing.date || editing.amount <= 0} className="flex-1  px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white text-sm font-medium rounded-lg transition-colors">{editing.id ? "Save Changes" : "Add Expense"}</button>
               {editing.id ? (
-                <button onClick={() => { handleDeleteExpense(editing.id); setModalOpen(false); setEditing(EMPTY); }} className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 text-sm font-medium rounded-lg border border-rose-200 transition-colors">Delete</button>
+                <button onClick={() => { void handleDeleteExpense(editing.id); setModalOpen(false); setEditing(EMPTY); }} className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 text-sm font-medium rounded-lg border border-rose-200 transition-colors">Delete</button>
               ) : null}
             </div>
           )}
