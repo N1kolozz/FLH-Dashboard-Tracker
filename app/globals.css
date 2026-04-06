@@ -75,6 +75,10 @@ body {
     width: 0;
     height: 0;
   }
+
+  .pb-safe-bottom {
+    padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+  }
 }
 
 /* Sidebar — slightly slimmer, same palette */

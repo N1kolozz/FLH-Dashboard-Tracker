@@ -140,7 +140,7 @@ export default function Sidebar() {
   };
 
   const navContent = (
-    <div className="flex flex-col h-full">
+    <div className="flex h-full min-h-0 flex-col">
       {/* Logo / Brand */}
       <div className="flex items-center gap-2.5 px-4 py-5 border-b border-purple-100/60">
         <Image
@@ -160,7 +160,7 @@ export default function Sidebar() {
       </div>
 
       {/* Nav Links */}
-      <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-4 sidebar-scroll">
+      <nav className="sidebar-scroll flex-1 overflow-y-auto px-2 py-3 space-y-4 min-h-0">
         {NAV_SECTIONS.map((section, idx) => (
           <div key={idx}>
             {section.title && !collapsed && (
@@ -199,7 +199,7 @@ export default function Sidebar() {
       </nav>
 
       {/* Profile & Collapse */}
-      <div className="mt-auto border-t border-purple-100/60 p-3">
+      <div className="mt-auto shrink-0 border-t border-purple-100/60 p-3 pb-safe-bottom">
         {session && (
           <div className="mb-2">
             {!collapsed ? (
@@ -274,7 +274,7 @@ export default function Sidebar() {
       {/* Sidebar panel */}
       <aside
         className={`
-          fixed md:sticky top-0 left-0 z-50 h-screen
+          fixed md:sticky top-0 left-0 z-50 h-[100dvh] md:h-screen
           bg-white/95 backdrop-blur-sm border-r border-purple-100/60 shadow-lg md:shadow-none
           transition-all duration-300 ease-in-out
           ${collapsed ? "md:w-[72px]" : "md:w-60"}
