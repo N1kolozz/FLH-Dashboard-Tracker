@@ -7,6 +7,7 @@ import { getMembers, addMember, deleteMember, updateMember } from "@/app/actions
 import { getCurrentSession } from "@/app/actions/session";
 import { avatarColor, getInitials } from "@/lib/member-avatar";
 import { getStoredSkeletonCount, resolveSkeletonCount, setStoredSkeletonCount } from "@/lib/loading-skeleton";
+import Link from "next/link";
 
 import type { Session } from "@/lib/auth";
 
@@ -280,6 +281,18 @@ export default function TeamPage() {
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
+            {/* Tab switcher */}
+            <div className="flex items-center gap-1 bg-white border border-purple-200 rounded-xl p-1">
+              <span className="px-3 py-1.5 text-sm font-semibold text-purple-700 bg-purple-100 rounded-lg">
+                Directory
+              </span>
+              <Link
+                href="/team/workload"
+                className="px-3 py-1.5 text-sm font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                Workload
+              </Link>
+            </div>
             <input
               type="text"
               value={search}
