@@ -90,7 +90,6 @@ function MemberWorkloadCard({
   const pct = maxScore > 0 ? Math.min((score / maxScore) * 100, 100) : 0;
   const level = getWorkloadLevel(score);
   const dept = DEPT_CONFIG[member.department] || DEPT_CONFIG["Other"];
-  const hasItems = member.activeProjects > 0 || member.upcomingEvents > 0;
 
   return (
     <div className={`bg-white rounded-xl border transition-all duration-200 ${expanded ? "border-purple-300 shadow-md shadow-purple-100/50" : "border-purple-200 hover:border-purple-300 hover:shadow-sm"}`}>
