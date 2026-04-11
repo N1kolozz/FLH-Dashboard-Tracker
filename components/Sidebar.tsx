@@ -13,6 +13,8 @@ interface NavLink {
   label: string;
   href: string;
   icon: React.ReactNode;
+  requiresAttendanceManager?: boolean;
+  requiresWorkloadAccess?: boolean;
 }
 
 interface NavSection {
@@ -71,6 +73,11 @@ const ICON = {
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
     </svg>
   ),
+  attendance: (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M8 7V3m8 4V3M5 11h14m-9 4l2 2 4-4M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+    </svg>
+  ),
   team: (
     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -114,8 +121,19 @@ const NAV_SECTIONS: NavSection[] = [
     title: "Organization",
     links: [
       { label: "Events", href: "/events", icon: ICON.events },
+      {
+        label: "Attendance",
+        href: "/attendance",
+        icon: ICON.attendance,
+        requiresAttendanceManager: true,
+      },
       { label: "Team Directory", href: "/team", icon: ICON.team },
-      { label: "Workload View", href: "/team/workload", icon: ICON.workload },
+      {
+        label: "Workload View",
+        href: "/team/workload",
+        icon: ICON.workload,
+        requiresWorkloadAccess: true,
+      },
     ],
   },
 ];
@@ -145,6 +163,15 @@ export default function Sidebar() {
   const isActive = (href: string) => {
     return pathname === href;
   };
+  const canManageAttendance = Boolean(
+    session &&
+      (session.role === "ADMIN" ||
+        session.role === "HEAD" ||
+        session.department === "Management")
+  );
+  const canViewWorkload = Boolean(
+    session && (session.role === "HEAD" || session.department === "Management")
+  );
 
   const handleLogout = async () => {
     await logout();
@@ -184,7 +211,13 @@ export default function Sidebar() {
               <div className="border-t border-slate-100 mx-2 mb-2" />
             )}
             <div className="space-y-0.5">
-              {section.links.map((link) => {
+              {section.links
+                .filter(
+                  (link) =>
+                    (!link.requiresAttendanceManager || canManageAttendance) &&
+                    (!link.requiresWorkloadAccess || canViewWorkload)
+                )
+                .map((link) => {
                 const active = isActive(link.href);
                 return (
                   <Link

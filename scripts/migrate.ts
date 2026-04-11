@@ -150,6 +150,87 @@ async function migrate() {
     console.log("✓ events owners column ready");
 
     await client.query(`
+      CREATE TABLE IF NOT EXISTS attendance_sessions (
+        id SERIAL PRIMARY KEY,
+        event_id INTEGER REFERENCES events(id) ON DELETE SET NULL,
+        title VARCHAR(255) NOT NULL,
+        meeting_date DATE NOT NULL,
+        instructions TEXT DEFAULT '',
+        is_active BOOLEAN NOT NULL DEFAULT FALSE,
+        created_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log("✓ attendance_sessions table ready");
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS attendance_records (
+        id SERIAL PRIMARY KEY,
+        session_id INTEGER NOT NULL REFERENCES attendance_sessions(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        status VARCHAR(20) NOT NULL DEFAULT 'pending',
+        note TEXT DEFAULT '',
+        reason TEXT DEFAULT '',
+        updated_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        responded_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log("✓ attendance_records table ready");
+
+    await client.query(`
+      ALTER TABLE attendance_sessions
+      ADD COLUMN IF NOT EXISTS instructions TEXT DEFAULT ''
+    `);
+    await client.query(`
+      ALTER TABLE attendance_sessions
+      ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT FALSE
+    `);
+    await client.query(`
+      ALTER TABLE attendance_sessions
+      ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    `);
+    await client.query(`
+      ALTER TABLE attendance_records
+      ADD COLUMN IF NOT EXISTS note TEXT DEFAULT ''
+    `);
+    await client.query(`
+      ALTER TABLE attendance_records
+      ADD COLUMN IF NOT EXISTS reason TEXT DEFAULT ''
+    `);
+    await client.query(`
+      ALTER TABLE attendance_records
+      ADD COLUMN IF NOT EXISTS updated_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL
+    `);
+    await client.query(`
+      ALTER TABLE attendance_records
+      ADD COLUMN IF NOT EXISTS responded_at TIMESTAMP
+    `);
+    await client.query(`
+      ALTER TABLE attendance_records
+      ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS attendance_sessions_event_id_idx
+      ON attendance_sessions (event_id)
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS attendance_sessions_active_idx
+      ON attendance_sessions (is_active)
+    `);
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS attendance_records_session_user_idx
+      ON attendance_records (session_id, user_id)
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS attendance_records_user_status_idx
+      ON attendance_records (user_id, status)
+    `);
+    console.log("✓ attendance columns and indexes ready");
+
+    await client.query(`
       CREATE TABLE IF NOT EXISTS inventory_items (
         id SERIAL PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
