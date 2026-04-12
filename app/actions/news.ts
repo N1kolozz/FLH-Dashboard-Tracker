@@ -1,0 +1,222 @@
+"use server";
+
+import { pool } from "@/lib/db";
+import { getSession, type Session } from "@/lib/auth";
+
+export type DashboardNewsType = "announcement" | "event" | "project";
+
+export interface DashboardNewsItem {
+  id: string;
+  source_id: number;
+  type: DashboardNewsType;
+  title: string;
+  body: string;
+  meta: string;
+  href: string | null;
+  created_at: string;
+  author_name: string | null;
+}
+
+type AnnouncementRow = {
+  id: number;
+  title: string;
+  body: string | null;
+  created_at: Date | string;
+  author_name: string | null;
+};
+
+type EventNewsRow = {
+  id: number;
+  title: string;
+  body: string | null;
+  created_at: Date | string;
+  event_date: string | null;
+  department: string | null;
+};
+
+type ProjectNewsRow = {
+  id: number;
+  title: string;
+  body: string | null;
+  created_at: Date | string;
+  status: string | null;
+  deadline: string | null;
+};
+
+function serializeTimestamp(value: Date | string) {
+  if (value instanceof Date) return value.toISOString();
+  return value;
+}
+
+function formatLabel(value: string | null) {
+  if (!value) return "";
+  if (value.toLowerCase() === "all") return "All Departments";
+  if (value.toLowerCase() === "pr") return "PR & Social";
+  return value
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function formatDateLabel(label: string, value: string | null) {
+  if (!value) return "";
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return `${label} ${value}`;
+  return `${label} ${date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  })}`;
+}
+
+function canPublishNews(session: Session | null) {
+  if (!session) return false;
+  const role = session.role.toUpperCase();
+  const department = session.department.toLowerCase();
+  return (
+    role === "HEAD" ||
+    role === "MANAGEMENT" ||
+    department === "management"
+  );
+}
+
+function sessionUserId(session: Session) {
+  const userId = Number(session.userId);
+  return Number.isInteger(userId) ? userId : null;
+}
+
+export async function getDashboardNews() {
+  try {
+    const [announcementsRes, eventsRes, projectsRes] = await Promise.all([
+      pool.query(
+        `SELECT
+           np.id,
+           np.title,
+           np.body,
+           np.created_at,
+           u.full_name AS author_name
+         FROM news_posts np
+         LEFT JOIN users u ON u.id = np.created_by_user_id
+         ORDER BY np.created_at DESC
+         LIMIT 20`
+      ),
+      pool.query(
+        `SELECT
+           e.id,
+           e.title,
+           e.description AS body,
+           e.created_at,
+           e.date::text AS event_date,
+           e.department
+         FROM events e
+         ORDER BY e.created_at DESC
+         LIMIT 20`
+      ),
+      pool.query(
+        `SELECT
+           p.id,
+           p.name AS title,
+           p.description AS body,
+           p.created_at,
+           p.status,
+           p.deadline::text AS deadline
+         FROM projects p
+         ORDER BY p.created_at DESC
+         LIMIT 20`
+      ),
+    ]);
+
+    const announcements = (announcementsRes.rows as AnnouncementRow[]).map(
+      (item): DashboardNewsItem => ({
+        id: `announcement-${item.id}`,
+        source_id: item.id,
+        type: "announcement",
+        title: item.title,
+        body: item.body ?? "",
+        meta: item.author_name ? `Posted by ${item.author_name}` : "Team update",
+        href: null,
+        created_at: serializeTimestamp(item.created_at),
+        author_name: item.author_name,
+      })
+    );
+
+    const events = (eventsRes.rows as EventNewsRow[]).map(
+      (item): DashboardNewsItem => ({
+        id: `event-${item.id}`,
+        source_id: item.id,
+        type: "event",
+        title: item.title,
+        body: item.body ?? "",
+        meta: [formatDateLabel("Event date", item.event_date), formatLabel(item.department)]
+          .filter(Boolean)
+          .join(" · "),
+        href: "/events",
+        created_at: serializeTimestamp(item.created_at),
+        author_name: null,
+      })
+    );
+
+    const projects = (projectsRes.rows as ProjectNewsRow[]).map(
+      (item): DashboardNewsItem => ({
+        id: `project-${item.id}`,
+        source_id: item.id,
+        type: "project",
+        title: item.title,
+        body: item.body ?? "",
+        meta: [formatLabel(item.status), formatDateLabel("Deadline", item.deadline)]
+          .filter(Boolean)
+          .join(" · "),
+        href: "/projects/overview",
+        created_at: serializeTimestamp(item.created_at),
+        author_name: null,
+      })
+    );
+
+    const news = [...announcements, ...events, ...projects]
+      .sort(
+        (a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      )
+      .slice(0, 30);
+
+    return { success: true, news };
+  } catch (error) {
+    console.error("Error fetching dashboard news:", error);
+    return { error: "Failed to fetch news" };
+  }
+}
+
+export async function createNewsPost(data: { title: string; body: string }) {
+  try {
+    const session = await getSession();
+    if (!session || !canPublishNews(session)) {
+      return { error: "Not authorized" };
+    }
+
+    const title = data.title.trim();
+    const body = data.body.trim();
+    if (!title) {
+      return { error: "Title is required" };
+    }
+
+    const res = await pool.query(
+      `INSERT INTO news_posts (title, body, created_by_user_id)
+       VALUES ($1, $2, $3)
+       RETURNING id, created_at`,
+      [title, body, sessionUserId(session)]
+    );
+
+    const createdAt = res.rows[0].created_at;
+    return {
+      success: true,
+      id: res.rows[0].id as number,
+      createdAt:
+        createdAt instanceof Date
+          ? createdAt.toISOString()
+          : String(createdAt),
+    };
+  } catch (error) {
+    console.error("Error creating news post:", error);
+    return { error: "Failed to create news post" };
+  }
+}

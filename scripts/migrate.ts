@@ -231,6 +231,21 @@ async function migrate() {
     console.log("✓ attendance columns and indexes ready");
 
     await client.query(`
+      CREATE TABLE IF NOT EXISTS news_posts (
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        body TEXT DEFAULT '',
+        created_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS news_posts_created_at_idx
+      ON news_posts (created_at DESC)
+    `);
+    console.log("✓ news_posts table ready");
+
+    await client.query(`
       CREATE TABLE IF NOT EXISTS inventory_items (
         id SERIAL PRIMARY KEY,
         name VARCHAR(255) NOT NULL,

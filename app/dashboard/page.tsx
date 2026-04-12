@@ -4,6 +4,15 @@ import Link from "next/link";
 import { useState, useEffect, useCallback } from "react";
 import { StatsResponse } from "@/app/api/stats/route";
 import { getDashboardCounts } from "@/app/actions/dashboard-stats";
+import { getCurrentSession } from "@/app/actions/session";
+import {
+  createNewsPost,
+  getDashboardNews,
+  type DashboardNewsItem,
+  type DashboardNewsType,
+} from "@/app/actions/news";
+import Modal from "@/components/Modal";
+import type { Session } from "@/lib/auth";
 
 /* ─── Quick-stat card ─── */
 function QuickStat({
@@ -39,42 +48,110 @@ function QuickStat({
   );
 }
 
-/* ─── Quick-link card ─── */
-function QuickLink({
-  label,
-  description,
-  href,
-  icon,
-}: {
-  label: string;
-  description: string;
-  href: string;
-  icon: React.ReactNode;
-}) {
-  return (
-    <Link
-      href={href}
-      className="group flex items-center gap-4 bg-white rounded-xl border border-slate-100 px-4 py-3 hover:border-purple-200 hover:bg-purple-50/30 transition-all duration-150"
-    >
-      <div className="w-10 h-10 rounded-lg bg-slate-100 group-hover:bg-purple-100 flex items-center justify-center text-slate-400 group-hover:text-purple-600 transition-colors shrink-0">
-        {icon}
-      </div>
-      <div className="min-w-0">
-        <p className="text-sm font-semibold text-slate-700 group-hover:text-purple-700 transition-colors">
-          {label}
-        </p>
-        <p className="text-xs text-slate-500 truncate">{description}</p>
-      </div>
-      <svg
-        className="w-4 h-4 text-slate-300 group-hover:text-purple-400 ml-auto shrink-0 transition-colors"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+const NEWS_CONFIG: Record<
+  DashboardNewsType,
+  {
+    label: string;
+    badge: string;
+    icon: React.ReactNode;
+  }
+> = {
+  announcement: {
+    label: "Team News",
+    badge: "bg-purple-100 text-purple-700 border-purple-200",
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M11 5.882V19.24a1.76 1.76 0 01-1.105-.385l-3.63-2.904A2 2 0 005 15.511H4a2 2 0 01-2-2v-3.022a2 2 0 012-2h1a2 2 0 001.265-.44l3.63-2.904A1.76 1.76 0 0111 4.76v1.122zm8.5 4.118a4.5 4.5 0 010 4.999M17 8a2.5 2.5 0 010 4.999" />
       </svg>
-    </Link>
+    ),
+  },
+  event: {
+    label: "Event",
+    badge: "bg-fuchsia-100 text-fuchsia-700 border-fuchsia-200",
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+      </svg>
+    ),
+  },
+  project: {
+    label: "Project",
+    badge: "bg-violet-100 text-violet-700 border-violet-200",
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+      </svg>
+    ),
+  },
+};
+
+function canPublishNews(session: Session | null) {
+  if (!session) return false;
+  const role = session.role.toUpperCase();
+  const department = session.department.toLowerCase();
+  return Boolean(
+    role === "HEAD" ||
+      role === "MANAGEMENT" ||
+      department === "management"
   );
+}
+
+function formatNewsDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Recently";
+  return date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function NewsItem({ item }: { item: DashboardNewsItem }) {
+  const config = NEWS_CONFIG[item.type];
+  const className =
+    "block h-full rounded-lg border border-purple-100 bg-white/95 p-4 shadow-sm transition hover:border-purple-300 hover:bg-purple-50/60";
+  const content = (
+    <>
+      <div className="flex items-start justify-between gap-3">
+        <div
+          className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-semibold ${config.badge}`}
+        >
+          {config.icon}
+          {config.label}
+        </div>
+        <span className="shrink-0 text-xs font-medium text-slate-400">
+          {formatNewsDate(item.created_at)}
+        </span>
+      </div>
+      <h3 className="mt-3 text-base font-bold text-slate-900">{item.title}</h3>
+      {item.body && (
+        <p className="mt-2 text-sm leading-6 text-slate-600">{item.body}</p>
+      )}
+      <div className="mt-4 flex items-center justify-between gap-3 border-t border-purple-50 pt-3">
+        <p className="min-w-0 truncate text-xs font-medium text-purple-700">
+          {item.meta || "FLH update"}
+        </p>
+        {item.href && (
+          <span className="inline-flex items-center gap-1 text-xs font-semibold text-purple-600">
+            Open
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </span>
+        )}
+      </div>
+    </>
+  );
+
+  if (item.href) {
+    return (
+      <Link href={item.href} className={className}>
+        {content}
+      </Link>
+    );
+  }
+
+  return <article className={className}>{content}</article>;
 }
 
 export default function DashboardPage() {
@@ -85,6 +162,15 @@ export default function DashboardPage() {
   const [eventCount, setEventCount] = useState(0);
   const [expenseTotal, setExpenseTotal] = useState(0);
   const [teamCount, setTeamCount] = useState(0);
+  const [session, setSession] = useState<Session | null>(null);
+  const [newsItems, setNewsItems] = useState<DashboardNewsItem[]>([]);
+  const [newsLoading, setNewsLoading] = useState(true);
+  const [newsError, setNewsError] = useState("");
+  const [newsModalOpen, setNewsModalOpen] = useState(false);
+  const [newsForm, setNewsForm] = useState({ title: "", body: "" });
+  const [newsSaving, setNewsSaving] = useState(false);
+
+  const userCanPublishNews = canPublishNews(session);
 
   // Fetch social stats from API
   const fetchSocial = useCallback(async () => {
@@ -111,8 +197,22 @@ export default function DashboardPage() {
     }
   }, []);
 
+  const loadNews = useCallback(async () => {
+    setNewsLoading(true);
+    const result = await getDashboardNews();
+    if ("news" in result) {
+      setNewsItems(result.news ?? []);
+      setNewsError("");
+    } else if ("error" in result) {
+      setNewsError(result.error ?? "Failed to fetch news");
+    }
+    setNewsLoading(false);
+  }, []);
+
   useEffect(() => {
     fetchSocial();
+    loadNews();
+    getCurrentSession().then(setSession);
 
     // Load stats from database
     getDashboardCounts().then((counts) => {
@@ -122,7 +222,31 @@ export default function DashboardPage() {
       setExpenseTotal(counts.expenseTotal);
       setTeamCount(counts.teamCount);
     });
-  }, [fetchSocial]);
+  }, [fetchSocial, loadNews]);
+
+  const submitNews = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!newsForm.title.trim() || newsSaving) return;
+
+    setNewsSaving(true);
+    setNewsError("");
+    const result = await createNewsPost({
+      title: newsForm.title,
+      body: newsForm.body,
+    });
+    setNewsSaving(false);
+
+    if ("success" in result && result.success) {
+      setNewsForm({ title: "", body: "" });
+      setNewsModalOpen(false);
+      await loadNews();
+      return;
+    }
+
+    if ("error" in result) {
+      setNewsError(result.error ?? "Failed to create news post");
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -212,75 +336,122 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        {/* Quick Links */}
-        <section>
-          <h2 className="text-sm font-semibold text-slate-600 uppercase tracking-wide mb-3">
-            Quick Actions
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <QuickLink
-              label="Social Analytics"
-              description="View follower growth and platform stats"
-              href="/social"
-              icon={
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+        <section className="min-h-0 overflow-hidden rounded-lg border border-purple-200 bg-gradient-to-br from-white via-purple-50/70 to-fuchsia-50/60 p-4 shadow-sm sm:p-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-purple-600">
+                News
+              </p>
+              <h2 className="mt-1 text-xl font-bold text-slate-900">
+                Latest updates
+              </h2>
+              <p className="mt-1 text-sm text-slate-600">
+                Fresh updates for everyone in the hub.
+              </p>
+            </div>
+            {userCanPublishNews && (
+              <button
+                type="button"
+                onClick={() => setNewsModalOpen(true)}
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-purple-700"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
-              }
-            />
-            <QuickLink
-              label="Content Calendar"
-              description="Plan and schedule social media posts"
-              href="/social/calendar"
-              icon={
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-              }
-            />
-            <QuickLink
-              label="Projects Overview"
-              description="Review project health, deadlines, and outcomes in one place"
-              href="/projects/overview"
-              icon={
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M3 13h8V3H3v10zm10 8h8V3h-8v18zM3 21h8v-6H3v6z" />
-                </svg>
-              }
-            />
-            <QuickLink
-              label="Inventory"
-              description="Track and manage NGO assets and supplies"
-              href="/logistics/inventory"
-              icon={
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                </svg>
-              }
-            />
-            <QuickLink
-              label="Expense Tracker"
-              description="Log expenses and track spending by category"
-              href="/logistics/expenses"
-              icon={
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              }
-            />
-            <QuickLink
-              label="Team Directory"
-              description="View and manage team members"
-              href="/team"
-              icon={
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-              }
-            />
+                Post update
+              </button>
+            )}
+          </div>
+
+          {newsError && (
+            <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              {newsError}
+            </div>
+          )}
+
+          <div className="mt-5 max-h-[520px] min-h-0 overflow-y-auto pr-1 overscroll-contain">
+            {newsLoading ? (
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                {[0, 1, 2, 3].map((item) => (
+                  <div key={item} className="rounded-lg border border-purple-100 bg-white p-4">
+                    <div className="h-5 w-28 rounded bg-purple-100" />
+                    <div className="mt-4 h-4 w-2/3 rounded bg-slate-100" />
+                    <div className="mt-3 h-3 w-full rounded bg-slate-100" />
+                    <div className="mt-2 h-3 w-4/5 rounded bg-slate-100" />
+                  </div>
+                ))}
+              </div>
+            ) : newsItems.length > 0 ? (
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                {newsItems.map((item) => (
+                  <NewsItem key={item.id} item={item} />
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-lg border border-dashed border-purple-200 bg-white/80 px-4 py-8 text-center">
+                <p className="text-sm font-semibold text-slate-700">No news yet</p>
+                <p className="mt-1 text-sm text-slate-500">
+                  New events and projects will land here automatically.
+                </p>
+              </div>
+            )}
           </div>
         </section>
       </div>
+
+      <Modal
+        open={newsModalOpen}
+        onClose={() => setNewsModalOpen(false)}
+        title="Post News"
+        maxWidth="max-w-xl"
+      >
+        <form onSubmit={submitNews} className="space-y-4">
+          <div>
+            <label className="block text-sm font-semibold text-slate-700">
+              Title
+            </label>
+            <input
+              value={newsForm.title}
+              onChange={(event) =>
+                setNewsForm((current) => ({ ...current, title: event.target.value }))
+              }
+              className="mt-1 w-full rounded-lg border border-purple-200 px-3 py-2 text-sm text-slate-700 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-200"
+              placeholder="What should the team know?"
+              maxLength={255}
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-slate-700">
+              Message
+            </label>
+            <textarea
+              value={newsForm.body}
+              onChange={(event) =>
+                setNewsForm((current) => ({ ...current, body: event.target.value }))
+              }
+              className="mt-1 min-h-32 w-full resize-y rounded-lg border border-purple-200 px-3 py-2 text-sm text-slate-700 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-200"
+              placeholder="Add the details members need."
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={() => setNewsModalOpen(false)}
+              className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={newsSaving || !newsForm.title.trim()}
+              className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {newsSaving ? "Posting..." : "Post update"}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }
