@@ -46,8 +46,8 @@ export async function getProjects() {
            NULLIF(p.owner_user_ids, '{}'),
            CASE WHEN p.owner_user_id IS NULL THEN '{}'::INTEGER[] ELSE ARRAY[p.owner_user_id] END
          ) AS owner_user_ids,
-         p.created_at,
-         p.updated_at
+         (p.created_at AT TIME ZONE 'UTC')::text || 'Z' as created_at,
+         (p.updated_at AT TIME ZONE 'UTC')::text || 'Z' as updated_at
        FROM projects p
        ORDER BY
          CASE p.status
@@ -93,10 +93,11 @@ export async function createProject(data: {
          deadline,
          team,
          tags,
-         owner_user_ids
+         owner_user_ids,
+         updated_at
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       RETURNING id, created_at, updated_at`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'))
+       RETURNING id, (created_at AT TIME ZONE 'UTC')::text || 'Z' as created_at, (updated_at AT TIME ZONE 'UTC')::text || 'Z' as updated_at`,
       [
         data.name,
         data.description,
@@ -154,9 +155,9 @@ export async function updateProject(
            team=$6,
            tags=$7,
            owner_user_ids=$8,
-           updated_at=CURRENT_TIMESTAMP
+           updated_at=(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
        WHERE id=$9
-       RETURNING updated_at`,
+       RETURNING (updated_at AT TIME ZONE 'UTC')::text || 'Z' as updated_at`,
       [
         data.name,
         data.description,

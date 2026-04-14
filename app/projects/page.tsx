@@ -48,7 +48,7 @@ const COLUMNS: { id: Status; label: string; color: string }[] = [
   { id: "planning", label: "Planning", color: "border-t-slate-400" },
   { id: "in_progress", label: "In Progress", color: "border-t-blue-500" },
   { id: "review", label: "Review", color: "border-t-amber-500" },
-  { id: "completed", label: "Completed", color: "border-t-blue-500" },
+  { id: "completed", label: "Completed", color: "border-t-green-500" },
 ];
 
 const PRIORITY_CONFIG: Record<
