@@ -264,7 +264,7 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-8">
         {/* Stats Grid */}
         <section>
           <h2 className="text-sm font-semibold text-slate-600 uppercase tracking-wide mb-3">
@@ -369,7 +369,7 @@ export default function DashboardPage() {
             </div>
           )}
 
-          <div className="mt-5 max-h-[520px] min-h-0 overflow-y-auto pr-1 overscroll-contain">
+          <div className="mt-4 max-h-[clamp(380px,24vh,320px)] min-h-0 overflow-y-auto pr-1 overscroll-contain">
             {newsLoading ? (
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 {[0, 1, 2, 3].map((item) => (
