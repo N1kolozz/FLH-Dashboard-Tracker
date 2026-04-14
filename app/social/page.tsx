@@ -6,10 +6,12 @@ import PlatformCard from "@/components/PlatformCard";
 import GrowthChart from "@/components/GrowthChart";
 import CombinedGrowthChart from "@/components/CombinedGrowthChart";
 import DashboardStats from "@/components/DashboardStats";
-import { StatsResponse } from "@/app/api/stats/route";
-import { HistoryPoint } from "@/app/api/history/route";
+import type { StatsResponse } from "@/app/api/stats/route";
+import type { HistoryPoint } from "@/app/api/history/route";
 
 const PLATFORMS = ["instagram", "tiktok", "facebook"] as const;
+const MIN_PERCENT_BASELINE = 100;
+const MAX_PERCENT_BADGE = 300;
 type Platform = (typeof PLATFORMS)[number];
 type ChartTab = Platform | "all";
 type TimeRange = "30" | "90" | "all";
@@ -24,7 +26,20 @@ interface CompareRow {
   platform: Platform;
   currentGrowth: number | null;
   previousGrowth: number | null;
-  deltaPercent: number | null;
+  deltaLabel: string;
+  deltaTone: CompareTone;
+}
+
+type CompareTone = "positive" | "negative" | "neutral";
+
+interface CompareDelta {
+  label: string;
+  tone: CompareTone;
+}
+
+interface ComparePeriod {
+  start: string;
+  end: string;
 }
 
 function rangeToDays(range: TimeRange): number {
@@ -37,9 +52,93 @@ function ymd(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
+function parseYmd(date: string): Date {
+  return new Date(`${date}T00:00:00.000Z`);
+}
+
+function addDays(date: Date, days: number): Date {
+  const next = new Date(date);
+  next.setUTCDate(next.getUTCDate() + days);
+  return next;
+}
+
+function previousPeriodFromHistory(
+  points: HistoryPoint[],
+  days: number
+): ComparePeriod | null {
+  if (points.length === 0) return null;
+
+  const currentEnd = parseYmd(points[points.length - 1].date);
+  const currentStart = addDays(currentEnd, -(days - 1));
+  const previousEnd = addDays(currentStart, -1);
+  const previousStart = addDays(previousEnd, -(days - 1));
+
+  return {
+    start: ymd(previousStart),
+    end: ymd(previousEnd),
+  };
+}
+
 function growthFromHistory(points: HistoryPoint[]): number | null {
   if (points.length < 2) return null;
   return points[points.length - 1].followers - points[0].followers;
+}
+
+function formatSignedInteger(value: number): string {
+  if (value === 0) return "0";
+  const formatted = Math.abs(value).toLocaleString();
+  return `${value > 0 ? "+" : "-"}${formatted}`;
+}
+
+function formatSignedPercent(value: number): string {
+  const rounded = Number(value.toFixed(1));
+  if (rounded === 0) return "0%";
+  return `${rounded > 0 ? "+" : ""}${rounded}%`;
+}
+
+function formatFollowerDelta(value: number): string {
+  if (value === 0) return "No change";
+  const unit = Math.abs(value) === 1 ? "follower" : "followers";
+  return `${formatSignedInteger(value)} ${unit}`;
+}
+
+function formatNullableGrowth(value: number | null): string {
+  return value === null ? "N/A" : formatSignedInteger(value);
+}
+
+function compareDelta(
+  currentGrowth: number | null,
+  previousGrowth: number | null
+): CompareDelta {
+  if (currentGrowth === null || previousGrowth === null) {
+    return { label: "N/A", tone: "neutral" };
+  }
+
+  const deltaGrowth = currentGrowth - previousGrowth;
+  const tone: CompareTone =
+    deltaGrowth > 0 ? "positive" : deltaGrowth < 0 ? "negative" : "neutral";
+
+  if (deltaGrowth === 0) return { label: "No change", tone };
+
+  if (previousGrowth >= MIN_PERCENT_BASELINE) {
+    const deltaPercent = (deltaGrowth / previousGrowth) * 100;
+    if (Math.abs(deltaPercent) > MAX_PERCENT_BADGE) {
+      return {
+        label: formatFollowerDelta(deltaGrowth),
+        tone,
+      };
+    }
+
+    return {
+      label: formatSignedPercent(deltaPercent),
+      tone,
+    };
+  }
+
+  return {
+    label: formatFollowerDelta(deltaGrowth),
+    tone,
+  };
 }
 
 export default function DashboardPage() {
@@ -114,18 +213,18 @@ export default function DashboardPage() {
 
         if (compareMode && insightsRange !== "all") {
           const days = rangeToDays(insightsRange);
-          const today = new Date();
-          const currentStart = new Date(today);
-          currentStart.setDate(today.getDate() - (days - 1));
-          const previousEnd = new Date(currentStart);
-          previousEnd.setDate(currentStart.getDate() - 1);
-          const previousStart = new Date(previousEnd);
-          previousStart.setDate(previousEnd.getDate() - (days - 1));
-
           const previousResults = await Promise.all(
             PLATFORMS.map(async (platform) => {
+              const period = previousPeriodFromHistory(
+                nextHistory[platform],
+                days
+              );
+              if (!period) {
+                return { platform, data: [] as HistoryPoint[] };
+              }
+
               const res = await fetch(
-                `/api/history?platform=${platform}&start=${ymd(previousStart)}&end=${ymd(previousEnd)}`,
+                `/api/history?platform=${platform}&start=${period.start}&end=${period.end}`,
                 { cache: "no-store" }
               );
               if (!res.ok) throw new Error(`Compare ${platform}: HTTP ${res.status}`);
@@ -139,16 +238,13 @@ export default function DashboardPage() {
             const previous = growthFromHistory(
               previousResults.find((r) => r.platform === platform)?.data ?? []
             );
-            const deltaPercent =
-              current !== null && previous !== null && previous !== 0
-                ? ((current - previous) / Math.abs(previous)) * 100
-                : null;
+            const delta = compareDelta(current, previous);
             return {
               platform,
               currentGrowth: current,
               previousGrowth: previous,
-              deltaPercent:
-                deltaPercent === null ? null : Number(deltaPercent.toFixed(1)),
+              deltaLabel: delta.label,
+              deltaTone: delta.tone,
             };
           });
           if (!cancelled) setCompareRows(rows);
@@ -223,10 +319,9 @@ export default function DashboardPage() {
     return best;
   })();
 
-  function deltaClass(deltaPercent: number | null): string {
-    if (deltaPercent === null) return "bg-slate-100 text-slate-600";
-    if (deltaPercent > 0) return "bg-purple-100 text-purple-700";
-    if (deltaPercent < 0) return "bg-rose-100 text-rose-700";
+  function deltaClass(tone: CompareTone): string {
+    if (tone === "positive") return "bg-purple-100 text-purple-700";
+    if (tone === "negative") return "bg-rose-100 text-rose-700";
     return "bg-slate-100 text-slate-600";
   }
 
@@ -313,11 +408,10 @@ export default function DashboardPage() {
                   <button
                     key={r}
                     onClick={() => setInsightsRange(r)}
-                    className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
-                      insightsRange === r
+                    className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${insightsRange === r
                         ? "bg-white text-slate-800 shadow-sm"
                         : "text-slate-500 hover:text-slate-700"
-                    }`}
+                      }`}
                   >
                     {r === "all" ? "All time" : `${r} days`}
                   </button>
@@ -325,11 +419,10 @@ export default function DashboardPage() {
               </div>
               <button
                 onClick={() => setCompareMode((v) => !v)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                  compareMode
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${compareMode
                     ? "bg-purple-50 border-purple-200 text-purple-700"
                     : "bg-white border-slate-200 text-slate-600"
-                }`}
+                  }`}
               >
                 Compare mode {compareMode ? "ON" : "OFF"}
               </button>
@@ -352,7 +445,7 @@ export default function DashboardPage() {
               ) : bestDay ? (
                 <>
                   <p className="text-lg font-bold text-slate-900">
-                    +{bestDay.value.toLocaleString()}
+                    {formatSignedInteger(bestDay.value)}
                   </p>
                   <p className="text-sm text-slate-600 capitalize">
                     {bestDay.platform} · {bestDay.date}
@@ -372,7 +465,7 @@ export default function DashboardPage() {
               ) : bestWeek ? (
                 <>
                   <p className="text-lg font-bold text-slate-900">
-                    +{bestWeek.value.toLocaleString()}
+                    {formatSignedInteger(bestWeek.value)}
                   </p>
                   <p className="text-sm text-slate-600 capitalize">
                     {bestWeek.platform} · ending {bestWeek.date}
@@ -388,29 +481,30 @@ export default function DashboardPage() {
           {compareMode && insightsRange !== "all" && (
             <div className="mt-4 rounded-xl border border-purple-100 overflow-hidden">
               <div className="px-4 py-2 bg-purple-50/50 text-xs text-slate-500 uppercase tracking-wide">
-                Compare current range vs previous period
+                <p>Compare current range vs previous period</p>
+                <p className="mt-0.5 text-[11px] normal-case tracking-normal text-slate-400">
+                  Small baselines use follower difference.
+                </p>
               </div>
               <div className="divide-y divide-purple-100">
                 {compareRows.map((row) => (
                   <div
                     key={row.platform}
-                    className="px-4 py-2 text-sm flex items-center justify-between"
+                    className="px-4 py-2 text-sm flex items-center justify-between gap-3"
                   >
-                    <span className="capitalize text-slate-600">{row.platform}</span>
-                    <span className="text-slate-800 flex items-center gap-2">
+                    <span className="capitalize text-slate-600 shrink-0">{row.platform}</span>
+                    <span className="text-slate-800 flex flex-wrap items-center justify-end gap-2 text-right">
                       <span>
-                        {row.currentGrowth !== null ? `${row.currentGrowth >= 0 ? "+" : ""}${row.currentGrowth}` : "N/A"}
+                        {formatNullableGrowth(row.currentGrowth)}
                         {" vs "}
-                        {row.previousGrowth !== null ? `${row.previousGrowth >= 0 ? "+" : ""}${row.previousGrowth}` : "N/A"}
+                        {formatNullableGrowth(row.previousGrowth)}
                       </span>
                       <span
                         className={`px-2 py-0.5 rounded-full text-xs font-semibold ${deltaClass(
-                          row.deltaPercent
+                          row.deltaTone
                         )}`}
                       >
-                        {row.deltaPercent !== null
-                          ? `${row.deltaPercent >= 0 ? "+" : ""}${row.deltaPercent}%`
-                          : "N/A"}
+                        {row.deltaLabel}
                       </span>
                     </span>
                   </div>
@@ -468,11 +562,10 @@ export default function DashboardPage() {
             <div className="flex w-full sm:w-auto overflow-x-auto bg-slate-100 rounded-lg p-0.5 gap-0.5 whitespace-nowrap">
               <button
                 onClick={() => setActiveChart("all")}
-                className={`shrink-0 px-2.5 sm:px-3 py-1 rounded-md text-[11px] sm:text-xs font-medium transition-colors ${
-                  activeChart === "all"
+                className={`shrink-0 px-2.5 sm:px-3 py-1 rounded-md text-[11px] sm:text-xs font-medium transition-colors ${activeChart === "all"
                     ? "bg-white text-slate-800 shadow-sm"
                     : "text-slate-500 hover:text-slate-700"
-                }`}
+                  }`}
               >
                 All
               </button>
@@ -480,11 +573,10 @@ export default function DashboardPage() {
                 <button
                   key={p}
                   onClick={() => setActiveChart(p)}
-                  className={`shrink-0 px-2.5 sm:px-3 py-1 rounded-md text-[11px] sm:text-xs font-medium capitalize transition-colors ${
-                    activeChart === p
+                  className={`shrink-0 px-2.5 sm:px-3 py-1 rounded-md text-[11px] sm:text-xs font-medium capitalize transition-colors ${activeChart === p
                       ? "bg-white text-slate-800 shadow-sm"
                       : "text-slate-500 hover:text-slate-700"
-                  }`}
+                    }`}
                 >
                   {p}
                 </button>
