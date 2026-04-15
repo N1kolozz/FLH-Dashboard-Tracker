@@ -25,6 +25,12 @@ import ProjectsSubnav from "@/components/ProjectsSubnav";
 import { getCurrentSession } from "@/app/actions/session";
 import type { Session } from "@/lib/auth";
 import { getStoredSkeletonMap, setStoredSkeletonMap } from "@/lib/loading-skeleton";
+import {
+  submitForReview,
+  approveReview,
+  rejectReview,
+  getProjectReviewStatuses,
+} from "@/app/actions/reviews";
 
 /* ─── Types ─── */
 type Priority = "low" | "medium" | "high";
@@ -252,10 +258,12 @@ function ProjectCardContent({
   project,
   owners,
   daysUntilDeadline,
+  reviewStatus,
 }: {
   project: Project;
   owners: MemberChoice[];
   daysUntilDeadline: (deadline: string) => number | null;
+  reviewStatus?: { status: string; reviewId: number; feedback: string | null } | null;
 }) {
   const dl = daysUntilDeadline(project.deadline);
 
@@ -266,11 +274,29 @@ function ProjectCardContent({
       />
 
       <div className="mb-4 flex items-start justify-between gap-3">
-        <span
-          className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold ${PRIORITY_CONFIG[project.priority].classes}`}
-        >
-          {PRIORITY_CONFIG[project.priority].label}
-        </span>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span
+            className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold ${PRIORITY_CONFIG[project.priority].classes}`}
+          >
+            {PRIORITY_CONFIG[project.priority].label}
+          </span>
+          {reviewStatus?.status === "approved" && (
+            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+              <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+              </svg>
+              Reviewed
+            </span>
+          )}
+          {reviewStatus?.status === "pending" && (
+            <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+              <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Pending Review
+            </span>
+          )}
+        </div>
         {dl !== null && (
           <span
             className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold ${
@@ -390,6 +416,7 @@ function DraggableProjectCard({
   cardRefs,
   onOpen,
   daysUntilDeadline,
+  reviewStatus,
 }: {
   project: Project;
   owners: MemberChoice[];
@@ -398,6 +425,7 @@ function DraggableProjectCard({
   cardRefs: React.MutableRefObject<Record<number, HTMLDivElement | null>>;
   onOpen: (project: Project) => void;
   daysUntilDeadline: (deadline: string) => number | null;
+  reviewStatus?: { status: string; reviewId: number; feedback: string | null } | null;
 }) {
   const { attributes, listeners, setNodeRef } = useDraggable({
     id: project.id,
@@ -423,6 +451,7 @@ function DraggableProjectCard({
         project={project}
         owners={owners}
         daysUntilDeadline={daysUntilDeadline}
+        reviewStatus={reviewStatus}
       />
     </div>
   );
@@ -509,6 +538,14 @@ export default function ProjectsPage() {
   const [cachedColumnCounts, setCachedColumnCounts] = useState<Record<Status, number>>(
     EMPTY_COLUMN_COUNTS
   );
+  const [reviewStatuses, setReviewStatuses] = useState<
+    Record<number, { status: string; reviewId: number; feedback: string | null }>
+  >({});
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [reviewTarget, setReviewTarget] = useState<{ projectId: number; reviewId: number; projectName: string } | null>(null);
+  const [reviewFeedback, setReviewFeedback] = useState("");
+  const [reviewSaving, setReviewSaving] = useState(false);
+  const deepLinkHandledRef = useRef(false);
   const boardRef = useRef<HTMLDivElement | null>(null);
   const columnRefs = useRef<Array<HTMLDivElement | null>>([]);
   const cardRefs = useRef<Record<number, HTMLDivElement | null>>({});
@@ -539,10 +576,11 @@ export default function ProjectsPage() {
     async function init() {
       setIsLoadingData(true);
       try {
-        const [sess, projectRes, memberRes] = await Promise.all([
+        const [sess, projectRes, memberRes, revStatuses] = await Promise.all([
           getCurrentSession(),
           getProjects(),
           getMembers(),
+          getProjectReviewStatuses(),
         ]);
         setSession(sess);
         if (projectRes.success && projectRes.projects) {
@@ -553,6 +591,33 @@ export default function ProjectsPage() {
             .map((member) => ({ id: member.id, name: member.name }))
             .sort((a, b) => a.name.localeCompare(b.name));
           setMembers(nextMembers);
+        }
+        setReviewStatuses(revStatuses);
+
+        // Auto-open review modal if navigated from dashboard notification
+        if (!deepLinkHandledRef.current) {
+          const urlParams = new URLSearchParams(window.location.search);
+          const urlReviewId = urlParams.get("reviewId");
+          const urlProjectId = urlParams.get("projectId");
+          if (urlReviewId && urlProjectId) {
+            deepLinkHandledRef.current = true;
+            const pid = Number(urlProjectId);
+            const rid = Number(urlReviewId);
+            const targetProject = (projectRes.success && projectRes.projects)
+              ? projectRes.projects.find((p) => p.id === pid)
+              : null;
+            if (targetProject && Number.isInteger(rid)) {
+              setTimeout(() => {
+                setReviewTarget({
+                  projectId: pid,
+                  reviewId: rid,
+                  projectName: targetProject.name,
+                });
+                setReviewFeedback("");
+                setReviewModalOpen(true);
+              }, 300);
+            }
+          }
         }
       } finally {
         setIsLoadingData(false);
@@ -623,16 +688,25 @@ export default function ProjectsPage() {
     session.department === "Projects"
   );
 
+  const isHeadOrAdmin = session && (
+    session.role === "ADMIN" ||
+    session.role === "HEAD"
+  );
+
   const refreshProjects = async ({ showSkeleton = false }: { showSkeleton?: boolean } = {}) => {
     if (showSkeleton) {
       setIsLoadingData(true);
     }
 
     try {
-      const res = await getProjects();
+      const [res, revStatuses] = await Promise.all([
+        getProjects(),
+        getProjectReviewStatuses(),
+      ]);
       if (res.success && res.projects) {
         setProjects(res.projects.map(rowToProject));
       }
+      setReviewStatuses(revStatuses);
     } finally {
       if (showSkeleton) {
         setIsLoadingData(false);
@@ -768,10 +842,58 @@ export default function ProjectsPage() {
     setModalOpen(true);
   };
 
+  /* ─── Review actions ─── */
+  const handleSubmitForReview = async (projectId: number) => {
+    const result = await submitForReview("project", projectId);
+    if (result.success) {
+      void refreshProjects();
+    }
+  };
+
+  const handleApproveReview = async () => {
+    if (!reviewTarget) return;
+    setReviewSaving(true);
+    const result = await approveReview(reviewTarget.reviewId, reviewFeedback || undefined);
+    setReviewSaving(false);
+    if (result.success) {
+      setReviewModalOpen(false);
+      setReviewTarget(null);
+      setReviewFeedback("");
+      void refreshProjects();
+    }
+  };
+
+  const handleRejectReview = async () => {
+    if (!reviewTarget || !reviewFeedback.trim()) return;
+    setReviewSaving(true);
+    const result = await rejectReview(reviewTarget.reviewId, reviewFeedback);
+    setReviewSaving(false);
+    if (result.success) {
+      setReviewModalOpen(false);
+      setReviewTarget(null);
+      setReviewFeedback("");
+      void refreshProjects();
+    }
+  };
+
+  const openReviewModal = (projectId: number, reviewId: number, projectName: string) => {
+    setReviewTarget({ projectId, reviewId, projectName });
+    setReviewFeedback("");
+    setReviewModalOpen(true);
+  };
+
   /* ─── Drag & Drop ─── */
   const moveProjectToColumn = async (project: Project, col: Status) => {
     if (project.status === col) {
       return;
+    }
+
+    // Block moving to completed if not HEAD/ADMIN and not approved
+    if (col === "completed" && !isHeadOrAdmin) {
+      const rs = reviewStatuses[project.id];
+      if (!rs || rs.status !== "approved") {
+        return; // silently block
+      }
     }
 
     const nextProject = {
@@ -1056,6 +1178,7 @@ export default function ProjectsPage() {
 
                     {items.map((p, cardIndex) => {
                       const owners = getOwnerMembers(p.ownerUserIds);
+                      const rs = reviewStatuses[p.id] || null;
 
                       return (
                         <Fragment key={p.id}>
@@ -1075,6 +1198,7 @@ export default function ProjectsPage() {
                             cardRefs={cardRefs}
                             onOpen={handleOpenProject}
                             daysUntilDeadline={daysUntilDeadline}
+                            reviewStatus={rs}
                           />
                         </Fragment>
                       );
@@ -1103,6 +1227,7 @@ export default function ProjectsPage() {
                       project={draggedProject}
                       owners={draggedOwners}
                       daysUntilDeadline={daysUntilDeadline}
+                      reviewStatus={reviewStatuses[draggedProject.id] || null}
                     />
                   </div>
                 </div>
@@ -1202,6 +1327,64 @@ export default function ProjectsPage() {
             </div>
           ) : null}
 
+          {/* Review status section */}
+          {editing.id && (() => {
+            const rs = reviewStatuses[editing.id];
+            return (
+              <div className="space-y-2">
+                {rs?.status === "approved" && (
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700 flex items-center gap-2">
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span className="font-semibold">Approved by management</span>
+                    {rs.feedback && <span className="text-emerald-600">— {rs.feedback}</span>}
+                  </div>
+                )}
+                {rs?.status === "pending" && (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 flex items-center gap-2">
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span className="font-semibold">Pending review from HEAD/Admin</span>
+                  </div>
+                )}
+                {/* Submit for Review button — visible when in review column, no pending/approved */}
+                {editing.status === "review" && (!rs || rs.status === "rejected") && canEdit && (
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      void handleSubmitForReview(editing.id);
+                    }}
+                    className="w-full px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+                  >
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Submit for Review
+                  </button>
+                )}
+                {/* Review button for HEAD/ADMIN when pending */}
+                {rs?.status === "pending" && isHeadOrAdmin && (
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setModalOpen(false);
+                      openReviewModal(editing.id, rs.reviewId, editing.name);
+                    }}
+                    className="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+                  >
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.743 7.523 5 12 5c4.478 0 8.268 2.743 9.542 7-1.274 4.257-5.064 7-9.542 7-4.477 0-8.268-2.743-9.542-7z" />
+                    </svg>
+                    Review This Project
+                  </button>
+                )}
+              </div>
+            );
+          })()}
+
           {canEdit && (
             <div className="flex items-center gap-3 pt-2">
               <button
@@ -1226,6 +1409,58 @@ export default function ProjectsPage() {
             </div>
           )}
         </div>
+      </Modal>
+
+      {/* Review Modal for HEAD/ADMIN */}
+      <Modal
+        open={reviewModalOpen}
+        onClose={() => { setReviewModalOpen(false); setReviewTarget(null); setReviewFeedback(""); }}
+        title="Review Project"
+      >
+        {reviewTarget && (
+          <div className="space-y-4">
+            <div className="rounded-xl border border-purple-100 bg-purple-50/50 p-4">
+              <p className="text-sm text-slate-500">Project</p>
+              <p className="text-base font-bold text-slate-900">{reviewTarget.projectName}</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Feedback <span className="text-slate-400">(required for rejection)</span>
+              </label>
+              <textarea
+                value={reviewFeedback}
+                onChange={(e) => setReviewFeedback(e.target.value)}
+                rows={3}
+                className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 resize-none"
+                placeholder="Add feedback or comments..."
+              />
+            </div>
+
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                onClick={handleApproveReview}
+                disabled={reviewSaving}
+                className="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                {reviewSaving ? "Approving..." : "Approve"}
+              </button>
+              <button
+                onClick={handleRejectReview}
+                disabled={reviewSaving || !reviewFeedback.trim()}
+                className="flex-1 px-4 py-2 bg-rose-50 hover:bg-rose-100 disabled:bg-slate-100 text-rose-600 disabled:text-slate-400 text-sm font-medium rounded-lg border border-rose-200 disabled:border-slate-200 transition-colors flex items-center justify-center gap-2"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                {reviewSaving ? "Rejecting..." : "Reject"}
+              </button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );

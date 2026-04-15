@@ -9,9 +9,10 @@ import type { ImpactRecordRow } from "@/app/actions/impact";
 import { getMembers } from "@/app/actions/members";
 import EmptyState from "@/components/EmptyState";
 import ProjectsSubnav from "@/components/ProjectsSubnav";
+import { getProjectReviewStatuses } from "@/app/actions/reviews";
 
 type Priority = "low" | "medium" | "high";
-type Status = "planning" | "in_progress" | "review" | "completed";
+type Status = "planning" | "in_progress" | "review" | "completed" | "rejected";
 type ActivityType = "workshop" | "training" | "outreach" | "mentoring" | "event" | "other";
 type AttentionTone = "rose" | "amber" | "blue" | "slate";
 
@@ -80,6 +81,10 @@ const STATUS_CONFIG: Record<Status, { label: string; classes: string }> = {
   completed: {
     label: "Completed",
     classes: "bg-emerald-100 text-emerald-700 border-emerald-200",
+  },
+  rejected: {
+    label: "Rejected",
+    classes: "bg-rose-100 text-rose-700 border-rose-200",
   },
 };
 
@@ -251,6 +256,9 @@ function formatDeadlineLabel(project: EnrichedProject) {
 
 function getAttentionItems(project: Project, daysUntilDeadline: number | null, outcomeSummary: OutcomeSummary) {
   const items: AttentionItem[] = [];
+
+  // Rejected projects don't need attention flags
+  if (project.status === "rejected") return items;
 
   if (project.status !== "completed" && daysUntilDeadline !== null && daysUntilDeadline < 0) {
     items.push({
@@ -470,6 +478,9 @@ export default function ProjectsOverviewPage() {
   const [statusFilter, setStatusFilter] = useState<Status | "all">("all");
   const [priorityFilter, setPriorityFilter] = useState<Priority | "all">("all");
   const [isLoadingData, setIsLoadingData] = useState(true);
+  const [rejectionFeedbacks, setRejectionFeedbacks] = useState<
+    Record<number, { feedback: string | null; reviewerName: string | null; rejectedAt: string | null }>
+  >({});
 
   useEffect(() => {
     async function loadOverview() {
@@ -484,6 +495,22 @@ export default function ProjectsOverviewPage() {
 
         if (projectRes.success && projectRes.projects) {
           setProjects(projectRes.projects.map(rowToProject));
+
+          // Fetch rejection feedbacks for rejected projects
+          const rejectedIds = projectRes.projects
+            .filter((p) => p.status === "rejected")
+            .map((p) => p.id);
+          if (rejectedIds.length > 0) {
+            const revStatuses = await getProjectReviewStatuses();
+            const feedbacks: Record<number, { feedback: string | null; reviewerName: string | null; rejectedAt: string | null }> = {};
+            for (const id of rejectedIds) {
+              const rs = revStatuses[id];
+              if (rs) {
+                feedbacks[id] = { feedback: rs.feedback, reviewerName: null, rejectedAt: null };
+              }
+            }
+            setRejectionFeedbacks(feedbacks);
+          }
         }
 
         if (outcomeRes.success && outcomeRes.records) {
@@ -583,18 +610,20 @@ export default function ProjectsOverviewPage() {
   const overdueCount = enrichedProjects.filter(
     (project) =>
       project.status !== "completed" &&
+      project.status !== "rejected" &&
       project.daysUntilDeadline !== null &&
       project.daysUntilDeadline < 0
   ).length;
   const dueSoonCount = enrichedProjects.filter(
     (project) =>
       project.status !== "completed" &&
+      project.status !== "rejected" &&
       project.daysUntilDeadline !== null &&
       project.daysUntilDeadline >= 0 &&
       project.daysUntilDeadline <= 7
   ).length;
   const attentionProjects = enrichedProjects
-    .filter((project) => project.attentionItems.length > 0)
+    .filter((project) => project.attentionItems.length > 0 && project.status !== "rejected")
     .slice(0, 5);
   const legacyOutcomeCount = outcomes.filter((record) => record.projectId === null).length;
 
@@ -919,6 +948,14 @@ export default function ProjectsOverviewPage() {
                         <p className="mt-1 max-w-sm text-sm text-slate-500">
                           {project.description || project.team || "No description yet"}
                         </p>
+                        {project.status === "rejected" && rejectionFeedbacks[project.id]?.feedback && (
+                          <div className="mt-2 flex items-start gap-1.5 rounded-lg border border-rose-100 bg-rose-50/50 px-2.5 py-1.5 max-w-sm">
+                            <svg className="mt-0.5 h-3.5 w-3.5 shrink-0 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                            </svg>
+                            <p className="text-xs text-rose-700 line-clamp-2">{rejectionFeedbacks[project.id].feedback}</p>
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-4 text-slate-600">
                         {project.ownerNames.length > 0 ? project.ownerNames.join(", ") : "Unassigned"}
@@ -926,8 +963,8 @@ export default function ProjectsOverviewPage() {
                       <td className="min-w-[160px] px-4 py-4">
                         <div className="flex flex-wrap gap-2">
                           <PortfolioBadge
-                            label={STATUS_CONFIG[project.status].label}
-                            className={STATUS_CONFIG[project.status].classes}
+                            label={STATUS_CONFIG[project.status]?.label ?? project.status}
+                            className={STATUS_CONFIG[project.status]?.classes ?? "bg-slate-100 text-slate-600 border-slate-200"}
                           />
                           <PortfolioBadge
                             label={PRIORITY_CONFIG[project.priority].label}

@@ -22,6 +22,12 @@ import {
 } from "@/lib/calendar-ui";
 import { getCurrentSession } from "@/app/actions/session";
 import type { Session } from "@/lib/auth";
+import {
+  submitForReview,
+  approveReview,
+  rejectReview,
+  getPostReviewStatuses,
+} from "@/app/actions/reviews";
 
 /* ─── Types ─── */
 type Platform = "instagram" | "tiktok" | "facebook";
@@ -201,15 +207,23 @@ export default function ContentCalendarPage() {
   const holidaysCacheRef = useRef<Record<number, PublicHoliday[]>>({});
   const [session, setSession] = useState<Session | null>(null);
   const [isLoadingData, setIsLoadingData] = useState(true);
+  const [reviewStatuses, setReviewStatuses] = useState<
+    Record<number, { status: string; reviewId: number; feedback: string | null }>
+  >({});
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [reviewTarget, setReviewTarget] = useState<{ postId: number; reviewId: number; postCaption: string } | null>(null);
+  const [reviewFeedback, setReviewFeedback] = useState("");
+  const [reviewSaving, setReviewSaving] = useState(false);
 
   useEffect(() => {
     async function init() {
       setIsLoadingData(true);
       try {
-        const [sess, postRes, memberRes] = await Promise.all([
+        const [sess, postRes, memberRes, revStatuses] = await Promise.all([
           getCurrentSession(),
           getContentPosts(),
           getMembers(),
+          getPostReviewStatuses(),
         ]);
         setSession(sess);
         if (postRes.success && postRes.posts) {
@@ -221,6 +235,7 @@ export default function ContentCalendarPage() {
             .sort((a, b) => a.name.localeCompare(b.name));
           setMembers(nextMembers);
         }
+        setReviewStatuses(revStatuses);
       } finally {
         setIsLoadingData(false);
       }
@@ -232,6 +247,11 @@ export default function ContentCalendarPage() {
     session.role === "ADMIN" || 
     session.role === "HEAD" || 
     session.department === "PR & Social"
+  );
+
+  const isHeadOrAdmin = session && (
+    session.role === "ADMIN" ||
+    session.role === "HEAD"
   );
 
   useEffect(() => {
@@ -262,10 +282,14 @@ export default function ContentCalendarPage() {
     }
 
     try {
-      const res = await getContentPosts();
+      const [res, revStatuses] = await Promise.all([
+        getContentPosts(),
+        getPostReviewStatuses(),
+      ]);
       if (res.success && res.posts) {
         setPosts(sortPosts(res.posts.map(rowToPost)));
       }
+      setReviewStatuses(revStatuses);
     } finally {
       if (showLoading) {
         setIsLoadingData(false);
@@ -1029,6 +1053,70 @@ export default function ContentCalendarPage() {
             onChange={(ownerUserIds) => setEditing({ ...editing, ownerUserIds })}
             disabled={!canEdit}
           />
+
+          {/* Review status section */}
+          {editing.id && (() => {
+            const rs = reviewStatuses[editing.id];
+            return (
+              <div className="space-y-2">
+                {rs?.status === "approved" && (
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700 flex items-center gap-2">
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span className="font-semibold">Approved for publishing</span>
+                    {rs.feedback && <span className="text-emerald-600">— {rs.feedback}</span>}
+                  </div>
+                )}
+                {rs?.status === "pending" && (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 flex items-center gap-2">
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span className="font-semibold">Pending approval from HEAD/Admin</span>
+                  </div>
+                )}
+                {/* Submit for Approval button */}
+                {(!rs || rs.status === "rejected") && canEdit && (
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      void (async () => {
+                        const result = await submitForReview("content_post", editing.id);
+                        if (result.success) void refreshPosts();
+                      })();
+                    }}
+                    className="w-full px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+                  >
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Submit for Approval
+                  </button>
+                )}
+                {/* Review button for HEAD/ADMIN */}
+                {rs?.status === "pending" && isHeadOrAdmin && (
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setModalOpen(false);
+                      setReviewTarget({ postId: editing.id, reviewId: rs.reviewId, postCaption: editing.caption });
+                      setReviewFeedback("");
+                      setReviewModalOpen(true);
+                    }}
+                    className="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+                  >
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.743 7.523 5 12 5c4.478 0 8.268 2.743 9.542 7-1.274 4.257-5.064 7-9.542 7-4.477 0-8.268-2.743-9.542-7z" />
+                    </svg>
+                    Review This Post
+                  </button>
+                )}
+              </div>
+            );
+          })()}
+
           {canEdit && (
             <div className="flex items-center gap-3 pt-2">
               <button onClick={savePost} disabled={!editing.caption.trim() || !editing.date} className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 text-white text-sm font-medium rounded-lg transition-colors">{editing.id ? "Save Changes" : "Plan Post"}</button>
@@ -1038,6 +1126,80 @@ export default function ContentCalendarPage() {
             </div>
           )}
         </div>
+      </Modal>
+
+      {/* Review Modal for HEAD/ADMIN */}
+      <Modal
+        open={reviewModalOpen}
+        onClose={() => { setReviewModalOpen(false); setReviewTarget(null); setReviewFeedback(""); }}
+        title="Review Post"
+      >
+        {reviewTarget && (
+          <div className="space-y-4">
+            <div className="rounded-xl border border-purple-100 bg-purple-50/50 p-4">
+              <p className="text-sm text-slate-500">Post Content</p>
+              <p className="text-sm font-bold text-slate-900 line-clamp-3">{reviewTarget.postCaption}</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Feedback <span className="text-slate-400">(required for rejection)</span>
+              </label>
+              <textarea
+                value={reviewFeedback}
+                onChange={(e) => setReviewFeedback(e.target.value)}
+                rows={3}
+                className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 resize-none"
+                placeholder="Add feedback or comments..."
+              />
+            </div>
+
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                onClick={async () => {
+                  if (!reviewTarget) return;
+                  setReviewSaving(true);
+                  const result = await approveReview(reviewTarget.reviewId, reviewFeedback || undefined);
+                  setReviewSaving(false);
+                  if (result.success) {
+                    setReviewModalOpen(false);
+                    setReviewTarget(null);
+                    setReviewFeedback("");
+                    void refreshPosts();
+                  }
+                }}
+                disabled={reviewSaving}
+                className="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                {reviewSaving ? "Approving..." : "Approve"}
+              </button>
+              <button
+                onClick={async () => {
+                  if (!reviewTarget || !reviewFeedback.trim()) return;
+                  setReviewSaving(true);
+                  const result = await rejectReview(reviewTarget.reviewId, reviewFeedback);
+                  setReviewSaving(false);
+                  if (result.success) {
+                    setReviewModalOpen(false);
+                    setReviewTarget(null);
+                    setReviewFeedback("");
+                    void refreshPosts();
+                  }
+                }}
+                disabled={reviewSaving || !reviewFeedback.trim()}
+                className="flex-1 px-4 py-2 bg-rose-50 hover:bg-rose-100 disabled:bg-slate-100 text-rose-600 disabled:text-slate-400 text-sm font-medium rounded-lg border border-rose-200 disabled:border-slate-200 transition-colors flex items-center justify-center gap-2"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                {reviewSaving ? "Rejecting..." : "Reject"}
+              </button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );

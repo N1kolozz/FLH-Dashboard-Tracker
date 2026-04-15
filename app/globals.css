@@ -119,3 +119,88 @@ body {
     transform: scale(1) translateY(0);
   }
 }
+
+/* ─── Presentation Animations ─── */
+
+@keyframes presSlideEnterNext {
+  from {
+    opacity: 0;
+    transform: translateX(60px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes presSlideEnterPrev {
+  from {
+    opacity: 0;
+    transform: translateX(-60px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes presFadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes presScale {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.pres-slide-enter-next {
+  animation: presSlideEnterNext 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.pres-slide-enter-prev {
+  animation: presSlideEnterPrev 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.pres-anim-fade-up {
+  animation: presFadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.pres-anim-scale {
+  animation: presScale 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.pres-anim-stagger > * {
+  animation: presFadeUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.pres-anim-stagger > *:nth-child(1) { animation-delay: 0.05s; }
+.pres-anim-stagger > *:nth-child(2) { animation-delay: 0.1s; }
+.pres-anim-stagger > *:nth-child(3) { animation-delay: 0.15s; }
+.pres-anim-stagger > *:nth-child(4) { animation-delay: 0.2s; }
+.pres-anim-stagger > *:nth-child(5) { animation-delay: 0.25s; }
+.pres-anim-stagger > *:nth-child(6) { animation-delay: 0.3s; }
+.pres-anim-stagger > *:nth-child(7) { animation-delay: 0.35s; }
+.pres-anim-stagger > *:nth-child(8) { animation-delay: 0.4s; }
+.pres-anim-stagger > *:nth-child(9) { animation-delay: 0.45s; }
+.pres-anim-stagger > *:nth-child(10) { animation-delay: 0.5s; }
+
+.pres-stat-card {
+  animation: presScale 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.pres-fullscreen {
+  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+}

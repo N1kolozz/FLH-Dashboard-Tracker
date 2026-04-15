@@ -3,7 +3,7 @@
 import { pool } from "@/lib/db";
 import { getSession, type Session } from "@/lib/auth";
 
-export type DashboardNewsType = "announcement" | "event" | "project";
+export type DashboardNewsType = "announcement" | "event" | "project" | "review";
 
 export interface DashboardNewsItem {
   id: string;
@@ -15,6 +15,7 @@ export interface DashboardNewsItem {
   href: string | null;
   created_at: string;
   author_name: string | null;
+  review_status?: string;
 }
 
 type AnnouncementRow = {
@@ -74,6 +75,7 @@ function canPublishNews(session: Session | null) {
   const role = session.role.toUpperCase();
   const department = session.department.toLowerCase();
   return (
+    role === "ADMIN" ||
     role === "HEAD" ||
     role === "MANAGEMENT" ||
     department === "management"
@@ -93,7 +95,7 @@ export async function getDashboardNews() {
            np.id,
            np.title,
            np.body,
-           np.created_at,
+           (np.created_at AT TIME ZONE 'UTC')::text || 'Z' AS created_at,
            u.full_name AS author_name
          FROM news_posts np
          LEFT JOIN users u ON u.id = np.created_by_user_id
@@ -105,7 +107,7 @@ export async function getDashboardNews() {
            e.id,
            e.title,
            e.description AS body,
-           e.created_at,
+           (e.created_at AT TIME ZONE 'UTC')::text || 'Z' AS created_at,
            e.date::text AS event_date,
            e.department
          FROM events e
@@ -117,7 +119,7 @@ export async function getDashboardNews() {
            p.id,
            p.name AS title,
            p.description AS body,
-           p.created_at,
+           (p.created_at AT TIME ZONE 'UTC')::text || 'Z' AS created_at,
            p.status,
            p.deadline::text AS deadline
          FROM projects p
@@ -179,7 +181,65 @@ export async function getDashboardNews() {
       )
       .slice(0, 30);
 
-    return { success: true, news };
+    // Fetch pending reviews for HEAD/ADMIN (these go to the top)
+    let reviewItems: DashboardNewsItem[] = [];
+    try {
+      const reviewRes = await pool.query(
+        `SELECT rr.id, rr.entity_type, rr.entity_id, rr.status,
+                (rr.created_at AT TIME ZONE 'UTC')::text || 'Z' AS created_at,
+                u.full_name as submitted_by_name,
+                CASE 
+                  WHEN rr.entity_type = 'project' THEN p.name
+                  WHEN rr.entity_type = 'content_post' THEN cp.caption
+                END as entity_name
+         FROM review_requests rr
+         LEFT JOIN users u ON u.id = rr.submitted_by
+         LEFT JOIN projects p ON rr.entity_type = 'project' AND p.id = rr.entity_id
+         LEFT JOIN content_posts cp ON rr.entity_type = 'content_post' AND cp.id = rr.entity_id
+         WHERE (
+           -- Only keep if the referenced entity still exists
+           ((rr.entity_type = 'project' AND p.id IS NOT NULL) OR
+            (rr.entity_type = 'content_post' AND cp.id IS NOT NULL))
+         ) AND (
+           -- Only show pending, or ones reviewed recently (last 48 hours)
+           rr.status = 'pending' OR 
+           (rr.reviewed_at IS NOT NULL AND rr.reviewed_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') - INTERVAL '48 hours')
+         )
+         ORDER BY rr.reviewed_at DESC NULLS LAST, rr.created_at DESC
+         LIMIT 10`
+      );
+
+      reviewItems = reviewRes.rows.map(
+        (row: {
+          id: number;
+          entity_type: string;
+          entity_id: number;
+          status: string;
+          created_at: Date | string;
+          submitted_by_name: string | null;
+          entity_name: string | null;
+        }): DashboardNewsItem => ({
+          id: `review-${row.id}`,
+          source_id: row.id,
+          type: "review",
+          title: `${row.entity_type === "project" ? "Project" : "Post"} review`,
+          body: row.entity_name || "Untitled",
+          meta: row.submitted_by_name
+            ? `Submitted by ${row.submitted_by_name}`
+            : "Submitted for review",
+          href: row.entity_type === "project"
+            ? `/projects?reviewId=${row.id}&projectId=${row.entity_id}`
+            : null,
+          created_at: serializeTimestamp(row.created_at),
+          author_name: row.submitted_by_name,
+          review_status: row.status,
+        })
+      );
+    } catch {
+      // Don't fail the whole query if reviews table doesn't exist
+    }
+
+    return { success: true, news, reviewItems };
   } catch (error) {
     console.error("Error fetching dashboard news:", error);
     return { error: "Failed to fetch news" };

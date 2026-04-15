@@ -15,6 +15,7 @@ interface NavLink {
   icon: React.ReactNode;
   requiresAttendanceManager?: boolean;
   requiresWorkloadAccess?: boolean;
+  requiresHeadRole?: boolean;
 }
 
 interface NavSection {
@@ -88,6 +89,11 @@ const ICON = {
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
     </svg>
   ),
+  summary: (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
+    </svg>
+  ),
 };
 
 const NAV_SECTIONS: NavSection[] = [
@@ -134,6 +140,12 @@ const NAV_SECTIONS: NavSection[] = [
         icon: ICON.workload,
         requiresWorkloadAccess: true,
       },
+      {
+        label: "Summary",
+        href: "/summary",
+        icon: ICON.summary,
+        requiresHeadRole: true,
+      },
     ],
   },
 ];
@@ -170,8 +182,9 @@ export default function Sidebar() {
         session.department === "Management")
   );
   const canViewWorkload = Boolean(
-    session && (session.role === "HEAD" || session.department === "Management")
+    session && (session.role === "ADMIN" || session.role === "HEAD" || session.department === "Management")
   );
+  const isHead = Boolean(session && (session.role === "ADMIN" || session.role === "HEAD"));
 
   const handleLogout = async () => {
     await logout();
@@ -215,7 +228,8 @@ export default function Sidebar() {
                 .filter(
                   (link) =>
                     (!link.requiresAttendanceManager || canManageAttendance) &&
-                    (!link.requiresWorkloadAccess || canViewWorkload)
+                    (!link.requiresWorkloadAccess || canViewWorkload) &&
+                    (!link.requiresHeadRole || isHead)
                 )
                 .map((link) => {
                 const active = isActive(link.href);

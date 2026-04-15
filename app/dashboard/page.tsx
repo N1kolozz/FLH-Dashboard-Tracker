@@ -83,6 +83,15 @@ const NEWS_CONFIG: Record<
       </svg>
     ),
   },
+  review: {
+    label: "Needs Review",
+    badge: "bg-amber-100 text-amber-700 border-amber-200",
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+  },
 };
 
 function canPublishNews(session: Session | null) {
@@ -107,9 +116,26 @@ function formatNewsDate(value: string) {
 }
 
 function NewsItem({ item }: { item: DashboardNewsItem }) {
-  const config = NEWS_CONFIG[item.type];
-  const className =
-    "block h-full rounded-lg border border-purple-100 bg-white/95 p-4 shadow-sm transition hover:border-purple-300 hover:bg-purple-50/60";
+  const config = { ...NEWS_CONFIG[item.type] };
+  let className = "block h-full rounded-lg border bg-white/95 p-4 shadow-sm transition hover:bg-purple-50/60 ";
+  
+  if (item.type === "review") {
+    if (item.review_status === "approved") {
+      config.label = "Review Approved";
+      config.badge = "bg-emerald-100 text-emerald-700 border-emerald-200";
+      className += "border-emerald-200 hover:border-emerald-300";
+    } else if (item.review_status === "rejected") {
+      config.label = "Review Rejected";
+      config.badge = "bg-rose-100 text-rose-700 border-rose-200";
+      className += "border-rose-200 hover:border-rose-300";
+    } else {
+      className += "border-amber-200 hover:border-amber-300";
+      config.label = "Needs Review";
+    }
+  } else {
+    className += "border-purple-100 hover:border-purple-300";
+  }
+
   const content = (
     <>
       <div className="flex items-start justify-between gap-3">
@@ -131,7 +157,7 @@ function NewsItem({ item }: { item: DashboardNewsItem }) {
         <p className="min-w-0 truncate text-xs font-medium text-purple-700">
           {item.meta || "FLH update"}
         </p>
-        {item.href && (
+        {(item.href && item.review_status === "pending") && (
           <span className="inline-flex items-center gap-1 text-xs font-semibold text-purple-600">
             Open
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -143,7 +169,7 @@ function NewsItem({ item }: { item: DashboardNewsItem }) {
     </>
   );
 
-  if (item.href) {
+  if (item.href && item.review_status === "pending") {
     return (
       <Link href={item.href} className={className}>
         {content}
@@ -164,6 +190,7 @@ export default function DashboardPage() {
   const [teamCount, setTeamCount] = useState(0);
   const [session, setSession] = useState<Session | null>(null);
   const [newsItems, setNewsItems] = useState<DashboardNewsItem[]>([]);
+  const [reviewItems, setReviewItems] = useState<DashboardNewsItem[]>([]);
   const [newsLoading, setNewsLoading] = useState(true);
   const [newsError, setNewsError] = useState("");
   const [newsModalOpen, setNewsModalOpen] = useState(false);
@@ -202,6 +229,7 @@ export default function DashboardPage() {
     const result = await getDashboardNews();
     if ("news" in result) {
       setNewsItems(result.news ?? []);
+      setReviewItems((result as { reviewItems?: DashboardNewsItem[] }).reviewItems ?? []);
       setNewsError("");
     } else if ("error" in result) {
       setNewsError(result.error ?? "Failed to fetch news");
@@ -370,6 +398,22 @@ export default function DashboardPage() {
           )}
 
           <div className="mt-4 max-h-[clamp(380px,24vh,320px)] min-h-0 overflow-y-auto pr-1 overscroll-contain">
+            {/* Pending review alerts for HEAD/ADMIN */}
+            {reviewItems.length > 0 && userCanPublishNews && (
+              <div className="mb-4 space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-amber-600 flex items-center gap-1.5">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                  </svg>
+                  Review Activity ({reviewItems.filter(i => i.review_status === 'pending').length} pending)
+                </p>
+                <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                  {reviewItems.map((item) => (
+                    <NewsItem key={item.id} item={item} />
+                  ))}
+                </div>
+              </div>
+            )}
             {newsLoading ? (
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 {[0, 1, 2, 3].map((item) => (
