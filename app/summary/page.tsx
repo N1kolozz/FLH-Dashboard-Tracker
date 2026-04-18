@@ -127,7 +127,7 @@ export default function MonthlySummaryPage() {
             </svg>
           </div>
           <h2 className="text-lg font-bold text-slate-800 mb-2">Access Restricted</h2>
-          <p className="text-sm text-slate-500">Only the HEAD role can access the Monthly Summary feature.</p>
+          <p className="text-sm text-slate-500">Only the HEAD and ADMIN roles can access the Monthly Summary feature.</p>
         </div>
       </div>
     );

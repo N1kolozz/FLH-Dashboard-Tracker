@@ -89,8 +89,8 @@ export async function getMonthlySummary(
 ): Promise<{ success: true; data: MonthlySummaryData } | { error: string }> {
   try {
     const session = await getSession();
-    if (!session || session.role !== "HEAD") {
-      return { error: "Not authorized — HEAD role only" };
+    if (!session || (session.role !== "HEAD" && session.role !== "ADMIN")) {
+      return { error: "Not authorized — HEAD or ADMIN role only" };
     }
 
     const { start, end } = monthStartEnd(month);
