@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import type {
   MonthlySummaryData,
   DepartmentSummary,
-} from "@/app/actions/monthly-summary";
+} from "@/types";
 
 /* ─── Department Colors ─── */
 const DEPT_COLORS: Record<string, { gradient: string; accent: string; badge: string; dot: string; light: string }> = {

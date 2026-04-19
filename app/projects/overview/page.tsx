@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { getProjects } from "@/app/actions/projects";
-import type { ProjectRow } from "@/app/actions/projects";
+import type { ProjectRow } from "@/types";
 import { getImpactRecords } from "@/app/actions/impact";
 import type { ImpactRecordRow } from "@/app/actions/impact";
 import { getMembers } from "@/app/actions/members";

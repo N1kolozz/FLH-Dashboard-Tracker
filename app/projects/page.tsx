@@ -15,7 +15,7 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { getProjects, createProject, updateProject, deleteProject } from "@/app/actions/projects";
-import type { ProjectRow } from "@/app/actions/projects";
+import type { ProjectRow } from "@/types";
 import { getMembers } from "@/app/actions/members";
 import MemberAvatarStack from "@/components/MemberAvatarStack";
 import MemberMultiSelect, { type MemberChoice } from "@/components/MemberMultiSelect";

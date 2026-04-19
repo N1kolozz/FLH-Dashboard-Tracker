@@ -2,88 +2,16 @@
 
 import { pool } from "@/lib/db";
 import { getSession, type Session } from "@/lib/auth";
-
-export type AttendanceStatus = "pending" | "present" | "absent" | "excused";
-
-export interface AttendanceSessionRow {
-  id: number;
-  event_id: number | null;
-  event_title: string | null;
-  event_date: string | null;
-  title: string;
-  meeting_date: string;
-  instructions: string;
-  is_active: boolean;
-  created_by_user_id: number | null;
-  created_at: string;
-  updated_at: string;
-  total_members: number;
-  pending_count: number;
-  present_count: number;
-  absent_count: number;
-  excused_count: number;
-}
-
-export interface AttendanceRecordRow {
-  id: number;
-  session_id: number;
-  user_id: number;
-  member_name: string;
-  member_email: string;
-  department: string;
-  position: string;
-  role: string;
-  status: AttendanceStatus;
-  note: string;
-  reason: string;
-  responded_at: string | null;
-  updated_at: string;
-}
-
-export interface AttendancePromptRow {
-  session_id: number;
-  title: string;
-  meeting_date: string;
-  instructions: string;
-  event_title: string | null;
-  event_date: string | null;
-  event_time: string | null;
-  event_end_time: string | null;
-  event_location: string | null;
-}
-
-export interface MemberAttendanceStat {
-  user_id: number;
-  member_name: string;
-  department: string;
-  recorded_count: number;
-  present_count: number;
-  absent_count: number;
-  excused_count: number;
-  attendance_rate: number | null;
-}
-
-export interface DepartmentAttendanceStat {
-  department: string;
-  recorded_count: number;
-  present_count: number;
-  absent_count: number;
-  excused_count: number;
-  attendance_rate: number | null;
-}
-
-export interface AttendanceStats {
-  session_count: number;
-  active_session_count: number;
-  recorded_count: number;
-  present_count: number;
-  absent_count: number;
-  excused_count: number;
-  pending_count: number;
-  average_attendance_rate: number | null;
-  member_stats: MemberAttendanceStat[];
-  department_stats: DepartmentAttendanceStat[];
-}
+import { assertCanManageAttendance } from "@/lib/permissions";
+import {
+  AttendanceStatus,
+  AttendanceSessionRow,
+  AttendanceRecordRow,
+  AttendancePromptRow,
+  MemberAttendanceStat,
+  DepartmentAttendanceStat,
+  AttendanceStats,
+} from "@/types";
 
 const ATTENDANCE_STATUSES: AttendanceStatus[] = [
   "pending",
@@ -121,18 +49,7 @@ const ATTENDANCE_AUDIENCE_CONDITION = `
   )
 `;
 
-async function assertCanManageAttendance() {
-  const session = await getSession();
-  if (
-    !session ||
-    (session.role !== "ADMIN" &&
-      session.role !== "HEAD" &&
-      session.department !== "Management")
-  ) {
-    throw new Error("Not authorized");
-  }
-  return session;
-}
+
 
 function normalizeStatus(status: string): AttendanceStatus {
   if (ATTENDANCE_STATUSES.includes(status as AttendanceStatus)) {
@@ -192,7 +109,8 @@ async function getEventDefaults(eventId: number | null) {
 
 export async function getAttendanceSessions() {
   try {
-    await assertCanManageAttendance();
+    const session = await getSession();
+    assertCanManageAttendance(session);
     await syncAttendanceRecords();
 
     const res = await pool.query(
@@ -229,7 +147,8 @@ export async function getAttendanceSessions() {
 
 export async function getAttendanceSessionDetails(id: number) {
   try {
-    await assertCanManageAttendance();
+    const session = await getSession();
+    assertCanManageAttendance(session);
     await syncAttendanceRecords(id);
 
     const sessionRes = await pool.query(
@@ -303,7 +222,8 @@ export async function createAttendanceSession(data: {
   isActive: boolean;
 }) {
   try {
-    const session = await assertCanManageAttendance();
+    const tempSession = await getSession();
+    const session = assertCanManageAttendance(tempSession);
     const eventId =
       typeof data.eventId === "number" && Number.isInteger(data.eventId)
         ? data.eventId
@@ -370,7 +290,8 @@ export async function updateAttendanceSession(
   }
 ) {
   try {
-    await assertCanManageAttendance();
+    const session = await getSession();
+    assertCanManageAttendance(session);
     const eventId =
       typeof data.eventId === "number" && Number.isInteger(data.eventId)
         ? data.eventId
@@ -412,7 +333,8 @@ export async function updateAttendanceSession(
 
 export async function deleteAttendanceSession(id: number) {
   try {
-    await assertCanManageAttendance();
+    const session = await getSession();
+    assertCanManageAttendance(session);
     await pool.query("DELETE FROM attendance_sessions WHERE id = $1", [id]);
     return { success: true };
   } catch (error) {
@@ -423,7 +345,8 @@ export async function deleteAttendanceSession(id: number) {
 
 export async function setAttendanceSessionActive(id: number, isActive: boolean) {
   try {
-    await assertCanManageAttendance();
+    const session = await getSession();
+    assertCanManageAttendance(session);
     await syncAttendanceRecords(id);
     await pool.query(
       `UPDATE attendance_sessions
@@ -449,7 +372,8 @@ export async function updateAttendanceRecord(
   }
 ) {
   try {
-    const session = await assertCanManageAttendance();
+    const tempSession = await getSession();
+    const session = assertCanManageAttendance(tempSession);
     const updatedBy = getSessionUserId(session);
     const status = normalizeStatus(data.status);
 
@@ -655,7 +579,8 @@ export async function submitMyAttendance(
 
 export async function getAttendanceStats() {
   try {
-    await assertCanManageAttendance();
+    const session = await getSession();
+    assertCanManageAttendance(session);
     await syncAttendanceRecords();
 
     const [summaryRes, memberRes, departmentRes] = await Promise.all([

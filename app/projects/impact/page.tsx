@@ -3,7 +3,7 @@
 import { Suspense, useState, useEffect, useMemo } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { getProjects } from "@/app/actions/projects";
-import type { ProjectRow } from "@/app/actions/projects";
+import type { ProjectRow } from "@/types";
 import { getImpactRecords, createImpactRecord, updateImpactRecord, deleteImpactRecord } from "@/app/actions/impact";
 import type { ImpactRecordRow } from "@/app/actions/impact";
 import Modal from "@/components/Modal";

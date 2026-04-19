@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { getCurrentSession } from "@/app/actions/session";
 import { getMonthlySummary } from "@/app/actions/monthly-summary";
-import type { MonthlySummaryData } from "@/app/actions/monthly-summary";
+import type { MonthlySummaryData } from "@/types";
 import MonthlySummaryPresentation from "./MonthlySummaryPresentation";
 
 /* ─── Month helpers ─── */

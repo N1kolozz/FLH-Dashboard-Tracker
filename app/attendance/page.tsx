@@ -14,11 +14,13 @@ import {
   setAttendanceSessionActive,
   updateAttendanceRecord,
   updateAttendanceSession,
+} from "@/app/actions/attendance";
+import {
   type AttendanceRecordRow,
   type AttendanceSessionRow,
   type AttendanceStats,
   type AttendanceStatus,
-} from "@/app/actions/attendance";
+} from "@/types";
 import type { Session } from "@/lib/auth";
 import { avatarColor, getInitials } from "@/lib/member-avatar";
 

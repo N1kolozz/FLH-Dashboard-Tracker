@@ -2,70 +2,12 @@
 
 import { pool } from "@/lib/db";
 import { getSession } from "@/lib/auth";
-
-/* ─── Types ─── */
-
-export interface MemberContribution {
-  id: number;
-  name: string;
-  department: string;
-  position: string;
-  role: string;
-  projectCount: number;
-  eventCount: number;
-  attendanceRate: number | null;
-  projects: { id: number; name: string; status: string; priority: string }[];
-  events: { id: number; title: string; date: string }[];
-}
-
-export interface DepartmentSummary {
-  department: string;
-  memberCount: number;
-  activeProjects: number;
-  completedProjects: number;
-  totalEvents: number;
-  totalExpenses: number;
-  attendanceRate: number | null;
-  members: MemberContribution[];
-  projects: {
-    id: number;
-    name: string;
-    status: string;
-    priority: string;
-    description: string;
-    ownerNames: string[];
-  }[];
-  events: {
-    id: number;
-    title: string;
-    date: string;
-    location: string;
-    description: string;
-    ownerNames: string[];
-  }[];
-  impactRecords: {
-    id: number;
-    projectName: string;
-    activityType: string;
-    peopleReached: number;
-    date: string;
-    resultSummary: string;
-  }[];
-}
-
-export interface MonthlySummaryData {
-  month: string; // YYYY-MM
-  monthLabel: string;
-  totalMembers: number;
-  totalProjects: number;
-  activeProjects: number;
-  completedProjects: number;
-  totalEvents: number;
-  totalExpenses: number;
-  totalPeopleReached: number;
-  overallAttendanceRate: number | null;
-  departments: DepartmentSummary[];
-}
+import { assertHeadOrAdmin } from "@/lib/permissions";
+import {
+  MemberContribution,
+  DepartmentSummary,
+  MonthlySummaryData,
+} from "@/types";
 
 /* ─── Helpers ─── */
 
@@ -88,10 +30,8 @@ export async function getMonthlySummary(
   month: string
 ): Promise<{ success: true; data: MonthlySummaryData } | { error: string }> {
   try {
-    const session = await getSession();
-    if (!session || (session.role !== "HEAD" && session.role !== "ADMIN")) {
-      return { error: "Not authorized — HEAD or ADMIN role only" };
-    }
+    const tempSession = await getSession();
+    assertHeadOrAdmin(tempSession);
 
     const { start, end } = monthStartEnd(month);
 

@@ -5,8 +5,8 @@ import { usePathname } from "next/navigation";
 import {
   getPendingAttendancePrompt,
   submitMyAttendance,
-  type AttendancePromptRow,
 } from "@/app/actions/attendance";
+import type { AttendancePromptRow } from "@/types";
 
 type ResponseStatus = "present" | "absent" | "excused";
 
