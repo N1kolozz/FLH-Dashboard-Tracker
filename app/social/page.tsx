@@ -329,7 +329,7 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-slate-50">
       {/* Page Header */}
       <header className="z-10 border-b border-purple-200 bg-gradient-to-r from-violet-100 via-purple-100 to-fuchsia-100">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-3">
+        <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <div className="min-w-0">
             <h1 className="text-base sm:text-lg font-bold text-slate-900 leading-none truncate flex items-center gap-2">
               Social Media Analytics
@@ -341,12 +341,12 @@ export default function DashboardPage() {
               Instagram · TikTok · Facebook
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex w-full items-center gap-3 sm:w-auto">
             <button
               onClick={exportCsv}
               title="Export CSV"
               aria-label="Export CSV"
-              className="flex items-center justify-center sm:justify-start gap-1.5 px-2.5 sm:px-3 py-1.5 bg-white/90 border border-purple-200 hover:bg-white text-purple-700 text-sm font-medium rounded-lg transition-colors"
+              className="flex h-10 w-full items-center justify-center gap-1.5 rounded-lg border border-purple-200 bg-white/90 px-4 py-2 text-sm font-medium text-purple-700 transition-colors hover:bg-white sm:w-auto sm:justify-start"
             >
               <svg
                 className="w-3.5 h-3.5"

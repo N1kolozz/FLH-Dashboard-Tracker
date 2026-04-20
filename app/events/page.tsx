@@ -485,15 +485,15 @@ export default function EventsPage() {
               {isLoadingData ? "Loading events..." : `${events.length} event${events.length !== 1 ? "s" : ""} · ${upcomingEvents.length} upcoming`}
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="flex bg-slate-100 rounded-lg p-0.5 gap-0.5">
-              <button onClick={() => setView("calendar")} className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${view === "calendar" ? "bg-white shadow-sm text-slate-800" : "text-slate-500"}`}>Calendar</button>
-              <button onClick={() => { setView("list"); setSelectedDate(null); }} className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${view === "list" ? "bg-white shadow-sm text-slate-800" : "text-slate-500"}`}>List</button>
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
+            <div className="flex h-10 rounded-lg bg-slate-100 p-0.5">
+              <button onClick={() => setView("calendar")} className={`flex-1 rounded-md px-3 text-xs font-medium transition-colors sm:flex-none ${view === "calendar" ? "bg-white shadow-sm text-slate-800" : "text-slate-500"}`}>Calendar</button>
+              <button onClick={() => { setView("list"); setSelectedDate(null); }} className={`flex-1 rounded-md px-3 text-xs font-medium transition-colors sm:flex-none ${view === "list" ? "bg-white shadow-sm text-slate-800" : "text-slate-500"}`}>List</button>
             </div>
             {canEdit && (
               <button
                 onClick={() => openNew()}
-                className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+                className="h-10 w-full rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-amber-700 sm:w-auto"
               >
                 + New Event
               </button>
@@ -1097,7 +1097,7 @@ export default function EventsPage() {
             <label className="block text-sm font-medium text-slate-700 mb-1">Event Title *</label>
             <input disabled={!canEdit} type="text" value={editing.title} onChange={(e) => setEditing({ ...editing, title: e.target.value })} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 disabled:bg-slate-50" placeholder="e.g., Summer Program Kickoff" />
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Date *</label>
               <input disabled={!canEdit} type="date" value={editing.date} onChange={(e) => setEditing({ ...editing, date: e.target.value })} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 disabled:bg-slate-50" />
@@ -1111,7 +1111,7 @@ export default function EventsPage() {
               <input disabled={!canEdit} type="time" value={editing.endTime} onChange={(e) => setEditing({ ...editing, endTime: e.target.value })} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 disabled:bg-slate-50" />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Department</label>
               <select disabled={!canEdit} value={editing.department} onChange={(e) => setEditing({ ...editing, department: e.target.value as Department })} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 disabled:bg-slate-50">

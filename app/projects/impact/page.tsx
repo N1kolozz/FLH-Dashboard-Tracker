@@ -478,7 +478,7 @@ function ImpactPageContent() {
                 disabled={!canAddOutcome}
                 title={!canAddOutcome ? "Create a project on the board first" : undefined}
                 onClick={() => { setEditing({ ...EMPTY, date: new Date().toISOString().slice(0, 10) }); setModalOpen(true); }}
-                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:hover:bg-slate-300 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+                className="h-10 w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700 disabled:bg-slate-300 disabled:hover:bg-slate-300 sm:w-auto"
               >+ Add Outcome</button>
             )}
           </div>
@@ -509,7 +509,7 @@ function ImpactPageContent() {
                 value={filterProjectId}
                 onChange={(event) => setFilterProjectId(event.target.value)}
                 title="Filter by project"
-                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-purple-300"
+                className="h-10 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-purple-300"
               >
                 <option value="all">All projects</option>
                 {projects.map((project) => (
@@ -523,7 +523,7 @@ function ImpactPageContent() {
                 value={filterActivity}
                 onChange={(event) => setFilterActivity(event.target.value as ActivityType | "all")}
                 title="Filter by activity type"
-                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-purple-300"
+                className="h-10 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-purple-300"
               >
                 <option value="all">All activity types</option>
                 {(Object.keys(ACTIVITY_CONFIG) as ActivityType[]).map((activity) => (
@@ -538,7 +538,7 @@ function ImpactPageContent() {
                 value={startDate}
                 onChange={(event) => setStartDate(event.target.value)}
                 title="Start date"
-                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-purple-300"
+                className="h-10 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-purple-300"
               />
 
               <input
@@ -546,14 +546,14 @@ function ImpactPageContent() {
                 value={endDate}
                 onChange={(event) => setEndDate(event.target.value)}
                 title="End date"
-                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-purple-300"
+                className="h-10 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-purple-300"
               />
 
               <button
                 type="button"
                 onClick={clearFilters}
                 disabled={!hasActiveFilters}
-                className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
+                className="h-10 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
               >
                 Clear Filters
               </button>
@@ -743,7 +743,7 @@ function ImpactPageContent() {
               </p>
             ) : null}
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">People Reached *</label>
               <input disabled={!canEdit} type="number" min={1} value={editing.peopleReached || ""} onChange={(e) => setEditing({ ...editing, peopleReached: parseInt(e.target.value) || 0 })} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 disabled:bg-slate-50" placeholder="50" />

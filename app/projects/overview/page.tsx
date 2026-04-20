@@ -646,16 +646,16 @@ export default function ProjectsOverviewPage() {
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
               <Link
                 href="/projects"
-                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                className="flex h-10 w-full items-center justify-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 sm:w-auto"
               >
                 Open Board
               </Link>
               <Link
                 href="/projects/impact"
-                className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700"
+                className="flex h-10 w-full items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700 sm:w-auto"
               >
                 View Outcomes
               </Link>
@@ -875,13 +875,13 @@ export default function ProjectsOverviewPage() {
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   placeholder="Search projects, owners, or teams..."
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-300 sm:w-64"
+                  className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-300 sm:w-64"
                 />
                 <select
                   value={statusFilter}
                   onChange={(event) => setStatusFilter(event.target.value as Status | "all")}
                   title="Filter by status"
-                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-purple-300"
+                  className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-purple-300 sm:w-40"
                 >
                   <option value="all">All statuses</option>
                   {(Object.keys(STATUS_CONFIG) as Status[]).map((status) => (
@@ -894,7 +894,7 @@ export default function ProjectsOverviewPage() {
                   value={priorityFilter}
                   onChange={(event) => setPriorityFilter(event.target.value as Priority | "all")}
                   title="Filter by priority"
-                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-purple-300"
+                  className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-purple-300 sm:w-40"
                 >
                   <option value="all">All priorities</option>
                   {(Object.keys(PRIORITY_CONFIG) as Priority[]).map((priority) => (

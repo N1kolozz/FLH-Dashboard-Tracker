@@ -390,19 +390,19 @@ export default function InventoryPage() {
               {isLoadingData ? "Loading inventory..." : `${items.length} item${items.length !== 1 ? "s" : ""} tracked`}
             </p>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search items..."
-              className="px-3 text-slate-500 py-1.5 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-300 w-40"
+              className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-300 sm:w-44"
             />
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value as ItemStatus | "all")}
               title="Filter status"
-              className="px-3 text-slate-500 py-1.5 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-300"
+              className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-300 sm:w-40"
             >
               <option value="all">All statuses</option>
               {(Object.keys(STATUS_CONFIG) as ItemStatus[]).map((s) => (
@@ -413,27 +413,27 @@ export default function InventoryPage() {
               value={filterCategory}
               onChange={(e) => setFilterCategory(e.target.value as Category | "all")}
               title="Filter category"
-              className="px-3 text-slate-500 py-1.5 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-300"
+              className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-300 sm:w-44"
             >
               <option value="all">All categories</option>
               {(Object.keys(CATEGORY_LABELS) as Category[]).map((c) => (
                 <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>
               ))}
             </select>
-            <div className="flex bg-slate-100 rounded-lg p-0.5 gap-0.5">
+            <div className="flex h-10 rounded-lg bg-slate-100 p-0.5">
               <button
                 onClick={() => setViewMode("grid")}
-                className={`px-2 py-1 rounded-md text-xs font-medium transition-colors ${viewMode === "grid" ? "bg-white shadow-sm text-slate-800" : "text-slate-500"}`}
+                className={`flex-1 rounded-md px-3 text-xs font-medium transition-colors sm:flex-none ${viewMode === "grid" ? "bg-white shadow-sm text-slate-800" : "text-slate-500"}`}
               >Grid</button>
               <button
                 onClick={() => setViewMode("list")}
-                className={`px-2 py-1 rounded-md text-xs font-medium transition-colors ${viewMode === "list" ? "bg-white shadow-sm text-slate-800" : "text-slate-500"}`}
+                className={`flex-1 rounded-md px-3 text-xs font-medium transition-colors sm:flex-none ${viewMode === "list" ? "bg-white shadow-sm text-slate-800" : "text-slate-500"}`}
               >List</button>
             </div>
             {canEdit && (
               <button
                 onClick={() => { setEditing(EMPTY); setModalOpen(true); }}
-                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+                className="h-10 w-full rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-700 sm:w-auto"
               >
                 + Add Item
               </button>
@@ -607,7 +607,7 @@ export default function InventoryPage() {
               placeholder="e.g., Projector"
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Category</label>
               <select
@@ -633,7 +633,7 @@ export default function InventoryPage() {
               />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
               <select

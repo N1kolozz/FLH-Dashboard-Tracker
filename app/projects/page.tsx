@@ -1060,19 +1060,19 @@ export default function ProjectsPage() {
                   : `${projects.length} project${projects.length !== 1 ? "s" : ""} · Drag cards to change status`}
               </p>
             </div>
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
               <input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search projects..."
-                className="px-3 text-slate-500 py-1.5 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 w-44"
+                className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-300 sm:w-56"
               />
               <select
                 value={filterPriority}
                 onChange={(e) => setFilterPriority(e.target.value as Priority | "all")}
                 title="Filter priority"
-                className="px-3 text-slate-500 py-1.5 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-300"
+                className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-300 sm:w-44"
               >
                 <option value="all">All priorities</option>
                 <option value="high">High</option>
@@ -1082,7 +1082,7 @@ export default function ProjectsPage() {
               {canEdit && (
                 <button
                   onClick={() => openNew()}
-                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+                  className="h-10 w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700 sm:w-auto"
                 >
                   + New Project
                 </button>
@@ -1292,7 +1292,7 @@ export default function ProjectsPage() {
               </select>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Deadline</label>
               <input disabled={!canEdit}
@@ -1390,7 +1390,7 @@ export default function ProjectsPage() {
               <button
                 onClick={saveProject}
                 disabled={!editing.name.trim()}
-                className="flex-1  px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white text-sm font-medium rounded-lg transition-colors"
+                className="flex-1  px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 text-white text-sm font-medium rounded-lg transition-colors"
               >
                 {editing.id ? "Save Changes" : "Create Project"}
               </button>

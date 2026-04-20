@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
 import { getWorkloadData } from "@/app/actions/workload";
 import type { WorkloadMember } from "@/app/actions/workload";
+import TeamSubnav from "@/components/TeamSubnav";
 import { avatarColor, getInitials } from "@/lib/member-avatar";
 
 /* ─── Constants ─── */
@@ -294,18 +294,7 @@ export default function WorkloadPage() {
               <p className="text-xs text-slate-500 mt-0.5">Who owns what — spot imbalances at a glance</p>
             </div>
 
-            {/* Tab nav */}
-            <div className="flex items-center gap-1 bg-white border border-purple-200 rounded-xl p-1 w-fit">
-              <Link
-                href="/team"
-                className="px-3 py-1.5 text-sm font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
-              >
-                Directory
-              </Link>
-              <span className="px-3 py-1.5 text-sm font-semibold text-purple-700 bg-purple-100 rounded-lg">
-                Workload
-              </span>
-            </div>
+            <TeamSubnav active="workload" />
           </div>
 
           {/* Summary stats */}
@@ -334,18 +323,18 @@ export default function WorkloadPage() {
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
         {/* Controls */}
-        <div className="flex flex-wrap items-center gap-2 mb-5">
+        <div className="mb-5 flex flex-col gap-2 lg:flex-row lg:items-center">
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search member..."
-            className="px-3 py-1.5 text-sm border border-slate-200 text-slate-500 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-300 w-44"
+            className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-300 lg:w-48"
           />
           <select
             value={filterDept}
             onChange={(e) => setFilterDept(e.target.value)}
-            className="px-3 py-1.5 text-sm border border-slate-200 text-slate-500 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-300"
+            className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-300 lg:w-44"
           >
             <option value="all">All departments</option>
             {Object.keys(DEPT_CONFIG).map((d) => (
@@ -355,14 +344,14 @@ export default function WorkloadPage() {
           <select
             value={sortKey}
             onChange={(e) => setSortKey(e.target.value as SortKey)}
-            className="px-3 py-1.5 text-sm border border-slate-200 text-slate-500 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-300"
+            className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-300 lg:w-52"
           >
             <option value="workload">Sort: Busiest first</option>
             <option value="activeProjects">Sort: Most projects</option>
           </select>
 
           {/* Legend */}
-          <div className="ml-auto flex items-center gap-2 flex-wrap justify-end">
+          <div className="flex flex-wrap items-center gap-2 pt-1 lg:ml-auto lg:justify-end lg:pt-0">
             {[
               { label: "Free", bar: "bg-slate-300" },
               { label: "Light", bar: "bg-emerald-400" },

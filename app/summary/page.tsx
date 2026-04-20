@@ -167,12 +167,12 @@ export default function MonthlySummaryPage() {
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
               {/* Month selector */}
               <select
                 value={selectedMonth}
                 onChange={(e) => setSelectedMonth(e.target.value)}
-                className="px-3 py-2 text-sm border border-purple-200 rounded-xl bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-300 shadow-sm"
+                className="h-10 w-full rounded-xl border border-purple-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-300 sm:w-48"
               >
                 {availableMonths.map((m) => (
                   <option key={m} value={m}>
@@ -185,7 +185,7 @@ export default function MonthlySummaryPage() {
               <button
                 onClick={() => setPresenting(true)}
                 disabled={!data || loading}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white text-sm font-semibold shadow-lg shadow-purple-500/20 hover:from-purple-500 hover:to-fuchsia-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 to-fuchsia-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-purple-500/20 transition-all hover:from-purple-500 hover:to-fuchsia-500 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
               >
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M8 5v14l11-7z" />

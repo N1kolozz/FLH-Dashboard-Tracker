@@ -104,7 +104,7 @@ async function notifyAttendancePrompt(options: {
       excludeUserId: options.excludeUserId,
       payload: createPushNotification({
         topic: "attendance",
-        title: `დასწრება საჭიროა: ${options.title}`,
+        title: `დასწრება: ${options.title}`,
         body: options.meetingDate
           ? `გთხოვთ დაადასტუროთ დასწრება: ${formatAttendanceDate(options.meetingDate)}.`
           : "გთხოვთ დაადასტუროთ დასწრება dashboard-ში.",

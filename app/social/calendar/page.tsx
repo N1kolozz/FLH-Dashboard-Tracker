@@ -484,7 +484,7 @@ export default function ContentCalendarPage() {
           {canEdit && (
             <button
               onClick={() => openNew()}
-              className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+              className="h-10 w-full rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-purple-700 sm:w-auto"
             >+ Plan Post</button>
           )}
         </div>
@@ -1027,7 +1027,7 @@ export default function ContentCalendarPage() {
             <label className="block text-sm font-medium text-slate-700 mb-1">Caption / Content *</label>
             <textarea disabled={!canEdit} value={editing.caption} onChange={(e) => setEditing({ ...editing, caption: e.target.value })} rows={3} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 resize-none disabled:bg-slate-50" placeholder="Post caption or content idea..." />
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Date *</label>
               <input disabled={!canEdit} type="date" value={editing.date} onChange={(e) => setEditing({ ...editing, date: e.target.value })} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 disabled:bg-slate-50" />
