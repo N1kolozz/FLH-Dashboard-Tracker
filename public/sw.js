@@ -12,7 +12,7 @@ self.addEventListener("push", (event) => {
     body: "dashboard-ში ახალი განახლებაა.",
     url: "/dashboard",
     tag: "flh-update",
-    icon: "/apple-icon",
+    icon: "/apple-touch-icon.png",
     badge: "/pwa-icon/192",
     topic: "news",
   };

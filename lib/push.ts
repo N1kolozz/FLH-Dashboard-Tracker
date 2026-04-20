@@ -101,19 +101,40 @@ export function getPublicPushKey() {
 }
 
 export function isPushConfigured() {
-  return Boolean(getPublicPushKey() && process.env.VAPID_PRIVATE_KEY?.trim());
+  try {
+    return Boolean(getVapidConfig());
+  } catch {
+    return false;
+  }
 }
 
 function getVapidConfig() {
   const publicKey = getPublicPushKey();
   const privateKey = process.env.VAPID_PRIVATE_KEY?.trim();
-  const subject = process.env.VAPID_SUBJECT?.trim() || "mailto:notifications@example.com";
+  const subject = normalizeVapidSubject(process.env.VAPID_SUBJECT);
 
   if (!publicKey || !privateKey) {
     return null;
   }
 
   return { publicKey, privateKey, subject };
+}
+
+function normalizeVapidSubject(value?: string) {
+  const subject = value?.trim() || "mailto:notifications@example.com";
+  const normalizedSubject = subject.replace(/^mailto:(https?:\/\/.+)$/i, "$1");
+
+  if (/^https?:\/\/\S+$/i.test(normalizedSubject)) {
+    return normalizedSubject;
+  }
+
+  if (/^mailto:[^\s@]+@[^\s@]+\.[^\s@]+$/i.test(normalizedSubject)) {
+    return normalizedSubject;
+  }
+
+  throw new Error(
+    "VAPID_SUBJECT must be a URL like https://example.com or an email like mailto:admin@example.com"
+  );
 }
 
 function vapidKeyToJwk(publicKey: string, privateKey: string) {
@@ -216,7 +237,7 @@ export function createPushNotification(input: Omit<PushNotificationPayload, "ico
   badge?: string;
 }) {
   return {
-    icon: input.icon ?? "/apple-icon",
+    icon: input.icon ?? "/apple-touch-icon.png",
     badge: input.badge ?? "/pwa-icon/192",
     ...input,
   };
