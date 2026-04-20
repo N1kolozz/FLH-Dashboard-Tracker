@@ -35,6 +35,12 @@ const TOPIC_LABELS: Record<PushTopic, string> = {
   attendance: "Attendance",
 };
 
+const PUSH_STATUS_CHANGED_EVENT = "flh:push-status-changed";
+
+function notifyPushStatusChanged() {
+  window.dispatchEvent(new Event(PUSH_STATUS_CHANGED_EVENT));
+}
+
 function base64UrlToUint8Array(value: string) {
   const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
   const padding = normalized.length % 4 === 0 ? "" : "=".repeat(4 - (normalized.length % 4));
@@ -58,9 +64,10 @@ export default function PushNotificationManager({
 }: {
   canSendTest?: boolean;
   collapsed?: boolean;
-  variant?: "card" | "sidebar";
+  variant?: "card" | "dashboard" | "sidebar";
 }) {
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const [hasCheckedStatus, setHasCheckedStatus] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
   const [isConfigured, setIsConfigured] = useState(false);
   const [publicKey, setPublicKey] = useState<string | null>(null);
@@ -107,6 +114,7 @@ export default function PushNotificationManager({
     setIsStandalone(isStandaloneMode());
 
     if (!supported) {
+      setHasCheckedStatus(true);
       return;
     }
 
@@ -129,6 +137,8 @@ export default function PushNotificationManager({
     } catch (error) {
       console.error("Failed to load push status:", error);
       setStatusMessage("Could not check notification status on this device.");
+    } finally {
+      setHasCheckedStatus(true);
     }
   }, [syncExistingSubscription]);
 
@@ -152,6 +162,18 @@ export default function PushNotificationManager({
     return () => {
       window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt as EventListener);
       window.removeEventListener("appinstalled", handleAppInstalled);
+    };
+  }, [refreshStatus]);
+
+  useEffect(() => {
+    const handlePushStatusChanged = () => {
+      void refreshStatus();
+    };
+
+    window.addEventListener(PUSH_STATUS_CHANGED_EVENT, handlePushStatusChanged);
+
+    return () => {
+      window.removeEventListener(PUSH_STATUS_CHANGED_EVENT, handlePushStatusChanged);
     };
   }, [refreshStatus]);
 
@@ -232,6 +254,7 @@ export default function PushNotificationManager({
 
       await syncExistingSubscription(subscription);
       setStatusMessage("Alerts are on for this device.");
+      notifyPushStatusChanged();
     } catch (error) {
       console.error("Failed to enable notifications:", error);
       setStatusMessage("Could not enable notifications on this device.");
@@ -254,6 +277,7 @@ export default function PushNotificationManager({
 
       if (!subscription) {
         setIsSubscribed(false);
+        notifyPushStatusChanged();
         return;
       }
 
@@ -271,6 +295,7 @@ export default function PushNotificationManager({
       setIsSubscribed(false);
       setPreferences(DEFAULT_PREFERENCES);
       setStatusMessage("Alerts are off for this device.");
+      notifyPushStatusChanged();
     } catch (error) {
       console.error("Failed to disable notifications:", error);
       setStatusMessage("Could not turn off notifications right now.");
@@ -403,6 +428,15 @@ export default function PushNotificationManager({
     ? "border-purple-100 bg-purple-50 text-purple-700 hover:bg-purple-100"
     : "border-slate-200 bg-white text-slate-600 hover:border-purple-100 hover:bg-purple-50 hover:text-purple-700";
 
+  const shouldShowDashboardInstallPrompt = !isStandalone && (Boolean(installPrompt) || isIOS);
+  const shouldShowDashboardAlertPrompt = isStandalone;
+  const shouldShowDashboardSetup =
+    hasCheckedStatus &&
+    isSupported &&
+    isConfigured &&
+    !isSubscribed &&
+    (shouldShowDashboardInstallPrompt || shouldShowDashboardAlertPrompt);
+
   const actions = (
     <div className="flex flex-wrap gap-2">
       {!isStandalone && installPrompt && (
@@ -522,6 +556,73 @@ export default function PushNotificationManager({
           </div>
         )}
       </div>
+    );
+  }
+
+  if (variant === "dashboard") {
+    if (!shouldShowDashboardSetup) {
+      return null;
+    }
+
+    const isInstallMode = shouldShowDashboardInstallPrompt && !isStandalone;
+    const isBlocked = permission === "denied";
+
+    return (
+      <section className="rounded-lg border border-purple-200 bg-white/90 p-3 shadow-sm sm:p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-purple-600">
+              App setup
+            </p>
+            <h2 className="mt-1 text-base font-bold text-slate-900">
+              {isInstallMode
+                ? "Install the dashboard app"
+                : isBlocked
+                  ? "Alerts are blocked"
+                  : "Turn on dashboard alerts"}
+            </h2>
+            <p className="mt-1 max-w-2xl text-sm leading-5 text-slate-600">
+              {isInstallMode
+                ? isIOS
+                  ? "On iPhone or iPad, install from the Share menu with Add to Home Screen, then open the app to turn on alerts."
+                  : "Install the app first, then turn on alerts for news, events, projects, and attendance."
+                : isBlocked
+                  ? "Notifications are blocked in this app. Allow them from browser settings to receive dashboard updates."
+                  : "Turn on alerts so this device receives news, events, projects, and attendance updates."}
+            </p>
+          </div>
+
+          <div className="flex shrink-0 flex-wrap gap-2">
+            {isInstallMode && installPrompt && (
+              <button
+                type="button"
+                onClick={installApp}
+                disabled={isBusy}
+                className="inline-flex items-center justify-center rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Install app
+              </button>
+            )}
+
+            {!isInstallMode && !isBlocked && (
+              <button
+                type="button"
+                onClick={enableNotifications}
+                disabled={!canEnableNotifications || isBusy}
+                className="inline-flex items-center justify-center rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Turn on alerts
+              </button>
+            )}
+          </div>
+        </div>
+
+        {statusMessage && (
+          <div className="mt-3 rounded-lg border border-purple-100 bg-purple-50 px-3 py-2 text-sm text-purple-800">
+            {statusMessage}
+          </div>
+        )}
+      </section>
     );
   }
 

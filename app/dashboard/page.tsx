@@ -12,6 +12,7 @@ import {
   type DashboardNewsType,
 } from "@/app/actions/news";
 import Modal from "@/components/Modal";
+import PushNotificationManager from "@/components/PushNotificationManager";
 import type { Session } from "@/lib/auth";
 
 /* ─── Quick-stat card ─── */
@@ -293,6 +294,8 @@ export default function DashboardPage() {
       </header>
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-8">
+        <PushNotificationManager variant="dashboard" />
+
         {/* Stats Grid */}
         <section>
           <h2 className="text-sm font-semibold text-slate-600 uppercase tracking-wide mb-3">
