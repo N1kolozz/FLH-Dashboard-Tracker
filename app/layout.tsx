@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import LayoutWrapper from "@/components/LayoutWrapper";
@@ -15,8 +15,20 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
+  applicationName: "FLH Dashboard",
   title: "FLH Dashboard",
   description: "Future Leaders Hub — NGO Operations Dashboard",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "FLH Dashboard",
+    statusBarStyle: "default",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#7c3aed",
+  colorScheme: "light",
 };
 
 export default function RootLayout({

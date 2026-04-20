@@ -5,6 +5,7 @@ import { getCurrentSession } from "@/app/actions/session";
 import { getMonthlySummary } from "@/app/actions/monthly-summary";
 import type { MonthlySummaryData } from "@/types";
 import MonthlySummaryPresentation from "./MonthlySummaryPresentation";
+import FlhIconMark from "@/components/FlhIconMark";
 
 /* ─── Month helpers ─── */
 
@@ -154,7 +155,12 @@ export default function MonthlySummaryPage() {
             <div>
               <h1 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                 Monthly Summary
-                <img src="/flhlogo.svg" alt="FLH Logo" className="w-5 h-5 object-contain" />
+                <FlhIconMark
+                  width={20}
+                  height={21}
+                  title="FLH Logo"
+                  className="h-5 w-5"
+                />
               </h1>
               <p className="text-xs text-slate-500 mt-0.5">
                 Full monthly overview of all NGO activities — present to the team

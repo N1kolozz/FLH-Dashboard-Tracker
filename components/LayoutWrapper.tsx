@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import Sidebar from "./Sidebar";
 import AttendancePrompt from "./AttendancePrompt";
+import PwaRegistrar from "./PwaRegistrar";
 
 export default function LayoutWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -14,6 +15,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
 
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-slate-50">
+      <PwaRegistrar />
       <Sidebar />
       <main className="flex-1 min-w-0 md:ml-0">{children}</main>
       <AttendancePrompt />

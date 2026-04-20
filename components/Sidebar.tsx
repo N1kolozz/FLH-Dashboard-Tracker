@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getCurrentSession } from "@/app/actions/session";
 import type { Session } from "@/lib/auth";
 import { logout } from "@/app/actions/auth";
+import PushNotificationManager from "@/components/PushNotificationManager";
+import FlhIconMark from "@/components/FlhIconMark";
 
 import { NAV_SECTIONS } from "@/config/navigation";
 
@@ -55,13 +56,11 @@ export default function Sidebar() {
     <div className="flex h-full min-h-0 flex-col">
       {/* Logo / Brand */}
       <div className="flex items-center gap-2.5 px-4 py-5 border-b border-purple-100/60">
-        <Image
-          src="/flhlogo.svg"
-          alt="FLH"
+        <FlhIconMark
           width={32}
-          height={32}
-          className="w-8 h-8 rounded-xl shadow-sm object-cover shrink-0"
-          priority
+          height={34}
+          title="FLH"
+          className="h-8 w-8 shrink-0"
         />
         {!collapsed && (
           <div className="min-w-0">
@@ -119,6 +118,12 @@ export default function Sidebar() {
 
       {/* Profile & Collapse */}
       <div className="mt-auto shrink-0 border-t border-purple-100/60 p-3 pb-safe-bottom">
+        <PushNotificationManager
+          variant="sidebar"
+          collapsed={collapsed}
+          canSendTest={session?.role?.toUpperCase() === "ADMIN"}
+        />
+
         {session && (
           <div className="mb-2">
             {!collapsed ? (
@@ -170,13 +175,11 @@ export default function Sidebar() {
           </svg>
         </button>
         <div className="flex items-center gap-2">
-          <Image
-            src="/flhlogo.svg"
-            alt="FLH"
+          <FlhIconMark
             width={28}
-            height={28}
-            className="w-7 h-7 rounded-lg shadow-sm object-cover shrink-0"
-            priority
+            height={30}
+            title="FLH"
+            className="h-7 w-7 shrink-0"
           />
           <h2 className="text-sm font-bold text-slate-800 leading-none">FLH Dashboard</h2>
         </div>

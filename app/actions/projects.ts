@@ -2,6 +2,7 @@
 
 import { getSession } from "@/lib/auth";
 import { assertCanManageProjects } from "@/lib/permissions";
+import { createPushNotification, notifySubscribers } from "@/lib/push";
 import {
   fetchAllProjects,
   fetchRejectedProjects,
@@ -9,6 +10,11 @@ import {
   updateProjectInDB,
   deleteProjectFromDB,
 } from "@/lib/dal/projects";
+
+function sessionUserId(session: { userId: string } | null) {
+  const userId = Number(session?.userId);
+  return Number.isInteger(userId) ? userId : null;
+}
 
 export async function getProjects() {
   try {
@@ -44,9 +50,28 @@ export async function createProject(data: {
   try {
     const session = await getSession();
     assertCanManageProjects(session);
+    const actorUserId = sessionUserId(session);
     const row = await insertProject(data);
     const createdAt = row.created_at;
     const updatedAt = row.updated_at;
+
+    try {
+      await notifySubscribers({
+        topic: "projects",
+        excludeUserId: actorUserId,
+        payload: createPushNotification({
+          topic: "projects",
+          title: `ახალი პროექტი: ${data.name}`,
+          body: data.deadline
+            ? `დედლაინი: ${data.deadline}.`
+            : "dashboard-ში ახალი პროექტი დაემატა.",
+          url: "/projects/overview",
+          tag: `project-${row.id as number}`,
+        }),
+      });
+    } catch (pushError) {
+      console.error("Error sending project push notification:", pushError);
+    }
 
     return {
       success: true,
@@ -78,12 +103,32 @@ export async function updateProject(
     tags: string[];
     ownerUserIds: number[];
   }
-) {
+  ) {
   try {
     const session = await getSession();
     assertCanManageProjects(session);
+    const actorUserId = sessionUserId(session);
     const row = await updateProjectInDB(id, data);
     const updatedAt = row?.updated_at;
+
+    try {
+      await notifySubscribers({
+        topic: "projects",
+        excludeUserId: actorUserId,
+        payload: createPushNotification({
+          topic: "projects",
+          title: `პროექტი განახლდა: ${data.name}`,
+          body: data.status
+            ? `სტატუსი: ${data.status.replace(/_/g, " ")}.`
+            : "dashboard-ში პროექტი განახლდა.",
+          url: "/projects/overview",
+          tag: `project-${id}`,
+        }),
+      });
+    } catch (pushError) {
+      console.error("Error sending project update notification:", pushError);
+    }
+
     return {
       success: true,
       updatedAt:

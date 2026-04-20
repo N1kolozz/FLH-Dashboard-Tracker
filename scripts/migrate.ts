@@ -246,6 +246,35 @@ async function migrate() {
     console.log("✓ news_posts table ready");
 
     await client.query(`
+      CREATE TABLE IF NOT EXISTS push_subscriptions (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        endpoint TEXT NOT NULL UNIQUE,
+        p256dh TEXT NOT NULL,
+        auth TEXT NOT NULL,
+        user_agent TEXT DEFAULT '',
+        topic_news BOOLEAN NOT NULL DEFAULT TRUE,
+        topic_events BOOLEAN NOT NULL DEFAULT TRUE,
+        topic_projects BOOLEAN NOT NULL DEFAULT TRUE,
+        topic_attendance BOOLEAN NOT NULL DEFAULT TRUE,
+        last_success_at TIMESTAMP,
+        last_failure_at TIMESTAMP,
+        last_failure_reason TEXT DEFAULT '',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS push_subscriptions_user_id_idx
+      ON push_subscriptions (user_id)
+    `);
+    await client.query(`
+      ALTER TABLE push_subscriptions
+      ADD COLUMN IF NOT EXISTS topic_attendance BOOLEAN NOT NULL DEFAULT TRUE
+    `);
+    console.log("✓ push_subscriptions table ready");
+
+    await client.query(`
       CREATE TABLE IF NOT EXISTS inventory_items (
         id SERIAL PRIMARY KEY,
         name VARCHAR(255) NOT NULL,

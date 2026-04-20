@@ -5,6 +5,7 @@ import type {
   MonthlySummaryData,
   DepartmentSummary,
 } from "@/types";
+import FlhIconMark from "@/components/FlhIconMark";
 
 /* ─── Department Colors ─── */
 const DEPT_COLORS: Record<string, { gradient: string; accent: string; badge: string; dot: string; light: string }> = {
@@ -142,10 +143,11 @@ function TitleSlide({ data }: { data: MonthlySummaryData }) {
 
       <div className="pres-anim-scale relative z-10">
         <div className="w-32 h-32 mx-auto mb-10 relative z-10 flex items-center justify-center">
-          <img 
-            src="/flhlogo.svg" 
-            alt="FLH Logo" 
-            className="w-full h-full object-contain filter drop-shadow-[0_0_35px_rgba(168,85,247,0.7)]"
+          <FlhIconMark
+            width={128}
+            height={134}
+            title="FLH Logo"
+            className="h-full w-full filter drop-shadow-[0_0_35px_rgba(168,85,247,0.7)]"
           />
         </div>
         <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white mb-4 tracking-tight">

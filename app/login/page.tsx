@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useRef } from "react";
-import Image from "next/image";
 import { checkEmail, login } from "../actions/auth";
+import FlhIconMark from "@/components/FlhIconMark";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -63,12 +63,11 @@ export default function LoginPage() {
         <div className="p-8">
           <div className="flex justify-center mb-6">
             <div className="w-16 h-16 overflow-hidden bg-white flex items-center justify-center">
-              <Image
-                src="/flhlogo.svg"
-                alt="FLH Logo"
+              <FlhIconMark
                 width={56}
-                height={56}
-                className="w-14 h-14 object-contain"
+                height={58}
+                title="FLH Logo"
+                className="h-14 w-14"
               />
             </div>
           </div>

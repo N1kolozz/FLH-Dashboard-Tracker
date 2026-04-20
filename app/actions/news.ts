@@ -2,6 +2,7 @@
 
 import { pool } from "@/lib/db";
 import { getSession, type Session } from "@/lib/auth";
+import { createPushNotification, notifySubscribers } from "@/lib/push";
 
 export type DashboardNewsType = "announcement" | "event" | "project" | "review";
 
@@ -267,6 +268,23 @@ export async function createNewsPost(data: { title: string; body: string }) {
     );
 
     const createdAt = res.rows[0].created_at;
+
+    try {
+      await notifySubscribers({
+        topic: "news",
+        excludeUserId: sessionUserId(session),
+        payload: createPushNotification({
+          topic: "news",
+          title: title,
+          body: body || "გუნდს ახალი განახლება დაემატა.",
+          url: "/dashboard",
+          tag: `news-${res.rows[0].id as number}`,
+        }),
+      });
+    } catch (pushError) {
+      console.error("Error sending news push notification:", pushError);
+    }
+
     return {
       success: true,
       id: res.rows[0].id as number,

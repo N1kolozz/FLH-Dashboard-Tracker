@@ -3,6 +3,7 @@
 import { pool } from "@/lib/db";
 import { getSession, type Session } from "@/lib/auth";
 import { assertCanManageAttendance } from "@/lib/permissions";
+import { createPushNotification, notifySubscribers } from "@/lib/push";
 import {
   AttendanceStatus,
   AttendanceSessionRow,
@@ -61,6 +62,59 @@ function normalizeStatus(status: string): AttendanceStatus {
 function getSessionUserId(session: Session) {
   const userId = Number(session.userId);
   return Number.isInteger(userId) ? userId : null;
+}
+
+function formatAttendanceDate(value: string) {
+  if (!value) return "";
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+
+  return date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+async function getPendingAttendanceUserIds(sessionId: number) {
+  const res = await pool.query<{ user_id: number }>(
+    `SELECT r.user_id
+     FROM attendance_records r
+     JOIN attendance_sessions s ON s.id = r.session_id
+     WHERE r.session_id = $1
+       AND s.is_active = TRUE
+       AND r.status = 'pending'`,
+    [sessionId]
+  );
+
+  return res.rows.map((row) => row.user_id);
+}
+
+async function notifyAttendancePrompt(options: {
+  sessionId: number;
+  title: string;
+  meetingDate: string;
+  excludeUserId?: number | null;
+}) {
+  try {
+    const userIds = await getPendingAttendanceUserIds(options.sessionId);
+    await notifySubscribers({
+      topic: "attendance",
+      userIds,
+      excludeUserId: options.excludeUserId,
+      payload: createPushNotification({
+        topic: "attendance",
+        title: `დასწრება საჭიროა: ${options.title}`,
+        body: options.meetingDate
+          ? `გთხოვთ დაადასტუროთ დასწრება: ${formatAttendanceDate(options.meetingDate)}.`
+          : "გთხოვთ დაადასტუროთ დასწრება dashboard-ში.",
+        url: "/dashboard",
+        tag: `attendance-${options.sessionId}`,
+      }),
+    });
+  } catch (pushError) {
+    console.error("Error sending attendance push notification:", pushError);
+  }
 }
 
 async function syncAttendanceRecords(sessionId?: number) {
@@ -261,6 +315,15 @@ export async function createAttendanceSession(data: {
     const id = res.rows[0].id as number;
     await syncAttendanceRecords(id);
 
+    if (data.isActive) {
+      await notifyAttendancePrompt({
+        sessionId: id,
+        title,
+        meetingDate,
+        excludeUserId: createdBy,
+      });
+    }
+
     return {
       success: true,
       id,
@@ -304,6 +367,12 @@ export async function updateAttendanceSession(
       return { error: "Title and meeting date are required" };
     }
 
+    const previousRes = await pool.query<{ is_active: boolean }>(
+      "SELECT is_active FROM attendance_sessions WHERE id = $1",
+      [id]
+    );
+    const wasActive = previousRes.rows[0]?.is_active ?? false;
+
     await pool.query(
       `UPDATE attendance_sessions
        SET event_id = $1,
@@ -323,6 +392,15 @@ export async function updateAttendanceSession(
       ]
     );
     await syncAttendanceRecords(id);
+
+    if (!wasActive && data.isActive) {
+      await notifyAttendancePrompt({
+        sessionId: id,
+        title,
+        meetingDate,
+        excludeUserId: session ? getSessionUserId(session) : null,
+      });
+    }
 
     return { success: true };
   } catch (error) {
@@ -355,6 +433,28 @@ export async function setAttendanceSessionActive(id: number, isActive: boolean) 
        WHERE id = $2`,
       [isActive, id]
     );
+
+    if (isActive) {
+      const sessionRes = await pool.query<{
+        title: string;
+        meeting_date: string;
+      }>(
+        `SELECT title, meeting_date::text
+         FROM attendance_sessions
+         WHERE id = $1`,
+        [id]
+      );
+
+      if (sessionRes.rows[0]) {
+        await notifyAttendancePrompt({
+          sessionId: id,
+          title: sessionRes.rows[0].title,
+          meetingDate: sessionRes.rows[0].meeting_date,
+          excludeUserId: session ? getSessionUserId(session) : null,
+        });
+      }
+    }
+
     return { success: true };
   } catch (error) {
     console.error("Error updating attendance activation:", error);

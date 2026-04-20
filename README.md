@@ -29,6 +29,9 @@ DATABASE_URL=postgresql://USER:PASSWORD@HOST:PORT/DATABASE
 JWT_SECRET=your-secure-jwt-secret-key  # Required for production, has fallback for local dev
 CRON_SECRET=your-secret-key-here
 APP_TIMEZONE=Asia/Tbilisi
+NEXT_PUBLIC_VAPID_PUBLIC_KEY=...
+VAPID_PRIVATE_KEY=...
+VAPID_SUBJECT=mailto:you@example.com
 META_ACCESS_TOKEN=...
 FB_PAGE_ID=...
 IG_ACCOUNT_ID=...
@@ -45,6 +48,14 @@ npm run migrate
 ```bash
 npm run dev
 ```
+
+### 4. PWA Push Notifications
+Generate VAPID keys for web push:
+```bash
+npm run generate:vapid
+```
+
+Then add the generated values to `.env.local`, run the migration, and enable alerts from the dashboard inside the installed PWA on mobile.
 
 ---
 

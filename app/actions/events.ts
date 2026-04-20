@@ -2,6 +2,7 @@
 
 import { pool } from "@/lib/db";
 import { getSession } from "@/lib/auth";
+import { createPushNotification, notifySubscribers } from "@/lib/push";
 
 export interface EventRow {
   id: number;
@@ -14,6 +15,11 @@ export interface EventRow {
   description: string;
   owner_user_ids: number[];
   created_at: string;
+}
+
+function sessionUserId(session: { userId: string }) {
+  const userId = Number(session.userId);
+  return Number.isInteger(userId) ? userId : null;
 }
 
 async function assertCanEdit() {
@@ -67,7 +73,8 @@ export async function createEvent(data: {
   ownerUserIds: number[];
 }) {
   try {
-    await assertCanEdit();
+    const session = await assertCanEdit();
+    const actorUserId = sessionUserId(session);
     const res = await pool.query(
       `INSERT INTO events (title, date, time, end_time, location, department, description, owner_user_ids)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, created_at`,
@@ -83,6 +90,24 @@ export async function createEvent(data: {
       ]
     );
     const createdAt = res.rows[0].created_at;
+
+    try {
+      await notifySubscribers({
+        topic: "events",
+        excludeUserId: actorUserId,
+        payload: createPushNotification({
+          topic: "events",
+          title: `ახალი ღონისძიება: ${data.title}`,
+          body: data.date
+            ? `დაგეგმილია ${data.date}${data.time ? `, ${data.time}` : ""}.`
+            : "dashboard-ში ახალი ღონისძიება დაემატა.",
+          url: "/events",
+          tag: `event-${res.rows[0].id as number}`,
+        }),
+      });
+    } catch (pushError) {
+      console.error("Error sending event push notification:", pushError);
+    }
 
     return {
       success: true,
@@ -112,7 +137,8 @@ export async function updateEvent(
   }
 ) {
   try {
-    await assertCanEdit();
+    const session = await assertCanEdit();
+    const actorUserId = sessionUserId(session);
     await pool.query(
       `UPDATE events
        SET title=$1, date=$2, time=$3, end_time=$4, location=$5, department=$6, description=$7, owner_user_ids=$8
@@ -129,6 +155,25 @@ export async function updateEvent(
         id,
       ]
     );
+
+    try {
+      await notifySubscribers({
+        topic: "events",
+        excludeUserId: actorUserId,
+        payload: createPushNotification({
+          topic: "events",
+          title: `ღონისძიება განახლდა: ${data.title}`,
+          body: data.date
+            ? `შეამოწმეთ განახლებული გეგმა ${data.date}${data.time ? `, ${data.time}` : ""}.`
+            : "dashboard-ში ღონისძიება განახლდა.",
+          url: "/events",
+          tag: `event-${id}`,
+        }),
+      });
+    } catch (pushError) {
+      console.error("Error sending event update notification:", pushError);
+    }
+
     return { success: true };
   } catch (error) {
     console.error("Error updating event:", error);
