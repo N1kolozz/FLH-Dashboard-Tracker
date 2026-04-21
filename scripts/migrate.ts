@@ -69,6 +69,10 @@ async function migrate() {
     await client.query(`
       ALTER TABLE follower_history ADD COLUMN IF NOT EXISTS posts_count INTEGER
     `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS follower_history_account_recorded_date_idx
+      ON follower_history (account_id, recorded_date DESC)
+    `);
     console.log("✓ follower_history profile stats columns ready");
 
     // ── Department module tables ────────────────────────────────────
@@ -115,6 +119,14 @@ async function migrate() {
       SET updated_at = created_at
       WHERE updated_at IS NULL
     `);
+    await client.query(`
+      ALTER TABLE projects
+      ADD COLUMN IF NOT EXISTS review_status VARCHAR(50) NOT NULL DEFAULT 'not_requested'
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS projects_review_status_idx
+      ON projects (review_status)
+    `);
     console.log("✓ projects updated_at column ready");
 
     await client.query(`
@@ -146,6 +158,10 @@ async function migrate() {
       UPDATE events
       SET owner_user_ids = ARRAY[owner_user_id]
       WHERE owner_user_id IS NOT NULL AND cardinality(owner_user_ids) = 0
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS events_date_idx
+      ON events (date DESC)
     `);
     console.log("✓ events owners column ready");
 
@@ -344,7 +360,42 @@ async function migrate() {
       SET owner_user_ids = ARRAY[owner_user_id]
       WHERE owner_user_id IS NOT NULL AND cardinality(owner_user_ids) = 0
     `);
+    await client.query(`
+      ALTER TABLE content_posts
+      ADD COLUMN IF NOT EXISTS approval_status VARCHAR(50) NOT NULL DEFAULT 'not_requested'
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS content_posts_date_time_idx
+      ON content_posts (date DESC, time ASC)
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS content_posts_approval_status_idx
+      ON content_posts (approval_status)
+    `);
     console.log("✓ content_posts owners column ready");
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS review_requests (
+        id SERIAL PRIMARY KEY,
+        entity_type VARCHAR(50) NOT NULL,
+        entity_id INTEGER NOT NULL,
+        status VARCHAR(50) NOT NULL DEFAULT 'pending',
+        submitted_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        reviewed_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        feedback TEXT DEFAULT '',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        reviewed_at TIMESTAMP
+      );
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS review_requests_entity_lookup_idx
+      ON review_requests (entity_type, entity_id, created_at DESC)
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS review_requests_status_created_at_idx
+      ON review_requests (status, created_at DESC)
+    `);
+    console.log("✓ review_requests table ready");
 
     await client.query(`
       CREATE TABLE IF NOT EXISTS impact_records (
@@ -442,20 +493,29 @@ async function migrate() {
 
     console.log("\nMigration complete!");
 
-    // Seed default admin
-    const adminEmail = "mr.osievi5@gmail.com";
-    const existingAdmin = await client.query(
-      "SELECT id FROM users WHERE email = $1",
-      [adminEmail]
-    );
-    if (existingAdmin.rows.length === 0) {
-      await client.query(
-        "INSERT INTO users (email, full_name, role, department) VALUES ($1, $2, $3, $4)",
-        [adminEmail, "Admin User", "ADMIN", "Management"]
+    const seedAdminEmail = process.env.SEED_ADMIN_EMAIL?.trim();
+    if (seedAdminEmail) {
+      const existingAdmin = await client.query(
+        "SELECT id FROM users WHERE email = $1",
+        [seedAdminEmail]
       );
-      console.log(`✓ Seeded default admin: ${adminEmail}`);
+      if (existingAdmin.rows.length === 0) {
+        await client.query(
+          "INSERT INTO users (email, full_name, role, department, position) VALUES ($1, $2, $3, $4, $5)",
+          [
+            seedAdminEmail,
+            process.env.SEED_ADMIN_FULL_NAME?.trim() || "Admin User",
+            "ADMIN",
+            process.env.SEED_ADMIN_DEPARTMENT?.trim() || "Management",
+            process.env.SEED_ADMIN_POSITION?.trim() || "",
+          ]
+        );
+        console.log(`✓ Seeded admin from SEED_ADMIN_EMAIL: ${seedAdminEmail}`);
+      } else {
+        console.log(`– Seed admin already exists: ${seedAdminEmail}`);
+      }
     } else {
-      console.log(`– Default admin already exists: ${adminEmail}`);
+      console.log("– Skipping admin seed (SEED_ADMIN_EMAIL not set)");
     }
   } finally {
     client.release();

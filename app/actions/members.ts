@@ -2,6 +2,10 @@
 
 import { pool } from "@/lib/db";
 import { getSession } from "@/lib/auth";
+import {
+  assertCanAssignPrivilegedRole,
+  assertHeadOrAdmin,
+} from "@/lib/permissions";
 
 export async function addMember(formData: {
   fullName: string;
@@ -11,16 +15,10 @@ export async function addMember(formData: {
   systemRole: string;
 }) {
   try {
-    const session = await getSession();
-    if (!session || (session.role !== "ADMIN" && session.role !== "HEAD")) {
-      return { error: "Not authorized to add members" };
-    }
+    const session = assertHeadOrAdmin(await getSession());
 
-    // Only ADMIN can create HEAD or ADMIN users
     const targetRole = formData.systemRole || "MEMBER";
-    if ((targetRole === "ADMIN" || targetRole === "HEAD") && session.role !== "ADMIN") {
-      return { error: "Only ADMIN can assign HEAD or ADMIN roles" };
-    }
+    assertCanAssignPrivilegedRole(session, targetRole);
 
     const res = await pool.query("SELECT id FROM users WHERE email = $1", [
       formData.email,
@@ -47,7 +45,10 @@ export async function addMember(formData: {
     };
   } catch (error) {
     console.error("Error adding member:", error);
-    return { error: "Failed to add member" };
+    return {
+      error:
+        error instanceof Error ? error.message : "Failed to add member",
+    };
   }
 }
 
@@ -65,16 +66,16 @@ export async function getMembers() {
 
 export async function deleteMember(id: number) {
   try {
-    const session = await getSession();
-    if (!session || (session.role !== "ADMIN" && session.role !== "HEAD")) {
-      return { error: "Not authorized to delete members" };
-    }
+    assertHeadOrAdmin(await getSession());
 
     await pool.query("DELETE FROM users WHERE id = $1", [id]);
     return { success: true };
   } catch (error) {
     console.error("Error deleting member:", error);
-    return { error: "Failed to delete member" };
+    return {
+      error:
+        error instanceof Error ? error.message : "Failed to delete member",
+    };
   }
 }
 
@@ -89,21 +90,12 @@ export async function updateMember(
   }
 ) {
   try {
-    const session = await getSession();
-    if (!session || (session.role !== "ADMIN" && session.role !== "HEAD")) {
-      return { error: "Not authorized to edit members" };
-    }
+    const session = assertHeadOrAdmin(await getSession());
 
-    // Only ADMIN can CHANGE someone's role to HEAD or ADMIN
     const targetRole = data.systemRole || "MEMBER";
-    if ((targetRole === "ADMIN" || targetRole === "HEAD") && session.role !== "ADMIN") {
-      // Check if the role is actually changing — if it's the same, allow it
-      const current = await pool.query("SELECT role FROM users WHERE id = $1", [id]);
-      if (current.rows.length === 0) return { error: "Member not found" };
-      if (current.rows[0].role !== targetRole) {
-        return { error: "Only ADMIN can assign HEAD or ADMIN roles" };
-      }
-    }
+    const current = await pool.query("SELECT role FROM users WHERE id = $1", [id]);
+    if (current.rows.length === 0) return { error: "Member not found" };
+    assertCanAssignPrivilegedRole(session, targetRole, current.rows[0].role);
 
     // Check for email conflict with other users
     const emailCheck = await pool.query(
@@ -122,6 +114,9 @@ export async function updateMember(
     return { success: true };
   } catch (error) {
     console.error("Error updating member:", error);
-    return { error: "Failed to update member" };
+    return {
+      error:
+        error instanceof Error ? error.message : "Failed to update member",
+    };
   }
 }

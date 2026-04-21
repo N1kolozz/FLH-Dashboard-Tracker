@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
 import {
   getPendingAttendancePrompt,
   submitMyAttendance,
@@ -54,9 +53,12 @@ function formatDate(value: string) {
   });
 }
 
-export default function AttendancePrompt() {
-  const pathname = usePathname();
-  const [prompt, setPrompt] = useState<AttendancePromptRow | null>(null);
+export default function AttendancePrompt({
+  initialPrompt = null,
+}: {
+  initialPrompt?: AttendancePromptRow | null;
+}) {
+  const [prompt, setPrompt] = useState<AttendancePromptRow | null>(initialPrompt);
   const [status, setStatus] = useState<ResponseStatus>("present");
   const [reason, setReason] = useState("");
   const [note, setNote] = useState("");
@@ -68,22 +70,33 @@ export default function AttendancePrompt() {
 
     async function checkPrompt() {
       const res = await getPendingAttendancePrompt();
-      if (cancelled) return;
-      if (res.success) {
-        setPrompt(res.prompt ?? null);
-        setStatus("present");
-        setReason("");
-        setNote("");
-        setError("");
-      }
+      if (cancelled || !("success" in res)) return;
+      setPrompt(res.prompt ?? null);
+      setStatus("present");
+      setReason("");
+      setNote("");
+      setError("");
     }
 
-    void checkPrompt();
+    const handleWindowFocus = () => {
+      void checkPrompt();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void checkPrompt();
+      }
+    };
+
+    window.addEventListener("focus", handleWindowFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       cancelled = true;
+      window.removeEventListener("focus", handleWindowFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [pathname]);
+  }, []);
 
   useEffect(() => {
     if (!prompt) return;

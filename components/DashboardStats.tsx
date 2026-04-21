@@ -1,6 +1,6 @@
 "use client";
 
-import { StatsResponse } from "@/app/api/stats/route";
+import type { StatsResponse } from "@/lib/queries/social";
 
 interface DashboardStatsProps {
   stats: StatsResponse | null;

@@ -6,6 +6,48 @@ import { cookies } from "next/headers";
 import { compare, hash } from "bcryptjs";
 import { redirect } from "next/navigation";
 
+const SESSION_COOKIE_NAME = "session";
+const SESSION_COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "lax" as const,
+  maxAge: 7 * 24 * 60 * 60,
+  path: "/",
+};
+
+const USER_SESSION_SELECT = `
+  SELECT id, email, password_hash, role, department, full_name
+  FROM users
+  WHERE email = $1
+`;
+
+function getAuthActionErrorMessage(error: unknown, fallback: string) {
+  if (
+    error instanceof Error &&
+    (error.message.includes("JWT_SECRET") ||
+      error.message.includes("session") ||
+      error.message.includes("Web Crypto"))
+  ) {
+    return "Server session configuration error";
+  }
+
+  return fallback;
+}
+
+async function setSessionCookie(sessionData: {
+  userId: number;
+  email: string;
+  role: string;
+  department: string;
+  fullName: string;
+}) {
+  const sessionCookieStr = await encrypt({
+    ...sessionData,
+    userId: String(sessionData.userId),
+  });
+  cookies().set(SESSION_COOKIE_NAME, sessionCookieStr, SESSION_COOKIE_OPTIONS);
+}
+
 export async function checkEmail(email: string) {
   try {
     const res = await pool.query("SELECT id, password_hash FROM users WHERE email = $1", [email]);
@@ -25,7 +67,7 @@ export async function checkEmail(email: string) {
 
 export async function login(email: string, password: string) {
   try {
-    const res = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
+    const res = await pool.query(USER_SESSION_SELECT, [email]);
     if (res.rows.length === 0) return { error: "Invalid credentials" };
 
     const user = res.rows[0];
@@ -41,26 +83,18 @@ export async function login(email: string, password: string) {
       department: user.department,
       fullName: user.full_name,
     };
-    const sessionCookieStr = await encrypt(sessionData);
-
-    cookies().set("session", sessionCookieStr, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60,
-      path: "/",
-    });
+    await setSessionCookie(sessionData);
 
     return { success: true };
   } catch (error) {
     console.error("Login error:", error);
-    return { error: "Login failed" };
+    return { error: getAuthActionErrorMessage(error, "Login failed") };
   }
 }
 
 export async function createPassword(email: string, password: string) {
   try {
-    const res = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
+    const res = await pool.query(USER_SESSION_SELECT, [email]);
     if (res.rows.length === 0) return { error: "User not found" };
 
     const user = res.rows[0];
@@ -76,25 +110,16 @@ export async function createPassword(email: string, password: string) {
       department: user.department,
       fullName: user.full_name,
     };
-    const sessionCookieStr = await encrypt(sessionData);
-
-    cookies().set("session", sessionCookieStr, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60,
-      path: "/",
-    });
+    await setSessionCookie(sessionData);
 
     return { success: true };
   } catch (error) {
     console.error("Create password error:", error);
-    return { error: "Failed to create password" };
+    return { error: getAuthActionErrorMessage(error, "Failed to create password") };
   }
 }
 
 export async function logout() {
-  cookies().delete("session");
+  cookies().delete(SESSION_COOKIE_NAME);
   redirect("/login");
 }
-

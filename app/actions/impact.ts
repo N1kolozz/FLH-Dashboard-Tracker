@@ -1,7 +1,7 @@
 "use server";
 
 import { pool } from "@/lib/db";
-import { getSession } from "@/lib/auth";
+import { requireDepartmentManagerSession } from "@/lib/action-auth";
 
 export interface ImpactRecordRow {
   id: number;
@@ -23,19 +23,6 @@ async function getProjectName(projectId: number) {
   }
 
   return String(res.rows[0].name);
-}
-
-async function assertCanEdit() {
-  const session = await getSession();
-  if (
-    !session ||
-    (session.role !== "ADMIN" &&
-      session.role !== "HEAD" &&
-      session.department !== "Projects")
-  ) {
-    throw new Error("Not authorized");
-  }
-  return session;
 }
 
 export async function getImpactRecords() {
@@ -71,7 +58,7 @@ export async function createImpactRecord(data: {
   evidenceLink: string;
 }) {
   try {
-    await assertCanEdit();
+    await requireDepartmentManagerSession("Projects");
     const projectName = await getProjectName(data.projectId);
 
     if (!projectName) {
@@ -127,7 +114,7 @@ export async function updateImpactRecord(
   }
 ) {
   try {
-    await assertCanEdit();
+    await requireDepartmentManagerSession("Projects");
     const projectName = await getProjectName(data.projectId);
 
     if (!projectName) {
@@ -164,7 +151,7 @@ export async function updateImpactRecord(
 
 export async function deleteImpactRecord(id: number) {
   try {
-    await assertCanEdit();
+    await requireDepartmentManagerSession("Projects");
     await pool.query("DELETE FROM impact_records WHERE id = $1", [id]);
     return { success: true };
   } catch (error) {

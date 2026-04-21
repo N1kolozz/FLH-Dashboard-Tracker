@@ -6,7 +6,7 @@ A full-stack operational dashboard for the **Future Leaders Hub (FLH)**. It comb
 
 ### Role-Based Access Control (RBAC)
 - **Authentication:** Secure JWT-based sessions (stored in HttpOnly cookies).
-- **Onboarding Flow:** Admins/Heads pre-add users via the dashboard. Users activate accounts via an email-linked `/create-password` flow.
+- **Onboarding Flow:** Admins/Heads pre-add users via the dashboard. A user whose email exists in `users` but does not yet have a password is sent to `/create-password` on first sign-in attempt to activate the account.
 - **Roles & Permissions:**
   - **ADMIN:** Full access. Can add/edit/delete any member and assign HEAD/ADMIN roles.
   - **HEAD:** Department leadership access. Can add members (MEMBER role only) and edit member details (name, department, position). Cannot edit ADMINs.
@@ -26,7 +26,7 @@ A full-stack operational dashboard for the **Future Leaders Hub (FLH)**. It comb
 Copy `.env.local.example` to `.env.local` and add:
 ```
 DATABASE_URL=postgresql://USER:PASSWORD@HOST:PORT/DATABASE
-JWT_SECRET=your-secure-jwt-secret-key  # Required for production, has fallback for local dev
+JWT_SECRET=your-secure-jwt-secret-key  # Required in production; local dev falls back to a built-in dev-only secret
 CRON_SECRET=your-secret-key-here
 APP_TIMEZONE=Asia/Tbilisi
 NEXT_PUBLIC_VAPID_PUBLIC_KEY=...
@@ -37,12 +37,23 @@ FB_PAGE_ID=...
 IG_ACCOUNT_ID=...
 ```
 
+Optional bootstrap admin seed:
+```
+SEED_ADMIN_EMAIL=admin@example.com
+SEED_ADMIN_FULL_NAME=Admin User
+SEED_ADMIN_DEPARTMENT=Management
+SEED_ADMIN_POSITION=Director
+```
+
+If `SEED_ADMIN_EMAIL` is set, `npm run migrate` creates that user with the `ADMIN` role only if the email does not already exist. It does not create a password automatically.
+
 ### 2. Database Migration
-Creates required tables (`users`, `social_accounts`, `follower_history`) and seeds the default admin account:
+Creates the required tables and optionally seeds a bootstrap admin user when `SEED_ADMIN_EMAIL` is set:
 ```bash
 npm run migrate
 ```
-*Note: Ensure you update the default admin credentials in `scripts/migrate.ts` before running.*
+
+After a seeded admin is created, the first sign-in attempt with that email will redirect to `/create-password` so the account owner can set the initial password.
 
 ### 3. Development Server
 ```bash

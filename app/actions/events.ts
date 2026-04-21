@@ -1,8 +1,9 @@
 "use server";
 
 import { pool } from "@/lib/db";
-import { getSession } from "@/lib/auth";
+import { requireDepartmentManagerSession } from "@/lib/action-auth";
 import { createPushNotification, notifySubscribers } from "@/lib/push";
+import { getSessionUserId } from "@/lib/permissions";
 
 export interface EventRow {
   id: number;
@@ -15,24 +16,6 @@ export interface EventRow {
   description: string;
   owner_user_ids: number[];
   created_at: string;
-}
-
-function sessionUserId(session: { userId: string }) {
-  const userId = Number(session.userId);
-  return Number.isInteger(userId) ? userId : null;
-}
-
-async function assertCanEdit() {
-  const session = await getSession();
-  if (
-    !session ||
-    (session.role !== "ADMIN" &&
-      session.role !== "HEAD" &&
-      session.department !== "Management")
-  ) {
-    throw new Error("Not authorized");
-  }
-  return session;
 }
 
 export async function getEvents() {
@@ -73,8 +56,8 @@ export async function createEvent(data: {
   ownerUserIds: number[];
 }) {
   try {
-    const session = await assertCanEdit();
-    const actorUserId = sessionUserId(session);
+    const session = await requireDepartmentManagerSession("Management");
+    const actorUserId = getSessionUserId(session);
     const res = await pool.query(
       `INSERT INTO events (title, date, time, end_time, location, department, description, owner_user_ids)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, created_at`,
@@ -137,8 +120,8 @@ export async function updateEvent(
   }
 ) {
   try {
-    const session = await assertCanEdit();
-    const actorUserId = sessionUserId(session);
+    const session = await requireDepartmentManagerSession("Management");
+    const actorUserId = getSessionUserId(session);
     await pool.query(
       `UPDATE events
        SET title=$1, date=$2, time=$3, end_time=$4, location=$5, department=$6, description=$7, owner_user_ids=$8
@@ -183,7 +166,7 @@ export async function updateEvent(
 
 export async function deleteEvent(id: number) {
   try {
-    await assertCanEdit();
+    await requireDepartmentManagerSession("Management");
     await pool.query("DELETE FROM events WHERE id = $1", [id]);
     return { success: true };
   } catch (error) {

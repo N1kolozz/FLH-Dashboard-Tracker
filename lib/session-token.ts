@@ -1,6 +1,7 @@
 const SESSION_MAX_AGE_SECONDS = 7 * 24 * 60 * 60;
-const secretKey = process.env.JWT_SECRET || "flh-super-secret-key-fallback";
 const encoder = new TextEncoder();
+const LOCAL_DEV_SESSION_SECRET = "flh-dashboard-local-dev-session-secret";
+let warnedAboutMissingJwtSecret = false;
 
 export interface Session {
   userId: string;
@@ -17,6 +18,26 @@ type SessionClaims = Session & {
 
 let cachedSigningKey: Promise<CryptoKey> | null = null;
 
+function getSecretKeyMaterial() {
+  const secretKey = process.env.JWT_SECRET?.trim();
+  if (secretKey) {
+    return encoder.encode(secretKey);
+  }
+
+  if (process.env.NODE_ENV !== "production") {
+    if (!warnedAboutMissingJwtSecret) {
+      console.warn(
+        "JWT_SECRET is not set; falling back to a local development session secret."
+      );
+      warnedAboutMissingJwtSecret = true;
+    }
+
+    return encoder.encode(LOCAL_DEV_SESSION_SECRET);
+  }
+
+  throw new Error("JWT_SECRET is required to sign and verify sessions in production");
+}
+
 function getSubtleCrypto() {
   const subtle = globalThis.crypto?.subtle;
   if (!subtle) {
@@ -29,7 +50,7 @@ function getSigningKey() {
   if (!cachedSigningKey) {
     cachedSigningKey = getSubtleCrypto().importKey(
       "raw",
-      encoder.encode(secretKey),
+      getSecretKeyMaterial(),
       { name: "HMAC", hash: "SHA-256" },
       false,
       ["sign", "verify"]

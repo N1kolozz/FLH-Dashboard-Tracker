@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -13,7 +12,7 @@ import {
   Filler,
 } from "chart.js";
 import { Line } from "react-chartjs-2";
-import { HistoryPoint } from "@/app/api/history/route";
+import type { HistoryPoint, SocialHistoryRange } from "@/lib/queries/social";
 
 ChartJS.register(
   CategoryScale,
@@ -44,51 +43,21 @@ const PLATFORM_COLORS = {
   },
 };
 
-type TimeRange = "30" | "90" | "all";
-
-const RANGE_LABELS: Record<TimeRange, string> = {
-  "30": "Last 30 days",
-  "90": "Last 90 days",
-  all: "All time",
-};
-
 interface GrowthChartProps {
   platform: keyof typeof PLATFORM_COLORS;
+  data: HistoryPoint[];
+  rangeLabel: SocialHistoryRange;
+  loading?: boolean;
+  error?: string | null;
 }
 
-export default function GrowthChart({ platform }: GrowthChartProps) {
-  const [data, setData] = useState<HistoryPoint[]>([]);
-  const [range, setRange] = useState<TimeRange>("30");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
-
-  useEffect(() => {
-    abortRef.current?.abort();
-    abortRef.current = new AbortController();
-
-    setLoading(true);
-    setError(null);
-
-    fetch(`/api/history?platform=${platform}&range=${range}`, {
-      signal: abortRef.current.signal,
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json();
-      })
-      .then((json: HistoryPoint[]) => {
-        setData(json);
-        setLoading(false);
-      })
-      .catch((err) => {
-        if (err.name !== "AbortError") {
-          setError(String(err));
-          setLoading(false);
-        }
-      });
-  }, [platform, range]);
-
+export default function GrowthChart({
+  platform,
+  data,
+  rangeLabel,
+  loading = false,
+  error = null,
+}: GrowthChartProps) {
   const config = PLATFORM_COLORS[platform];
 
   const chartData = {
@@ -163,25 +132,9 @@ export default function GrowthChart({ platform }: GrowthChartProps) {
             {config.label} Growth
           </h3>
         </div>
-        {/* Range Selector */}
-        <div className="flex w-full sm:w-auto overflow-x-auto bg-slate-100 rounded-lg p-0.5 gap-0.5 whitespace-nowrap">
-          {(Object.entries(RANGE_LABELS) as [TimeRange, string][]).map(
-            ([key, label]) => (
-              <button
-                key={key}
-                onClick={() => setRange(key)}
-                className={`shrink-0 px-2.5 sm:px-3 py-1 rounded-md text-[11px] sm:text-xs font-medium transition-colors ${
-                  range === key
-                    ? "bg-white text-slate-800 shadow-sm"
-                    : "text-slate-500 hover:text-slate-700"
-                }`}
-              >
-                <span className="sm:hidden">{key === "all" ? "All" : `${key}d`}</span>
-                <span className="hidden sm:inline">{label}</span>
-              </button>
-            )
-          )}
-        </div>
+        <span className="rounded-md bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-500 sm:text-xs">
+          {rangeLabel === "all" ? "All time" : `Last ${rangeLabel} days`}
+        </span>
       </div>
 
       {/* Chart Body */}

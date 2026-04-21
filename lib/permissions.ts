@@ -17,6 +17,14 @@ export function isHeadOrAdmin(session: Session | null): boolean {
   return session.role === "ADMIN" || session.role === "HEAD";
 }
 
+export function getSessionUserId(
+  session: Pick<Session, "userId"> | null | undefined
+): number | null {
+  if (!session) return null;
+  const userId = Number(session.userId);
+  return Number.isInteger(userId) ? userId : null;
+}
+
 /**
  * Asserts that the user is an Admin or Head.
  */
@@ -28,21 +36,57 @@ export function assertHeadOrAdmin(session: Session | null) {
   return session;
 }
 
+export function canManageDepartment(
+  session: Session | null,
+  department: string
+): boolean {
+  if (isHeadOrAdmin(session)) return true;
+  return session?.department === department;
+}
+
+export function assertCanManageDepartment(
+  session: Session | null,
+  department: string,
+  label = department
+) {
+  assertAuthenticated(session);
+  if (!canManageDepartment(session, department)) {
+    throw new Error(
+      `Not authorized: Requires ${label} department membership or HEAD/ADMIN role`
+    );
+  }
+  return session;
+}
+
+export function assertCanAssignPrivilegedRole(
+  session: Session | null,
+  targetRole: string,
+  currentRole?: string | null
+) {
+  const actor = assertHeadOrAdmin(session);
+  const isPrivilegedRole = targetRole === "ADMIN" || targetRole === "HEAD";
+
+  if (
+    isPrivilegedRole &&
+    actor.role !== "ADMIN" &&
+    targetRole !== currentRole
+  ) {
+    throw new Error("Only ADMIN can assign HEAD or ADMIN roles");
+  }
+
+  return actor;
+}
+
 /**
  * Checks if a user has sufficient privileges to manage Projects.
  * Requires Admin, Head, or 'Projects' department membership.
  */
 export function canManageProjects(session: Session | null): boolean {
-  if (isHeadOrAdmin(session)) return true;
-  return session?.department === "Projects";
+  return canManageDepartment(session, "Projects");
 }
 
 export function assertCanManageProjects(session: Session | null) {
-  assertAuthenticated(session);
-  if (!canManageProjects(session)) {
-    throw new Error("Not authorized: Requires Projects department membership or HEAD/ADMIN role");
-  }
-  return session;
+  return assertCanManageDepartment(session, "Projects");
 }
 
 /**
@@ -50,14 +94,9 @@ export function assertCanManageProjects(session: Session | null) {
  * Requires Admin, Head, or 'Management' department membership.
  */
 export function canManageAttendanceAndWorkload(session: Session | null): boolean {
-  if (isHeadOrAdmin(session)) return true;
-  return session?.department === "Management";
+  return canManageDepartment(session, "Management");
 }
 
 export function assertCanManageAttendance(session: Session | null) {
-  assertAuthenticated(session);
-  if (!canManageAttendanceAndWorkload(session)) {
-    throw new Error("Not authorized: Requires Management department membership or HEAD/ADMIN role");
-  }
-  return session;
+  return assertCanManageDepartment(session, "Management", "Management");
 }

@@ -1,26 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { getCurrentSession } from "@/app/actions/session";
 import type { Session } from "@/lib/auth";
 import { logout } from "@/app/actions/auth";
-import PushNotificationManager from "@/components/PushNotificationManager";
 import FlhIconMark from "@/components/FlhIconMark";
 
 import { NAV_SECTIONS } from "@/config/navigation";
 
-export default function Sidebar() {
+export default function Sidebar({ session }: { session: Session | null }) {
   const pathname = usePathname();
-  const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [session, setSession] = useState<Session | null>(null);
-
-  useEffect(() => {
-    getCurrentSession().then(setSession);
-  }, []);
 
   useEffect(() => {
     if (!mobileOpen) return;
@@ -49,7 +41,6 @@ export default function Sidebar() {
 
   const handleLogout = async () => {
     await logout();
-    router.push("/login");
   };
 
   const navContent = (
@@ -118,12 +109,6 @@ export default function Sidebar() {
 
       {/* Profile & Collapse */}
       <div className="mt-auto shrink-0 border-t border-purple-100/60 p-3 pb-safe-bottom">
-        <PushNotificationManager
-          variant="sidebar"
-          collapsed={collapsed}
-          canSendTest={session?.role?.toUpperCase() === "ADMIN"}
-        />
-
         {session && (
           <div className="mb-2">
             {!collapsed ? (

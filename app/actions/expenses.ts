@@ -1,7 +1,7 @@
 "use server";
 
 import { pool } from "@/lib/db";
-import { getSession } from "@/lib/auth";
+import { requireDepartmentManagerSession } from "@/lib/action-auth";
 
 export interface ExpenseRow {
   id: number;
@@ -12,19 +12,6 @@ export interface ExpenseRow {
   paid_by: string;
   notes: string;
   created_at: string;
-}
-
-async function assertCanEdit() {
-  const session = await getSession();
-  if (
-    !session ||
-    (session.role !== "ADMIN" &&
-      session.role !== "HEAD" &&
-      session.department !== "Logistics")
-  ) {
-    throw new Error("Not authorized");
-  }
-  return session;
 }
 
 export async function getExpenses() {
@@ -48,7 +35,7 @@ export async function createExpense(data: {
   notes: string;
 }) {
   try {
-    await assertCanEdit();
+    await requireDepartmentManagerSession("Logistics");
     const res = await pool.query(
       `INSERT INTO expenses (description, amount, category, date, paid_by, notes)
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, created_at`,
@@ -89,7 +76,7 @@ export async function updateExpense(
   }
 ) {
   try {
-    await assertCanEdit();
+    await requireDepartmentManagerSession("Logistics");
     await pool.query(
       `UPDATE expenses SET description=$1, amount=$2, category=$3, date=$4, paid_by=$5, notes=$6 WHERE id=$7`,
       [
@@ -111,7 +98,7 @@ export async function updateExpense(
 
 export async function deleteExpense(id: number) {
   try {
-    await assertCanEdit();
+    await requireDepartmentManagerSession("Logistics");
     await pool.query("DELETE FROM expenses WHERE id = $1", [id]);
     return { success: true };
   } catch (error) {

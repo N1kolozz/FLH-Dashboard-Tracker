@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -13,7 +12,11 @@ import {
   Filler,
 } from "chart.js";
 import { Line } from "react-chartjs-2";
-import { HistoryPoint } from "@/app/api/history/route";
+import type {
+  HistoryPoint,
+  SocialHistoryRange,
+  SocialPlatform,
+} from "@/lib/queries/social";
 import { Icons } from "@/components/Icons";
 
 ChartJS.register(
@@ -55,14 +58,6 @@ const PLATFORM_CONFIG = {
 const PLATFORM_COLORS = PLATFORM_CONFIG;
 
 type Platform = keyof typeof PLATFORM_COLORS;
-type TimeRange = "30" | "90" | "all";
-
-const RANGE_LABELS: Record<TimeRange, string> = {
-  "30": "Last 30 days",
-  "90": "Last 90 days",
-  all: "All time",
-};
-
 const PLATFORMS: Platform[] = ["instagram", "tiktok", "facebook"];
 
 function mergeDates(allData: Record<Platform, HistoryPoint[]>): string[] {
@@ -75,55 +70,18 @@ function mergeDates(allData: Record<Platform, HistoryPoint[]>): string[] {
   return Array.from(dateSet).sort();
 }
 
-export default function CombinedGrowthChart() {
-  const [allData, setAllData] = useState<Record<Platform, HistoryPoint[]>>({
-    instagram: [],
-    tiktok: [],
-    facebook: [],
-  });
-  const [range, setRange] = useState<TimeRange>("30");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
-
-  useEffect(() => {
-    abortRef.current?.abort();
-    abortRef.current = new AbortController();
-    const signal = abortRef.current.signal;
-
-    setLoading(true);
-    setError(null);
-
-    Promise.all(
-      PLATFORMS.map((platform) =>
-        fetch(`/api/history?platform=${platform}&range=${range}`, { signal })
-          .then((res) => {
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            return res.json() as Promise<HistoryPoint[]>;
-          })
-          .then((data) => ({ platform, data }))
-      )
-    )
-      .then((results) => {
-        const combined = { instagram: [], tiktok: [], facebook: [] } as Record<
-          Platform,
-          HistoryPoint[]
-        >;
-        for (const { platform, data } of results) {
-          combined[platform] = data;
-        }
-        setAllData(combined);
-        setLoading(false);
-      })
-      .catch((err) => {
-        if (err.name !== "AbortError") {
-          setError(String(err));
-          setLoading(false);
-        }
-      });
-  }, [range]);
-
-  const dates = mergeDates(allData);
+export default function CombinedGrowthChart({
+  allData,
+  rangeLabel,
+  loading = false,
+  error = null,
+}: {
+  allData: Record<SocialPlatform, HistoryPoint[]>;
+  rangeLabel: SocialHistoryRange;
+  loading?: boolean;
+  error?: string | null;
+}) {
+  const dates = mergeDates(allData as Record<Platform, HistoryPoint[]>);
   const totalPoints = PLATFORMS.reduce(
     (sum, p) => sum + allData[p].length,
     0
@@ -217,25 +175,9 @@ export default function CombinedGrowthChart() {
             All Platforms Growth
           </h3>
         </div>
-        {/* Range Selector */}
-        <div className="flex w-full sm:w-auto overflow-x-auto bg-slate-100 rounded-lg p-0.5 gap-0.5 whitespace-nowrap">
-          {(Object.entries(RANGE_LABELS) as [TimeRange, string][]).map(
-            ([key, label]) => (
-              <button
-                key={key}
-                onClick={() => setRange(key)}
-                className={`shrink-0 px-2.5 sm:px-3 py-1 rounded-md text-[11px] sm:text-xs font-medium transition-colors ${
-                  range === key
-                    ? "bg-white text-slate-800 shadow-sm"
-                    : "text-slate-500 hover:text-slate-700"
-                }`}
-              >
-                <span className="sm:hidden">{key === "all" ? "All" : `${key}d`}</span>
-                <span className="hidden sm:inline">{label}</span>
-              </button>
-            )
-          )}
-        </div>
+        <span className="rounded-md bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-500 sm:text-xs">
+          {rangeLabel === "all" ? "All time" : `Last ${rangeLabel} days`}
+        </span>
       </div>
 
       {/* Custom legend with platform icons */}

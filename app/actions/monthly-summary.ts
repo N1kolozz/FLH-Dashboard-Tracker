@@ -9,7 +9,51 @@ import {
   MonthlySummaryData,
 } from "@/types";
 
-/* ─── Helpers ─── */
+interface SummaryUserRow {
+  id: number;
+  name: string;
+  department: string;
+  role: string;
+  position: string;
+  email: string;
+}
+
+interface SummaryProjectRow {
+  id: number;
+  name: string;
+  description: string;
+  status: string;
+  priority: string;
+  team: string;
+  owner_user_ids: number[];
+}
+
+interface SummaryEventRow {
+  id: number;
+  title: string;
+  date: string;
+  location: string;
+  department: string;
+  description: string;
+  owner_user_ids: number[];
+}
+
+interface SummaryImpactRow {
+  id: number;
+  project_id: number | null;
+  project_name: string;
+  activity_type: string;
+  people_reached: number;
+  date: string;
+  result_summary: string;
+}
+
+interface SummaryAttendanceRow {
+  user_id: number;
+  department: string;
+  recorded: number;
+  present: number;
+}
 
 function monthStartEnd(month: string) {
   const [y, m] = month.split("-").map(Number);
@@ -24,280 +68,344 @@ function monthLabel(month: string) {
   return d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
 }
 
-/* ─── Main action ─── */
+function toOwnerIds(value: unknown): number[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((id) => Number(id))
+    .filter((id) => Number.isInteger(id));
+}
+
+function indexRowsByOwner<T extends { owner_user_ids: number[] }>(rows: T[]) {
+  const map = new Map<number, T[]>();
+
+  for (const row of rows) {
+    for (const ownerId of Array.from(new Set(toOwnerIds(row.owner_user_ids)))) {
+      const current = map.get(ownerId);
+      if (current) {
+        current.push(row);
+      } else {
+        map.set(ownerId, [row]);
+      }
+    }
+  }
+
+  return map;
+}
+
+function pushByKey<K, T>(map: Map<K, T[]>, key: K, item: T) {
+  const current = map.get(key);
+  if (current) {
+    current.push(item);
+  } else {
+    map.set(key, [item]);
+  }
+}
 
 export async function getMonthlySummary(
   month: string
 ): Promise<{ success: true; data: MonthlySummaryData } | { error: string }> {
   try {
-    const tempSession = await getSession();
-    assertHeadOrAdmin(tempSession);
+    assertHeadOrAdmin(await getSession());
 
     const { start, end } = monthStartEnd(month);
 
-    // 1. Fetch all members
-    const usersRes = await pool.query(
-      `SELECT id, full_name AS name, department, role, COALESCE(position, '') AS position, email
-       FROM users ORDER BY department, full_name`
-    );
-    const users = usersRes.rows as {
-      id: number;
-      name: string;
-      department: string;
-      role: string;
-      position: string;
-      email: string;
-    }[];
+    const [
+      usersRes,
+      projectsRes,
+      eventsRes,
+      expensesRes,
+      impactRes,
+      attendanceRes,
+    ] = await Promise.all([
+      pool.query(
+        `SELECT id, full_name AS name, department, role, COALESCE(position, '') AS position, email
+         FROM users
+         ORDER BY department, full_name`
+      ),
+      pool.query(
+        `SELECT
+           p.id,
+           p.name,
+           p.description,
+           p.status,
+           p.priority,
+           p.team,
+           COALESCE(
+             NULLIF(p.owner_user_ids, '{}'),
+             CASE WHEN p.owner_user_id IS NULL THEN '{}'::INTEGER[] ELSE ARRAY[p.owner_user_id] END
+           ) AS owner_user_ids
+         FROM projects p
+         WHERE p.created_at::date <= $2
+           AND (p.status != 'completed' OR p.updated_at::date >= $1)
+         ORDER BY p.created_at DESC`,
+        [start, end]
+      ),
+      pool.query(
+        `SELECT
+           e.id,
+           e.title,
+           e.date::text,
+           e.location,
+           e.department,
+           e.description,
+           COALESCE(
+             NULLIF(e.owner_user_ids, '{}'),
+             CASE WHEN e.owner_user_id IS NULL THEN '{}'::INTEGER[] ELSE ARRAY[e.owner_user_id] END
+           ) AS owner_user_ids
+         FROM events e
+         WHERE e.date >= $1 AND e.date <= $2
+         ORDER BY e.date ASC`,
+        [start, end]
+      ),
+      pool.query(
+        `SELECT COALESCE(SUM(amount), 0)::float AS total
+         FROM expenses
+         WHERE date >= $1 AND date <= $2`,
+        [start, end]
+      ),
+      pool.query(
+        `SELECT
+           ir.id,
+           ir.project_id,
+           COALESCE(p.name, ir.project_name) AS project_name,
+           ir.activity_type,
+           ir.people_reached,
+           ir.date::text,
+           COALESCE(ir.result_summary, '') AS result_summary
+         FROM impact_records ir
+         LEFT JOIN projects p ON p.id = ir.project_id
+         WHERE ir.date >= $1 AND ir.date <= $2
+         ORDER BY ir.date DESC`,
+        [start, end]
+      ),
+      pool.query(
+        `SELECT
+           u.id AS user_id,
+           u.department,
+           COUNT(r.id) FILTER (WHERE r.status <> 'pending')::int AS recorded,
+           COUNT(r.id) FILTER (WHERE r.status = 'present')::int AS present
+         FROM users u
+         LEFT JOIN attendance_records r ON r.user_id = u.id
+         LEFT JOIN attendance_sessions s ON s.id = r.session_id
+           AND s.meeting_date >= $1 AND s.meeting_date <= $2
+         WHERE s.id IS NOT NULL
+         GROUP BY u.id, u.department`,
+        [start, end]
+      ),
+    ]);
 
-    // 2. Projects that were active / created / completed in the month
-    const projectsRes = await pool.query(
-      `SELECT
-         p.id,
-         p.name,
-         p.description,
-         p.status,
-         p.priority,
-         p.team,
-         COALESCE(
-           NULLIF(p.owner_user_ids, '{}'),
-           CASE WHEN p.owner_user_id IS NULL THEN '{}'::INTEGER[] ELSE ARRAY[p.owner_user_id] END
-         ) AS owner_user_ids
-       FROM projects p
-       WHERE p.created_at::date <= $2
-         AND (p.status != 'completed' OR p.updated_at::date >= $1)
-       ORDER BY p.created_at DESC`,
-      [start, end]
-    );
-
-    // 3. Events in the month
-    const eventsRes = await pool.query(
-      `SELECT
-         e.id,
-         e.title,
-         e.date::text,
-         e.location,
-         e.department,
-         e.description,
-         COALESCE(
-           NULLIF(e.owner_user_ids, '{}'),
-           CASE WHEN e.owner_user_id IS NULL THEN '{}'::INTEGER[] ELSE ARRAY[e.owner_user_id] END
-         ) AS owner_user_ids
-       FROM events e
-       WHERE e.date >= $1 AND e.date <= $2
-       ORDER BY e.date ASC`,
-      [start, end]
-    );
-
-    // 4. Expenses in the month
-    const expensesRes = await pool.query(
-      `SELECT
-         COALESCE(SUM(amount), 0)::float AS total
-       FROM expenses
-       WHERE date >= $1 AND date <= $2`,
-      [start, end]
-    );
-
-    // 5. Impact records in the month
-    const impactRes = await pool.query(
-      `SELECT
-         ir.id,
-         COALESCE(p.name, ir.project_name) AS project_name,
-         ir.activity_type,
-         ir.people_reached,
-         ir.date::text,
-         COALESCE(ir.result_summary, '') AS result_summary
-       FROM impact_records ir
-       LEFT JOIN projects p ON p.id = ir.project_id
-       WHERE ir.date >= $1 AND ir.date <= $2
-       ORDER BY ir.date DESC`,
-      [start, end]
-    );
-
-    // 6. Attendance data for the month
-    const attendanceRes = await pool.query(
-      `SELECT
-         u.id AS user_id,
-         u.department,
-         COUNT(r.id) FILTER (WHERE r.status <> 'pending')::int AS recorded,
-         COUNT(r.id) FILTER (WHERE r.status = 'present')::int AS present
-       FROM users u
-       LEFT JOIN attendance_records r ON r.user_id = u.id
-       LEFT JOIN attendance_sessions s ON s.id = r.session_id
-         AND s.meeting_date >= $1 AND s.meeting_date <= $2
-       WHERE s.id IS NOT NULL
-       GROUP BY u.id, u.department`,
-      [start, end]
-    );
+    const users = usersRes.rows as SummaryUserRow[];
+    const projects = projectsRes.rows as SummaryProjectRow[];
+    const events = eventsRes.rows as SummaryEventRow[];
+    const impactRecords = impactRes.rows as SummaryImpactRow[];
+    const attendanceRows = attendanceRes.rows as SummaryAttendanceRow[];
 
     const attendanceMap = new Map<
       number,
       { recorded: number; present: number }
     >();
-    for (const row of attendanceRes.rows) {
+    for (const row of attendanceRows) {
       attendanceMap.set(row.user_id, {
         recorded: row.recorded,
         present: row.present,
       });
     }
 
-    // Build user lookup
-    const userMap = new Map(users.map((u) => [u.id, u]));
+    const userMap = new Map(users.map((user) => [user.id, user]));
+    const usersByDepartment = new Map<string, SummaryUserRow[]>();
+    const userDepartmentById = new Map<number, string>();
 
-    const ownerNames = (ids: number[]): string[] => {
-      return (ids || [])
-        .map((id) => userMap.get(id)?.name)
-        .filter(Boolean) as string[];
-    };
+    for (const user of users) {
+      pushByKey(usersByDepartment, user.department, user);
+      userDepartmentById.set(user.id, user.department);
+    }
 
-    // Build department breakdown
-    const deptNames = Array.from(new Set(users.map((u) => u.department))).sort();
+    const departmentNames = Array.from(usersByDepartment.keys()).sort();
+    const departmentsByLowerName = new Map(
+      departmentNames.map((department) => [department.toLowerCase(), department])
+    );
 
-    const departments: DepartmentSummary[] = deptNames.map((dept) => {
-      const deptUsers = users.filter((u) => u.department === dept);
-      const deptUserIds = new Set(deptUsers.map((u) => u.id));
+    const projectsByOwner = indexRowsByOwner(projects);
+    const eventsByOwner = indexRowsByOwner(events);
+    const projectsByDepartment = new Map<string, SummaryProjectRow[]>();
+    const eventsByDepartment = new Map<string, SummaryEventRow[]>();
+    const impactByProjectId = new Map<number, SummaryImpactRow[]>();
 
-      // Projects where at least one owner is from this dept, or team matches
-      const deptProjects = projectsRes.rows.filter((p) => {
-        const team = (p.team || "").toLowerCase();
-        const deptLC = dept.toLowerCase();
-        if (team === deptLC || team.includes(deptLC)) return true;
-        return (
-          Array.isArray(p.owner_user_ids) &&
-          p.owner_user_ids.some((id: number) => deptUserIds.has(id))
-        );
-      });
+    for (const project of projects) {
+      const linkedDepartments = new Set<string>();
+      const projectTeam = project.team.trim().toLowerCase();
 
-      // Events where department matches or owners in dept
-      const deptEvents = eventsRes.rows.filter((e) => {
-        const edept = (e.department || "").toLowerCase();
-        if (edept === "all" || edept === dept.toLowerCase()) return true;
-        return (
-          Array.isArray(e.owner_user_ids) &&
-          e.owner_user_ids.some((id: number) => deptUserIds.has(id))
-        );
-      });
-
-      // Impact records for department projects
-      const deptProjectIds = new Set(deptProjects.map((p) => p.id));
-      const deptImpact = impactRes.rows.filter((ir) =>
-        deptProjectIds.has(ir.project_id)
-      );
-
-      // Attendance for dept
-      let deptRecorded = 0;
-      let deptPresent = 0;
-      for (const u of deptUsers) {
-        const a = attendanceMap.get(u.id);
-        if (a) {
-          deptRecorded += a.recorded;
-          deptPresent += a.present;
+      for (const department of departmentNames) {
+        const loweredDepartment = department.toLowerCase();
+        if (
+          projectTeam &&
+          (projectTeam === loweredDepartment ||
+            projectTeam.includes(loweredDepartment))
+        ) {
+          linkedDepartments.add(department);
         }
       }
 
-      // Members list
-      const members: MemberContribution[] = deptUsers.map((u) => {
-        const userProjects = deptProjects.filter(
-          (p) =>
-            Array.isArray(p.owner_user_ids) && p.owner_user_ids.includes(u.id)
-        );
-        const userEvents = deptEvents.filter(
-          (e) =>
-            Array.isArray(e.owner_user_ids) && e.owner_user_ids.includes(u.id)
-        );
-        const att = attendanceMap.get(u.id);
+      for (const ownerId of toOwnerIds(project.owner_user_ids)) {
+        const ownerDepartment = userDepartmentById.get(ownerId);
+        if (ownerDepartment) linkedDepartments.add(ownerDepartment);
+      }
+
+      for (const department of Array.from(linkedDepartments)) {
+        pushByKey(projectsByDepartment, department, project);
+      }
+    }
+
+    for (const event of events) {
+      const linkedDepartments = new Set<string>();
+      const eventDepartment = event.department.trim().toLowerCase();
+
+      if (eventDepartment === "all") {
+        for (const department of departmentNames) {
+          linkedDepartments.add(department);
+        }
+      } else {
+        const matchedDepartment = departmentsByLowerName.get(eventDepartment);
+        if (matchedDepartment) {
+          linkedDepartments.add(matchedDepartment);
+        }
+      }
+
+      for (const ownerId of toOwnerIds(event.owner_user_ids)) {
+        const ownerDepartment = userDepartmentById.get(ownerId);
+        if (ownerDepartment) linkedDepartments.add(ownerDepartment);
+      }
+
+      for (const department of Array.from(linkedDepartments)) {
+        pushByKey(eventsByDepartment, department, event);
+      }
+    }
+
+    for (const record of impactRecords) {
+      if (record.project_id == null) continue;
+      pushByKey(impactByProjectId, record.project_id, record);
+    }
+
+    const ownerNames = (ids: number[]): string[] =>
+      toOwnerIds(ids)
+        .map((id) => userMap.get(id)?.name)
+        .filter(Boolean) as string[];
+
+    const departments: DepartmentSummary[] = departmentNames.map((department) => {
+      const departmentUsers = usersByDepartment.get(department) ?? [];
+      const departmentProjects = projectsByDepartment.get(department) ?? [];
+      const departmentEvents = eventsByDepartment.get(department) ?? [];
+      const departmentImpact = departmentProjects.flatMap(
+        (project) => impactByProjectId.get(project.id) ?? []
+      );
+
+      let departmentRecorded = 0;
+      let departmentPresent = 0;
+      for (const user of departmentUsers) {
+        const attendance = attendanceMap.get(user.id);
+        if (!attendance) continue;
+        departmentRecorded += attendance.recorded;
+        departmentPresent += attendance.present;
+      }
+
+      const members: MemberContribution[] = departmentUsers.map((user) => {
+        const userProjects = projectsByOwner.get(user.id) ?? [];
+        const userEvents = eventsByOwner.get(user.id) ?? [];
+        const attendance = attendanceMap.get(user.id);
 
         return {
-          id: u.id,
-          name: u.name,
-          department: u.department,
-          position: u.position,
-          role: u.role,
+          id: user.id,
+          name: user.name,
+          department: user.department,
+          position: user.position,
+          role: user.role,
           projectCount: userProjects.length,
           eventCount: userEvents.length,
           attendanceRate:
-            att && att.recorded > 0
-              ? Math.round((att.present / att.recorded) * 100)
+            attendance && attendance.recorded > 0
+              ? Math.round((attendance.present / attendance.recorded) * 100)
               : null,
-          projects: userProjects.map((p) => ({
-            id: p.id,
-            name: p.name,
-            status: p.status,
-            priority: p.priority,
+          projects: userProjects.map((project) => ({
+            id: project.id,
+            name: project.name,
+            status: project.status,
+            priority: project.priority,
           })),
-          events: userEvents.map((e) => ({
-            id: e.id,
-            title: e.title,
-            date: e.date,
+          events: userEvents.map((event) => ({
+            id: event.id,
+            title: event.title,
+            date: event.date,
           })),
         };
       });
 
       return {
-        department: dept,
-        memberCount: deptUsers.length,
-        activeProjects: deptProjects.filter((p) => p.status !== "completed")
-          .length,
-        completedProjects: deptProjects.filter((p) => p.status === "completed")
-          .length,
-        totalEvents: deptEvents.length,
-        totalExpenses: 0, // expenses are not department-keyed
+        department,
+        memberCount: departmentUsers.length,
+        activeProjects: departmentProjects.filter(
+          (project) => project.status !== "completed"
+        ).length,
+        completedProjects: departmentProjects.filter(
+          (project) => project.status === "completed"
+        ).length,
+        totalEvents: departmentEvents.length,
+        totalExpenses: 0,
         attendanceRate:
-          deptRecorded > 0
-            ? Math.round((deptPresent / deptRecorded) * 100)
+          departmentRecorded > 0
+            ? Math.round((departmentPresent / departmentRecorded) * 100)
             : null,
         members,
-        projects: deptProjects.map((p) => ({
-          id: p.id,
-          name: p.name,
-          status: p.status,
-          priority: p.priority,
-          description: p.description || "",
-          ownerNames: ownerNames(p.owner_user_ids),
+        projects: departmentProjects.map((project) => ({
+          id: project.id,
+          name: project.name,
+          status: project.status,
+          priority: project.priority,
+          description: project.description || "",
+          ownerNames: ownerNames(project.owner_user_ids),
         })),
-        events: deptEvents.map((e) => ({
-          id: e.id,
-          title: e.title,
-          date: e.date,
-          location: e.location || "",
-          description: e.description || "",
-          ownerNames: ownerNames(e.owner_user_ids),
+        events: departmentEvents.map((event) => ({
+          id: event.id,
+          title: event.title,
+          date: event.date,
+          location: event.location || "",
+          description: event.description || "",
+          ownerNames: ownerNames(event.owner_user_ids),
         })),
-        impactRecords: deptImpact.map((ir) => ({
-          id: ir.id,
-          projectName: ir.project_name,
-          activityType: ir.activity_type,
-          peopleReached: ir.people_reached,
-          date: ir.date,
-          resultSummary: ir.result_summary,
+        impactRecords: departmentImpact.map((record) => ({
+          id: record.id,
+          projectName: record.project_name,
+          activityType: record.activity_type,
+          peopleReached: record.people_reached,
+          date: record.date,
+          resultSummary: record.result_summary,
         })),
       };
     });
 
-    // Overall totals
     let totalRecorded = 0;
     let totalPresent = 0;
-    for (const a of Array.from(attendanceMap.values())) {
-      totalRecorded += a.recorded;
-      totalPresent += a.present;
+    for (const attendance of Array.from(attendanceMap.values())) {
+      totalRecorded += attendance.recorded;
+      totalPresent += attendance.present;
     }
+
+    const totalPeopleReached = impactRecords.reduce(
+      (sum, record) => sum + (record.people_reached || 0),
+      0
+    );
 
     const data: MonthlySummaryData = {
       month,
       monthLabel: monthLabel(month),
       totalMembers: users.length,
-      totalProjects: projectsRes.rows.length,
-      activeProjects: projectsRes.rows.filter((p) => p.status !== "completed")
+      totalProjects: projects.length,
+      activeProjects: projects.filter((project) => project.status !== "completed")
         .length,
-      completedProjects: projectsRes.rows.filter(
-        (p) => p.status === "completed"
-      ).length,
-      totalEvents: eventsRes.rows.length,
+      completedProjects: projects.filter((project) => project.status === "completed")
+        .length,
+      totalEvents: events.length,
       totalExpenses: expensesRes.rows[0]?.total || 0,
-      totalPeopleReached: impactRes.rows.reduce(
-        (sum: number, r: { people_reached: number }) =>
-          sum + (r.people_reached || 0),
-        0
-      ),
+      totalPeopleReached,
       overallAttendanceRate:
         totalRecorded > 0
           ? Math.round((totalPresent / totalRecorded) * 100)

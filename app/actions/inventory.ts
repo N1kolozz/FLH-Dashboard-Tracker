@@ -1,7 +1,7 @@
 "use server";
 
 import { pool } from "@/lib/db";
-import { getSession } from "@/lib/auth";
+import { requireDepartmentManagerSession } from "@/lib/action-auth";
 
 export interface CheckoutRow {
   id: number;
@@ -21,19 +21,6 @@ export interface InventoryItemRow {
   notes: string;
   checkouts: CheckoutRow[];
   created_at: string;
-}
-
-async function assertCanEdit() {
-  const session = await getSession();
-  if (
-    !session ||
-    (session.role !== "ADMIN" &&
-      session.role !== "HEAD" &&
-      session.department !== "Logistics")
-  ) {
-    throw new Error("Not authorized");
-  }
-  return session;
 }
 
 export async function getInventoryItems() {
@@ -80,7 +67,7 @@ export async function createInventoryItem(data: {
   notes: string;
 }) {
   try {
-    await assertCanEdit();
+    await requireDepartmentManagerSession("Logistics");
     const res = await pool.query(
       `INSERT INTO inventory_items (name, category, quantity, status, location, condition, notes)
        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, created_at`,
@@ -123,7 +110,7 @@ export async function updateInventoryItem(
   }
 ) {
   try {
-    await assertCanEdit();
+    await requireDepartmentManagerSession("Logistics");
     await pool.query(
       `UPDATE inventory_items SET name=$1, category=$2, quantity=$3, status=$4, location=$5, condition=$6, notes=$7 WHERE id=$8`,
       [
@@ -146,7 +133,7 @@ export async function updateInventoryItem(
 
 export async function deleteInventoryItem(id: number) {
   try {
-    await assertCanEdit();
+    await requireDepartmentManagerSession("Logistics");
     await pool.query("DELETE FROM inventory_items WHERE id = $1", [id]);
     return { success: true };
   } catch (error) {
@@ -157,7 +144,7 @@ export async function deleteInventoryItem(id: number) {
 
 export async function checkoutItem(itemId: number, person: string) {
   try {
-    await assertCanEdit();
+    await requireDepartmentManagerSession("Logistics");
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
@@ -196,7 +183,7 @@ export async function checkoutItem(itemId: number, person: string) {
 
 export async function checkinItem(itemId: number) {
   try {
-    await assertCanEdit();
+    await requireDepartmentManagerSession("Logistics");
     const client = await pool.connect();
     try {
       await client.query("BEGIN");

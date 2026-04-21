@@ -1,7 +1,11 @@
 "use server";
 
 import { pool } from "@/lib/db";
-import { getSession } from "@/lib/auth";
+import {
+  requireAuthenticatedSession,
+  requireHeadOrAdminSession,
+} from "@/lib/action-auth";
+import { getSessionUserId } from "@/lib/permissions";
 
 /* ─── Types ─── */
 
@@ -20,22 +24,6 @@ export interface ReviewRequest {
   entity_name?: string;
 }
 
-/* ─── Auth helpers ─── */
-
-async function assertAuthenticated() {
-  const session = await getSession();
-  if (!session) throw new Error("Not authenticated");
-  return session;
-}
-
-async function assertHeadOrAdmin() {
-  const session = await assertAuthenticated();
-  if (session.role !== "HEAD" && session.role !== "ADMIN") {
-    throw new Error("Only HEAD or ADMIN can review");
-  }
-  return session;
-}
-
 /* ─── Submit for Review ─── */
 
 export async function submitForReview(
@@ -43,8 +31,8 @@ export async function submitForReview(
   entityId: number
 ) {
   try {
-    const session = await assertAuthenticated();
-    const userId = Number(session.userId);
+    const session = await requireAuthenticatedSession();
+    const userId = getSessionUserId(session);
 
     // Check if there's already a pending review
     const existing = await pool.query(
@@ -73,7 +61,7 @@ export async function submitForReview(
       `INSERT INTO review_requests (entity_type, entity_id, submitted_by)
        VALUES ($1, $2, $3)
        RETURNING id, created_at`,
-      [entityType, entityId, Number.isInteger(userId) ? userId : null]
+      [entityType, entityId, userId]
     );
 
     return { success: true, id: res.rows[0].id };
@@ -87,8 +75,8 @@ export async function submitForReview(
 
 export async function approveReview(reviewId: number, feedback?: string) {
   try {
-    const session = await assertHeadOrAdmin();
-    const userId = Number(session.userId);
+    const session = await requireHeadOrAdminSession();
+    const userId = getSessionUserId(session);
 
     // Get the review
     const reviewRes = await pool.query(
@@ -109,7 +97,7 @@ export async function approveReview(reviewId: number, feedback?: string) {
            feedback = $2,
            reviewed_at = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
        WHERE id = $3`,
-      [Number.isInteger(userId) ? userId : null, feedback || null, reviewId]
+      [userId, feedback || null, reviewId]
     );
 
     // Update entity review status
@@ -136,8 +124,8 @@ export async function approveReview(reviewId: number, feedback?: string) {
 
 export async function rejectReview(reviewId: number, feedback: string) {
   try {
-    const session = await assertHeadOrAdmin();
-    const userId = Number(session.userId);
+    const session = await requireHeadOrAdminSession();
+    const userId = getSessionUserId(session);
 
     if (!feedback || !feedback.trim()) {
       return { error: "Feedback is required when rejecting" };
@@ -162,7 +150,7 @@ export async function rejectReview(reviewId: number, feedback: string) {
            feedback = $2,
            reviewed_at = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
        WHERE id = $3`,
-      [Number.isInteger(userId) ? userId : null, feedback.trim(), reviewId]
+      [userId, feedback.trim(), reviewId]
     );
 
     // On reject: mark project as rejected (soft-delete) or delete content post
@@ -215,7 +203,7 @@ export async function getPendingReviews(): Promise<{
   error?: string;
 }> {
   try {
-    await assertHeadOrAdmin();
+    await requireHeadOrAdminSession();
 
     const res = await pool.query(
       `SELECT rr.*,

@@ -1,6 +1,6 @@
 "use client";
 
-import { PlatformStats } from "@/app/api/stats/route";
+import type { PlatformStats } from "@/lib/queries/social";
 
 const PLATFORM_CONFIG = {
   instagram: {
