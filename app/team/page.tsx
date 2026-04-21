@@ -268,7 +268,7 @@ export default function TeamPage() {
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="border-b border-purple-200/70 bg-gradient-to-r from-violet-50/70 via-purple-50/65 to-fuchsia-50/70 backdrop-blur-md">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-4 sm:px-6 2xl:flex-row 2xl:items-center 2xl:justify-between">
           <div>
             <h1 className="text-lg font-bold text-slate-900 flex items-center gap-2">
               Team Directory
@@ -280,19 +280,19 @@ export default function TeamPage() {
               {isLoadingData ? "Loading members..." : `${members.length} member${members.length !== 1 ? "s" : ""}`}
             </p>
           </div>
-          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
-            <TeamSubnav active="directory" />
+          <div className="grid w-full grid-cols-1 gap-2 md:grid-cols-2 2xl:flex 2xl:w-auto 2xl:flex-wrap 2xl:items-center 2xl:justify-end">
+            <TeamSubnav active="directory" className="md:col-span-2 2xl:col-auto" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search name or role..."
-              className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-300 sm:w-56"
+              className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-300 2xl:w-56"
             />
             <select
               value={filterDept}
               onChange={(e) => setFilterDept(e.target.value)}
-              className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-300 sm:w-44"
+              className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-300 2xl:w-44"
             >
               <option value="all">All departments</option>
               {Object.keys(DEPT_CONFIG).map((d) => (<option key={d} value={d}>{DEPT_CONFIG[d].label}</option>))}
@@ -300,7 +300,7 @@ export default function TeamPage() {
             {canEdit && (
               <button
                 onClick={() => setModalOpen(true)}
-                className="h-10 w-full rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-purple-700 sm:w-auto"
+                className="h-10 w-full rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-purple-700 md:col-span-2 2xl:w-auto"
               >+ Add Member</button>
             )}
           </div>

@@ -283,7 +283,7 @@ export default function WorkloadPage() {
       {/* Header */}
       <header className="border-b border-purple-200/70 bg-gradient-to-r from-violet-50/70 via-purple-50/65 to-fuchsia-50/70 backdrop-blur-md">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
             <div>
               <h1 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                 Workload View
@@ -294,7 +294,7 @@ export default function WorkloadPage() {
               <p className="text-xs text-slate-500 mt-0.5">Who owns what — spot imbalances at a glance</p>
             </div>
 
-            <TeamSubnav active="workload" />
+            <TeamSubnav active="workload" className="xl:shrink-0" />
           </div>
 
           {/* Summary stats */}
@@ -323,18 +323,18 @@ export default function WorkloadPage() {
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
         {/* Controls */}
-        <div className="mb-5 flex flex-col gap-2 lg:flex-row lg:items-center">
+        <div className="mb-5 grid grid-cols-1 gap-2 md:grid-cols-2 xl:flex xl:flex-wrap xl:items-center">
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search member..."
-            className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-300 lg:w-48"
+            className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-300 xl:w-48"
           />
           <select
             value={filterDept}
             onChange={(e) => setFilterDept(e.target.value)}
-            className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-300 lg:w-44"
+            className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-300 xl:w-44"
           >
             <option value="all">All departments</option>
             {Object.keys(DEPT_CONFIG).map((d) => (
@@ -344,14 +344,14 @@ export default function WorkloadPage() {
           <select
             value={sortKey}
             onChange={(e) => setSortKey(e.target.value as SortKey)}
-            className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-300 lg:w-52"
+            className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-300 xl:w-52"
           >
             <option value="workload">Sort: Busiest first</option>
             <option value="activeProjects">Sort: Most projects</option>
           </select>
 
           {/* Legend */}
-          <div className="flex flex-wrap items-center gap-2 pt-1 lg:ml-auto lg:justify-end lg:pt-0">
+          <div className="flex flex-wrap items-center gap-2 pt-1 md:col-span-2 xl:ml-auto xl:justify-end xl:pt-0">
             {[
               { label: "Free", bar: "bg-slate-300" },
               { label: "Light", bar: "bg-emerald-400" },
