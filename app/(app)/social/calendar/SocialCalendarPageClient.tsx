@@ -89,6 +89,7 @@ export default function SocialCalendarPageClient({
   const [reviewTarget, setReviewTarget] = useState<{ postId: number; reviewId: number; postCaption: string } | null>(null);
   const [reviewFeedback, setReviewFeedback] = useState("");
   const [reviewSaving, setReviewSaving] = useState(false);
+  const deepLinkHandledRef = useRef(false);
 
   const canEdit = session && (
     session.role === "ADMIN" || 
@@ -120,6 +121,49 @@ export default function SocialCalendarPageClient({
       cancelled = true;
     };
   }, [viewYear]);
+
+  useEffect(() => {
+    if (deepLinkHandledRef.current) {
+      return;
+    }
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlReviewId = urlParams.get("reviewId");
+    const urlPostId = urlParams.get("postId");
+
+    if (!urlReviewId || !urlPostId) {
+      return;
+    }
+
+    deepLinkHandledRef.current = true;
+    const postId = Number(urlPostId);
+    const reviewId = Number(urlReviewId);
+    const targetPost = initialPosts.find((post) => post.id === postId) ?? null;
+
+    if (!targetPost || !Number.isInteger(reviewId)) {
+      return;
+    }
+
+    const targetDate = targetPost.date;
+    const targetMonth = new Date(`${targetDate}T00:00:00`);
+
+    if (!Number.isNaN(targetMonth.getTime())) {
+      setViewMonth(targetMonth.getMonth());
+      setViewYear(targetMonth.getFullYear());
+      setCalendarCursor(targetDate);
+      setSelectedDate(targetDate);
+    }
+
+    setTimeout(() => {
+      setReviewTarget({
+        postId,
+        reviewId,
+        postCaption: targetPost.caption,
+      });
+      setReviewFeedback("");
+      setReviewModalOpen(true);
+    }, 300);
+  }, [initialPosts]);
 
   const holidaysByDate = useMemo(() => buildHolidaysByDate(publicHolidays), [publicHolidays]);
 

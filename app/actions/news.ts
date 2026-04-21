@@ -230,7 +230,7 @@ export async function getDashboardNews() {
             : "Submitted for review",
           href: row.entity_type === "project"
             ? `/projects?reviewId=${row.id}&projectId=${row.entity_id}`
-            : null,
+            : `/social/calendar?reviewId=${row.id}&postId=${row.entity_id}`,
           created_at: serializeTimestamp(row.created_at),
           author_name: row.submitted_by_name,
           review_status: row.status,

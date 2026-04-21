@@ -39,11 +39,11 @@ function QuickStat({
   return (
     <Link
       href={href}
-      className="group bg-white hover:bg-slate-50 transition-colors rounded-2xl border border-purple-100 p-5"
+      className="group rounded-2xl border border-purple-100 bg-white p-5 transition-all duration-200 hover:-translate-y-1 hover:border-purple-200 hover:bg-slate-50 hover:shadow-xl hover:shadow-purple-100/60"
     >
       <div className="flex items-center gap-4">
         <div
-          className={`w-12 h-12 rounded-xl ${color} flex items-center justify-center`}
+          className={`w-12 h-12 rounded-xl ${color} flex items-center justify-center transition-transform duration-200 group-hover:scale-110 group-hover:rotate-3`}
         >
           {icon}
         </div>
@@ -125,7 +125,7 @@ function formatDashboardNumber(value: number) {
 
 function NewsItem({ item }: { item: DashboardNewsItem }) {
   const config = { ...NEWS_CONFIG[item.type] };
-  let className = "block h-full rounded-lg border bg-white/95 p-4 shadow-sm transition hover:bg-purple-50/60 ";
+  let className = "dash-news-card block h-full rounded-lg border bg-white/95 p-4 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:bg-purple-50/60 hover:shadow-lg hover:shadow-purple-100/60 ";
   
   if (item.type === "review") {
     if (item.review_status === "approved") {
@@ -273,8 +273,13 @@ export default function DashboardPage({
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="border-b border-purple-200/70 bg-gradient-to-r from-violet-100/70 via-purple-100/65 to-fuchsia-100/70 backdrop-blur-md">
+    <div className="relative min-h-screen overflow-hidden bg-slate-50">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(216,180,254,0.18),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(244,114,182,0.14),transparent_28%)]" />
+      <div className="pointer-events-none absolute -top-16 left-[7%] h-56 w-56 rounded-full bg-purple-300/18 blur-3xl" />
+      <div className="pointer-events-none absolute top-72 right-[10%] h-64 w-64 rounded-full bg-fuchsia-300/14 blur-3xl" />
+      <div className="pointer-events-none absolute bottom-12 left-1/3 h-52 w-52 rounded-full bg-cyan-200/16 blur-3xl" />
+
+      <header className="relative border-b border-purple-200/70 bg-gradient-to-r from-violet-100/70 via-purple-100/65 to-fuchsia-100/70 backdrop-blur-md">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
           <h1 className="text-xl sm:text-2xl font-bold text-slate-900 flex items-center gap-2">
             Welcome back
@@ -288,7 +293,7 @@ export default function DashboardPage({
         </div>
       </header>
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-8">
+      <div className="relative max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-8">
         <PushNotificationManager
           variant="dashboard"
           canSendTest={session?.role?.toUpperCase() === "ADMIN"}
@@ -349,17 +354,17 @@ export default function DashboardPage({
 
         {/* Second row — smaller stats */}
         <section className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="bg-white rounded-xl border border-purple-100 p-4 shadow-sm text-center">
+          <div className="rounded-xl border border-purple-100 bg-white p-4 text-center shadow-sm">
             <p className="text-xl font-bold text-slate-900">{followerGrowth}</p>
             <p className="text-xs text-slate-500 mt-0.5">Today&apos;s Growth</p>
           </div>
-          <div className="bg-white rounded-xl border border-purple-100 p-4 shadow-sm text-center">
+          <div className="rounded-xl border border-purple-100 bg-white p-4 text-center shadow-sm">
             <p className="text-xl font-bold text-slate-900">
               {expenseTotal > 0 ? `₾${formatDashboardNumber(expenseTotal)}` : "₾0"}
             </p>
             <p className="text-xs text-slate-500 mt-0.5">Expenses This Month</p>
           </div>
-          <div className="bg-white rounded-xl border border-purple-100 p-4 shadow-sm text-center">
+          <div className="rounded-xl border border-purple-100 bg-white p-4 text-center shadow-sm">
             <p className="text-xl font-bold text-slate-900">{teamCount}</p>
             <p className="text-xs text-slate-500 mt-0.5">Team Members</p>
           </div>
@@ -398,7 +403,7 @@ export default function DashboardPage({
             </div>
           )}
 
-          <div className="mt-4 max-h-[clamp(380px,24vh,320px)] min-h-0 overflow-y-auto pr-1 overscroll-contain">
+          <div className="mt-4 -mx-1 max-h-[clamp(380px,24vh,320px)] min-h-0 overflow-y-auto px-1 py-1 overscroll-contain">
             {/* Pending review alerts for HEAD/ADMIN */}
             {reviewItems.length > 0 && userCanPublishNews && (
               <div className="mb-4 space-y-2">
@@ -410,7 +415,9 @@ export default function DashboardPage({
                 </p>
                 <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                   {reviewItems.map((item) => (
-                    <NewsItem key={item.id} item={item} />
+                    <div key={item.id}>
+                      <NewsItem item={item} />
+                    </div>
                   ))}
                 </div>
               </div>
@@ -429,7 +436,9 @@ export default function DashboardPage({
             ) : newsItems.length > 0 ? (
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 {newsItems.map((item) => (
-                  <NewsItem key={item.id} item={item} />
+                  <div key={item.id}>
+                    <NewsItem item={item} />
+                  </div>
                 ))}
               </div>
             ) : (
