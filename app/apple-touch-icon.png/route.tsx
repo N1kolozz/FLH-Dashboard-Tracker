@@ -1,6 +1,8 @@
 import { ImageResponse } from "next/og";
 import FlhIconMark from "@/components/FlhIconMark";
 
+export const runtime = "edge";
+
 export async function GET() {
   return new ImageResponse(
     (

@@ -1,6 +1,8 @@
 import { ImageResponse } from "next/og";
 import FlhIconMark from "@/components/FlhIconMark";
 
+export const runtime = "edge";
+
 const ALLOWED_SIZES = new Set(["192", "512"]);
 
 function renderIcon(size: number, isTransparent: boolean) {
