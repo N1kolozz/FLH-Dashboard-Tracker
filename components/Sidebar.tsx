@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import type { Session } from "@/lib/auth";
 import { logout } from "@/app/actions/auth";
 import FlhIconMark from "@/components/FlhIconMark";
+import PushNotificationManager from "@/components/PushNotificationManager";
 
 import { NAV_SECTIONS } from "@/config/navigation";
 
@@ -109,6 +110,12 @@ export default function Sidebar({ session }: { session: Session | null }) {
 
       {/* Profile & Collapse */}
       <div className="mt-auto shrink-0 border-t border-purple-100/60 p-3 pb-safe-bottom">
+        <PushNotificationManager
+          variant="sidebar"
+          collapsed={collapsed}
+          canSendTest={session?.role?.toUpperCase() === "ADMIN"}
+        />
+
         {session && (
           <div className="mb-2">
             {!collapsed ? (
