@@ -21,7 +21,7 @@ export default function AppleIcon() {
           background: "linear-gradient(135deg, #ffffff 0%, #f5f3ff 100%)",
         }}
       >
-        <FlhIconMark width={162} height={170} />
+        <FlhIconMark width={144} height={150} />
       </div>
     ),
     size

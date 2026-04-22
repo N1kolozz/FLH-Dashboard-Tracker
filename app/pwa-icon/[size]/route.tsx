@@ -4,8 +4,8 @@ import FlhIconMark from "@/components/FlhIconMark";
 const ALLOWED_SIZES = new Set(["192", "512"]);
 
 function renderIcon(size: number, isTransparent: boolean) {
-  const logoWidth = Math.round(size * 0.90);
-  const logoHeight = Math.round(size * 0.94);
+  const logoWidth = Math.round(size * 0.80);
+  const logoHeight = Math.round(size * 0.83);
 
   return new ImageResponse(
     (
