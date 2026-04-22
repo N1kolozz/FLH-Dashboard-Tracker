@@ -3,9 +3,9 @@ import FlhIconMark from "@/components/FlhIconMark";
 
 const ALLOWED_SIZES = new Set(["192", "512"]);
 
-function renderIcon(size: number) {
-  const logoWidth = Math.round(size * 0.72);
-  const logoHeight = Math.round(size * 0.75);
+function renderIcon(size: number, isTransparent: boolean) {
+  const logoWidth = Math.round(size * 0.90);
+  const logoHeight = Math.round(size * 0.94);
 
   return new ImageResponse(
     (
@@ -16,7 +16,9 @@ function renderIcon(size: number) {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "linear-gradient(135deg, #ffffff 0%, #f5f3ff 100%)",
+          background: isTransparent
+            ? "transparent"
+            : "linear-gradient(135deg, #ffffff 0%, #f5f3ff 100%)",
         }}
       >
         <FlhIconMark width={logoWidth} height={logoHeight} />
@@ -30,14 +32,16 @@ function renderIcon(size: number) {
 }
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: { size: string } }
 ) {
   const size = params.size;
+  const { searchParams } = new URL(request.url);
+  const isTransparent = searchParams.get("bg") === "transparent";
 
   if (!ALLOWED_SIZES.has(size)) {
     return new Response("Not found", { status: 404 });
   }
 
-  return renderIcon(Number(size));
+  return renderIcon(Number(size), isTransparent);
 }
