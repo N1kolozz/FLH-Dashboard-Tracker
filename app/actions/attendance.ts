@@ -4,6 +4,7 @@ import { pool } from "@/lib/db";
 import { getSession, type Session } from "@/lib/auth";
 import { assertCanManageAttendance } from "@/lib/permissions";
 import { createPushNotification, notifySubscribers } from "@/lib/push";
+import { logActivity } from "@/lib/activity";
 import {
   AttendanceStatus,
   AttendanceSessionRow,
@@ -324,6 +325,8 @@ export async function createAttendanceSession(data: {
       });
     }
 
+    await logActivity("create_attendance", "/attendance", { sessionId: id, title }, createdBy || undefined);
+
     return {
       success: true,
       id,
@@ -402,6 +405,8 @@ export async function updateAttendanceSession(
       });
     }
 
+    await logActivity("update_attendance", "/attendance", { sessionId: id, title }, session ? getSessionUserId(session) || undefined : undefined);
+
     return { success: true };
   } catch (error) {
     console.error("Error updating attendance session:", error);
@@ -414,6 +419,7 @@ export async function deleteAttendanceSession(id: number) {
     const session = await getSession();
     assertCanManageAttendance(session);
     await pool.query("DELETE FROM attendance_sessions WHERE id = $1", [id]);
+    await logActivity("delete_attendance", "/attendance", { sessionId: id }, session ? getSessionUserId(session) || undefined : undefined);
     return { success: true };
   } catch (error) {
     console.error("Error deleting attendance session:", error);
@@ -532,6 +538,8 @@ export async function updateAttendanceRecord(
         updatedBy,
       ]
     );
+
+    await logActivity("update_attendance_record", "/attendance", { sessionId, userId, status }, updatedBy || undefined);
 
     return { success: true, id: res.rows[0].id as number };
   } catch (error) {
@@ -669,6 +677,8 @@ export async function submitMyAttendance(
         data.reason.trim(),
       ]
     );
+
+    await logActivity("submit_attendance", "/dashboard", { sessionId, status }, userId || undefined);
 
     return { success: true };
   } catch (error) {

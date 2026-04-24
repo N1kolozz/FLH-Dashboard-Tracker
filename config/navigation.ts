@@ -7,6 +7,7 @@ export interface NavLink {
   requiresAttendanceManager?: boolean;
   requiresWorkloadAccess?: boolean;
   requiresHeadRole?: boolean;
+  requiresAdminRole?: boolean;
 }
 
 export interface NavSection {
@@ -63,6 +64,17 @@ export const NAV_SECTIONS: NavSection[] = [
         href: "/summary",
         icon: Icons.summary,
         requiresHeadRole: true,
+      },
+    ],
+  },
+  {
+    title: "System",
+    links: [
+      {
+        label: "Admin Panel",
+        href: "/admin",
+        icon: Icons.admin,
+        requiresAdminRole: true,
       },
     ],
   },

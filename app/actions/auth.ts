@@ -5,6 +5,8 @@ import { encrypt } from "@/lib/auth";
 import { cookies } from "next/headers";
 import { compare, hash } from "bcryptjs";
 import { redirect } from "next/navigation";
+import { logActivity } from "@/lib/activity";
+import { endSession } from "@/app/actions/tracking";
 
 const SESSION_COOKIE_NAME = "session";
 const SESSION_COOKIE_OPTIONS = {
@@ -84,6 +86,8 @@ export async function login(email: string, password: string) {
       fullName: user.full_name,
     };
     await setSessionCookie(sessionData);
+    
+    await logActivity("login", "/login", {}, user.id);
 
     return { success: true };
   } catch (error) {
@@ -112,6 +116,8 @@ export async function createPassword(email: string, password: string) {
     };
     await setSessionCookie(sessionData);
 
+    await logActivity("create_password_login", "/create-password", {}, user.id);
+
     return { success: true };
   } catch (error) {
     console.error("Create password error:", error);
@@ -120,6 +126,8 @@ export async function createPassword(email: string, password: string) {
 }
 
 export async function logout() {
+  await logActivity("logout", "/dashboard");
+  await endSession();
   cookies().delete(SESSION_COOKIE_NAME);
   redirect("/login");
 }

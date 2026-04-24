@@ -39,6 +39,7 @@ export default function Sidebar({ session }: { session: Session | null }) {
     session && (session.role === "ADMIN" || session.role === "HEAD" || session.department === "Management")
   );
   const isHead = Boolean(session && (session.role === "ADMIN" || session.role === "HEAD"));
+  const isAdmin = Boolean(session && session.role === "ADMIN");
 
   const handleLogout = async () => {
     await logout();
@@ -64,48 +65,53 @@ export default function Sidebar({ session }: { session: Session | null }) {
 
       {/* Nav Links */}
       <nav className="sidebar-scroll flex-1 overflow-y-auto px-2 py-3 space-y-4 min-h-0">
-        {NAV_SECTIONS.map((section, idx) => (
-          <div key={idx}>
-            {section.title && !collapsed && (
-              <p className="px-3 mb-1.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-                {section.title}
-              </p>
-            )}
-            {collapsed && section.title && (
-              <div className="border-t border-slate-100 mx-2 mb-2" />
-            )}
-            <div className="space-y-0.5">
-              {section.links
-                .filter(
-                  (link) =>
-                    (!link.requiresAttendanceManager || canManageAttendance) &&
-                    (!link.requiresWorkloadAccess || canViewWorkload) &&
-                    (!link.requiresHeadRole || isHead)
-                )
-                .map((link) => {
-                const active = isActive(link.href);
-                return (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    onClick={() => setMobileOpen(false)}
-                    title={collapsed ? link.label : undefined}
-                    className={`flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-150 group ${
-                      active
-                        ? "bg-purple-100/80 text-purple-700 shadow-sm"
-                        : "text-slate-600 hover:bg-slate-100 hover:text-slate-800"
-                    } ${collapsed ? "justify-center" : ""}`}
-                  >
-                    <span className={`shrink-0 ${active ? "text-purple-600" : "text-slate-400 group-hover:text-slate-600"}`}>
-                      {link.icon}
-                    </span>
-                    {!collapsed && <span className="truncate">{link.label}</span>}
-                  </Link>
-                );
-              })}
+        {NAV_SECTIONS.map((section, idx) => {
+          const visibleLinks = section.links.filter(
+            (link) =>
+              (!link.requiresAttendanceManager || canManageAttendance) &&
+              (!link.requiresWorkloadAccess || canViewWorkload) &&
+              (!link.requiresHeadRole || isHead) &&
+              (!link.requiresAdminRole || isAdmin)
+          );
+
+          if (visibleLinks.length === 0) return null;
+
+          return (
+            <div key={idx}>
+              {section.title && !collapsed && (
+                <p className="px-3 mb-1.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                  {section.title}
+                </p>
+              )}
+              {collapsed && section.title && (
+                <div className="border-t border-slate-100 mx-2 mb-2" />
+              )}
+              <div className="space-y-0.5">
+                {visibleLinks.map((link) => {
+                  const active = isActive(link.href);
+                  return (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      onClick={() => setMobileOpen(false)}
+                      title={collapsed ? link.label : undefined}
+                      className={`flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-150 group ${
+                        active
+                          ? "bg-purple-100/80 text-purple-700 shadow-sm"
+                          : "text-slate-600 hover:bg-slate-100 hover:text-slate-800"
+                      } ${collapsed ? "justify-center" : ""}`}
+                    >
+                      <span className={`shrink-0 ${active ? "text-purple-600" : "text-slate-400 group-hover:text-slate-600"}`}>
+                        {link.icon}
+                      </span>
+                      {!collapsed && <span className="truncate">{link.label}</span>}
+                    </Link>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </nav>
 
       {/* Profile & Collapse */}

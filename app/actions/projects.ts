@@ -10,6 +10,7 @@ import {
   updateProjectInDB,
   deleteProjectFromDB,
 } from "@/lib/dal/projects";
+import { logActivity } from "@/lib/activity";
 
 function sessionUserId(session: { userId: string } | null) {
   const userId = Number(session?.userId);
@@ -73,6 +74,8 @@ export async function createProject(data: {
       console.error("Error sending project push notification:", pushError);
     }
 
+    await logActivity("create_project", "/projects", { projectId: row.id, projectName: data.name }, actorUserId || undefined);
+
     return {
       success: true,
       id: row.id as number,
@@ -129,6 +132,8 @@ export async function updateProject(
       console.error("Error sending project update notification:", pushError);
     }
 
+    await logActivity("update_project", "/projects", { projectId: id, projectName: data.name }, actorUserId || undefined);
+
     return {
       success: true,
       updatedAt:
@@ -149,6 +154,8 @@ export async function deleteProject(id: number) {
     const session = await getSession();
     assertCanManageProjects(session);
     await deleteProjectFromDB(id);
+    const actorUserId = sessionUserId(session);
+    await logActivity("delete_project", "/projects", { projectId: id }, actorUserId || undefined);
     return { success: true };
   } catch (error) {
     console.error("Error deleting project:", error);

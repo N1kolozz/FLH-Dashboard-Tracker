@@ -4,6 +4,7 @@ import { pool } from "@/lib/db";
 import { requireDepartmentManagerSession } from "@/lib/action-auth";
 import { createPushNotification, notifySubscribers } from "@/lib/push";
 import { getSessionUserId } from "@/lib/permissions";
+import { logActivity } from "@/lib/activity";
 
 export interface EventRow {
   id: number;
@@ -92,6 +93,8 @@ export async function createEvent(data: {
       console.error("Error sending event push notification:", pushError);
     }
 
+    await logActivity("create_event", "/events", { eventId: res.rows[0].id, title: data.title }, actorUserId || undefined);
+
     return {
       success: true,
       id: res.rows[0].id as number,
@@ -157,6 +160,8 @@ export async function updateEvent(
       console.error("Error sending event update notification:", pushError);
     }
 
+    await logActivity("update_event", "/events", { eventId: id, title: data.title }, actorUserId || undefined);
+
     return { success: true };
   } catch (error) {
     console.error("Error updating event:", error);
@@ -166,8 +171,10 @@ export async function updateEvent(
 
 export async function deleteEvent(id: number) {
   try {
-    await requireDepartmentManagerSession("Management");
+    const session = await requireDepartmentManagerSession("Management");
+    const actorUserId = getSessionUserId(session);
     await pool.query("DELETE FROM events WHERE id = $1", [id]);
+    await logActivity("delete_event", "/events", { eventId: id }, actorUserId || undefined);
     return { success: true };
   } catch (error) {
     console.error("Error deleting event:", error);

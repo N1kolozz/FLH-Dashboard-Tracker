@@ -2,6 +2,8 @@
 
 import { pool } from "@/lib/db";
 import { requireDepartmentManagerSession } from "@/lib/action-auth";
+import { getSessionUserId } from "@/lib/permissions";
+import { logActivity } from "@/lib/activity";
 
 export interface ExpenseRow {
   id: number;
@@ -35,7 +37,8 @@ export async function createExpense(data: {
   notes: string;
 }) {
   try {
-    await requireDepartmentManagerSession("Logistics");
+    const session = await requireDepartmentManagerSession("Logistics");
+    const actorUserId = getSessionUserId(session);
     const res = await pool.query(
       `INSERT INTO expenses (description, amount, category, date, paid_by, notes)
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, created_at`,
@@ -49,6 +52,8 @@ export async function createExpense(data: {
       ]
     );
     const createdAt = res.rows[0].created_at;
+
+    await logActivity("create_expense", "/logistics/expenses", { expenseId: res.rows[0].id, description: data.description, amount: data.amount }, actorUserId || undefined);
 
     return {
       success: true,
@@ -76,7 +81,8 @@ export async function updateExpense(
   }
 ) {
   try {
-    await requireDepartmentManagerSession("Logistics");
+    const session = await requireDepartmentManagerSession("Logistics");
+    const actorUserId = getSessionUserId(session);
     await pool.query(
       `UPDATE expenses SET description=$1, amount=$2, category=$3, date=$4, paid_by=$5, notes=$6 WHERE id=$7`,
       [
@@ -89,6 +95,7 @@ export async function updateExpense(
         id,
       ]
     );
+    await logActivity("update_expense", "/logistics/expenses", { expenseId: id, description: data.description, amount: data.amount }, actorUserId || undefined);
     return { success: true };
   } catch (error) {
     console.error("Error updating expense:", error);
@@ -98,8 +105,10 @@ export async function updateExpense(
 
 export async function deleteExpense(id: number) {
   try {
-    await requireDepartmentManagerSession("Logistics");
+    const session = await requireDepartmentManagerSession("Logistics");
+    const actorUserId = getSessionUserId(session);
     await pool.query("DELETE FROM expenses WHERE id = $1", [id]);
+    await logActivity("delete_expense", "/logistics/expenses", { expenseId: id }, actorUserId || undefined);
     return { success: true };
   } catch (error) {
     console.error("Error deleting expense:", error);

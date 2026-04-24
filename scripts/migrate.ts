@@ -456,6 +456,50 @@ async function migrate() {
     `);
     console.log("✓ impact_records structured outcome columns ready");
 
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS user_sessions (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        start_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        last_ping TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        duration_seconds INTEGER DEFAULT 0,
+        ip_address VARCHAR(45) DEFAULT '',
+        user_agent TEXT DEFAULT '',
+        is_active BOOLEAN DEFAULT TRUE
+      );
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS user_sessions_user_id_idx ON user_sessions (user_id);
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS user_sessions_start_time_idx ON user_sessions (start_time DESC);
+    `);
+    console.log("✓ user_sessions table ready");
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS user_activities (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        session_id INTEGER REFERENCES user_sessions(id) ON DELETE SET NULL,
+        action VARCHAR(255) NOT NULL,
+        path VARCHAR(255) DEFAULT '',
+        details JSONB DEFAULT '{}'::jsonb,
+        ip_address VARCHAR(45) DEFAULT '',
+        user_agent TEXT DEFAULT '',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS user_activities_user_id_idx ON user_activities (user_id);
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS user_activities_action_idx ON user_activities (action);
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS user_activities_created_at_idx ON user_activities (created_at DESC);
+    `);
+    console.log("✓ user_activities table ready");
+
     // Seed accounts (upsert by URL to avoid duplicates)
     const accounts = [
       {

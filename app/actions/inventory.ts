@@ -2,6 +2,8 @@
 
 import { pool } from "@/lib/db";
 import { requireDepartmentManagerSession } from "@/lib/action-auth";
+import { getSessionUserId } from "@/lib/permissions";
+import { logActivity } from "@/lib/activity";
 
 export interface CheckoutRow {
   id: number;
@@ -67,7 +69,8 @@ export async function createInventoryItem(data: {
   notes: string;
 }) {
   try {
-    await requireDepartmentManagerSession("Logistics");
+    const session = await requireDepartmentManagerSession("Logistics");
+    const actorUserId = getSessionUserId(session);
     const res = await pool.query(
       `INSERT INTO inventory_items (name, category, quantity, status, location, condition, notes)
        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, created_at`,
@@ -82,6 +85,8 @@ export async function createInventoryItem(data: {
       ]
     );
     const createdAt = res.rows[0].created_at;
+
+    await logActivity("create_inventory", "/logistics/inventory", { itemId: res.rows[0].id, name: data.name }, actorUserId || undefined);
 
     return {
       success: true,
@@ -110,7 +115,8 @@ export async function updateInventoryItem(
   }
 ) {
   try {
-    await requireDepartmentManagerSession("Logistics");
+    const session = await requireDepartmentManagerSession("Logistics");
+    const actorUserId = getSessionUserId(session);
     await pool.query(
       `UPDATE inventory_items SET name=$1, category=$2, quantity=$3, status=$4, location=$5, condition=$6, notes=$7 WHERE id=$8`,
       [
@@ -124,6 +130,7 @@ export async function updateInventoryItem(
         id,
       ]
     );
+    await logActivity("update_inventory", "/logistics/inventory", { itemId: id, name: data.name }, actorUserId || undefined);
     return { success: true };
   } catch (error) {
     console.error("Error updating inventory item:", error);
@@ -133,8 +140,10 @@ export async function updateInventoryItem(
 
 export async function deleteInventoryItem(id: number) {
   try {
-    await requireDepartmentManagerSession("Logistics");
+    const session = await requireDepartmentManagerSession("Logistics");
+    const actorUserId = getSessionUserId(session);
     await pool.query("DELETE FROM inventory_items WHERE id = $1", [id]);
+    await logActivity("delete_inventory", "/logistics/inventory", { itemId: id }, actorUserId || undefined);
     return { success: true };
   } catch (error) {
     console.error("Error deleting inventory item:", error);
@@ -144,7 +153,8 @@ export async function deleteInventoryItem(id: number) {
 
 export async function checkoutItem(itemId: number, person: string) {
   try {
-    await requireDepartmentManagerSession("Logistics");
+    const session = await requireDepartmentManagerSession("Logistics");
+    const actorUserId = getSessionUserId(session);
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
@@ -159,6 +169,8 @@ export async function checkoutItem(itemId: number, person: string) {
         [itemId]
       );
       await client.query("COMMIT");
+
+      await logActivity("checkout_inventory", "/logistics/inventory", { itemId, person }, actorUserId || undefined);
 
       return {
         success: true,
@@ -183,7 +195,8 @@ export async function checkoutItem(itemId: number, person: string) {
 
 export async function checkinItem(itemId: number) {
   try {
-    await requireDepartmentManagerSession("Logistics");
+    const session = await requireDepartmentManagerSession("Logistics");
+    const actorUserId = getSessionUserId(session);
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
@@ -202,6 +215,8 @@ export async function checkinItem(itemId: number) {
         [itemId]
       );
       await client.query("COMMIT");
+
+      await logActivity("checkin_inventory", "/logistics/inventory", { itemId }, actorUserId || undefined);
 
       return {
         success: true,
