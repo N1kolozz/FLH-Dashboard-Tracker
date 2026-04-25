@@ -1108,7 +1108,7 @@ export default function EventsPage({
             <div className="rounded-2xl border border-amber-200/60 bg-gradient-to-br from-amber-50/50 to-orange-50/50 p-4 mb-2 shadow-sm">
               <label className="mb-2 flex items-center gap-2 text-sm font-bold text-amber-900">
                 <svg className="h-5 w-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-               AI Itinerary Generator
+               AI Generator
               </label>
               <p className="text-xs text-amber-700/80 mb-3">Describe the event in a few words and AI will draft the full itinerary, required logistics, and schedule.</p>
               <div className="flex flex-col gap-2 sm:flex-row">

@@ -18,15 +18,22 @@ export async function generateItinerary(prompt: string) {
     const model = genAI.getGenerativeModel({ model: "gemma-4-31b-it" });
 
     const systemInstruction = `You are an expert event planner AI. You help generate structured event itineraries and logistics details based on brief user inputs.
+You MUST output all text (title, description, and location) in grammatically correct, formal Georgian language (ქართული).
+
+CRITICAL GEORGIAN TERMINOLOGY RULES:
+- ALWAYS use the word "ღონისძიება" (event) and its correct forms (e.g., "ღონისძიების"). NEVER use incorrect forms like "ღონისმევის".
+- ALWAYS use the word "ლოჯისტიკა" (logistics). NEVER use "ლოგისტიკა".
+- Ensure spelling, grammar, and phrasing are perfectly natural in Georgian.
+
 You MUST output a valid JSON object with EXACTLY the following fields:
-- "title": A short, professional title for the event (string).
+- "title": A short, professional title for the event in Georgian (string).
 - "department": One of the following exact string values representing the best fit: "pr", "logistics", "projects", "all", "other".
-- "description": A detailed itinerary, list of required logistics/equipment, and team roles, formatted professionally with line breaks (string).
-- "location": A short string representing the location if mentioned (e.g., "Main Hall", "Park", "Office"), or "" (empty string).
+- "description": A detailed itinerary, list of required logistics/equipment, and team roles, formatted professionally with line breaks, in Georgian (string).
+- "location": A short string representing the location in Georgian if mentioned, or "" (empty string).
 - "time": A suggested start time in HH:mm format (e.g., "09:00" or "14:30") if implied, or "" (empty string).
 - "endTime": A suggested end time in HH:mm format, or "" (empty string).
 
-Do NOT include any markdown formatting like \`\`\`json. Return strictly the raw JSON object.`;
+Do NOT include any markdown formatting. Return strictly the raw JSON object.`;
 
     const result = await model.generateContent({
       contents: [
