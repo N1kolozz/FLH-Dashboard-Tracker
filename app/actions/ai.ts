@@ -72,3 +72,69 @@ Do NOT include any markdown formatting. Return strictly the raw JSON object.`;
     return { success: false, error: error.message || "Failed to generate itinerary. Please try again." };
   }
 }
+
+export async function generateDailyBriefing() {
+  try {
+    const { pool } = await import('@/lib/db');
+    
+    const [statsRes, activityRes, sessionRes] = await Promise.all([
+      pool.query(`
+        SELECT 
+          (SELECT COUNT(*) FROM projects) as projects,
+          (SELECT COUNT(*) FROM inventory_items) as inventory,
+          (SELECT COUNT(*) FROM events WHERE date >= CURRENT_DATE) as events
+      `),
+      pool.query(`
+        SELECT DISTINCT u.full_name
+        FROM user_activities a
+        JOIN users u ON a.user_id = u.id
+        WHERE a.created_at >= NOW() - INTERVAL '24 hours'
+        LIMIT 10
+      `),
+      pool.query(`
+        SELECT COUNT(DISTINCT user_id) as count
+        FROM user_sessions
+        WHERE start_time >= NOW() - INTERVAL '24 hours'
+      `)
+    ]);
+
+    const stats = statsRes.rows[0];
+    const activeUsers = activityRes.rows.map((r: any) => r.full_name).filter(Boolean);
+    const sessionCount = parseInt(sessionRes.rows[0]?.count || '0');
+    const projectCount = parseInt(stats.projects);
+    const inventoryCount = parseInt(stats.inventory);
+    const eventCount = parseInt(stats.events);
+
+    // Time-appropriate greeting hint
+    const hour = new Date().getHours();
+    let timeOfDay = "დილა";
+    if (hour >= 12 && hour < 18) timeOfDay = "შუადღე";
+    else if (hour >= 18) timeOfDay = "საღამო";
+
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+    const model = genAI.getGenerativeModel({ model: "gemini-3.1-flash-lite-preview" });
+
+    const prompt = `დაწერე მოკლე დღიური ბრიფინგი (2-3 წინადადება) ქართულ ენაზე "Future Leaders Hub"-ის გუნდის წევრებისთვის.
+
+მონაცემები:
+- აქტიური პროექტები: ${projectCount}
+- ინვენტარის ერთეულები: ${inventoryCount}
+- მომავალი ღონისძიებები: ${eventCount}
+- ბოლო 24 საათში აქტიური მომხმარებლები: ${activeUsers.length > 0 ? activeUsers.join(", ") : "არცერთი"}
+- სესიები ბოლო 24 საათში: ${sessionCount}
+- დღის დრო: ${timeOfDay}
+
+დაიწყე მისალმებით ("${timeOfDay} მშვიდობისა!"). მხოლოდ ქართული ენა. არანაირი markdown. მხოლოდ ბრიფინგის ტექსტი.`;
+
+    const result = await model.generateContent(prompt);
+    let text = result.response.text().trim();
+
+    // Clean up any stray markdown
+    text = text.replace(/[*#`]/g, '').trim();
+
+    return { success: true, briefing: text };
+  } catch (error: any) {
+    console.error("Daily Briefing error:", error);
+    return { success: false, error: error.message || String(error) };
+  }
+}

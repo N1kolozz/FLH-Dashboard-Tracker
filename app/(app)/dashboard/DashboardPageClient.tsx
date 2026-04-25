@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   createNewsPost,
   getDashboardNews,
@@ -21,6 +21,9 @@ const dashboardDateFormatter = new Intl.DateTimeFormat("en-US", {
   year: "numeric",
   timeZone: "UTC",
 });
+
+
+import { generateDailyBriefing } from "@/app/actions/ai";
 
 /* ─── Quick-stat card ─── */
 function QuickStat({
@@ -217,6 +220,40 @@ export default function DashboardPage({
   const [newsForm, setNewsForm] = useState({ title: "", body: "" });
   const [newsSaving, setNewsSaving] = useState(false);
 
+  // Daily Briefing State (cached in localStorage, 1 request per day per user)
+  const BRIEFING_KEY = `flh_daily_briefing_${initialSession?.userId || 'anon'}`;
+  const [dailyBriefing, setDailyBriefing] = useState<string | null>(null);
+  const [briefingLoading, setBriefingLoading] = useState(false);
+  const [briefingChecked, setBriefingChecked] = useState(false);
+
+  // On mount, check localStorage for today's cached briefing
+  useEffect(() => {
+    try {
+      const cached = localStorage.getItem(BRIEFING_KEY);
+      if (cached) {
+        const { date, text } = JSON.parse(cached);
+        const today = new Date().toISOString().slice(0, 10);
+        if (date === today && text) {
+          setDailyBriefing(text);
+        }
+      }
+    } catch {}
+    setBriefingChecked(true);
+  }, [BRIEFING_KEY]);
+
+  const handleGenerateBriefing = async () => {
+    setBriefingLoading(true);
+    const res = await generateDailyBriefing();
+    if (res.success && res.briefing) {
+      setDailyBriefing(res.briefing);
+      const today = new Date().toISOString().slice(0, 10);
+      localStorage.setItem(BRIEFING_KEY, JSON.stringify({ date: today, text: res.briefing }));
+    } else {
+      setDailyBriefing(null);
+    }
+    setBriefingLoading(false);
+  };
+
   const userCanPublishNews = canPublishNews(session);
 
   const values = Object.values(initialStats);
@@ -298,6 +335,58 @@ export default function DashboardPage({
           variant="dashboard"
           canSendTest={session?.role?.toUpperCase() === "ADMIN"}
         />
+
+        {/* Daily Briefing AI Widget */}
+        <div className="relative overflow-hidden rounded-2xl border border-amber-200/60 bg-gradient-to-r from-orange-50/80 via-amber-50/50 to-yellow-50/80 p-5 sm:p-6 shadow-[0_4px_20px_-4px_rgba(251,191,36,0.15)]">
+          <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-amber-400/20 blur-2xl" />
+          <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-inner">
+              <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-lg font-bold text-amber-900 flex items-center gap-2">
+                  Daily AI Briefing
+                  {briefingLoading && (
+                    <span className="flex h-2 w-2 relative">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                    </span>
+                  )}
+                </h2>
+                {dailyBriefing && (
+                  <span className="text-xs text-amber-600/60 font-medium">დღეს უკვე შეიქმნა ✓</span>
+                )}
+              </div>
+              <div className="mt-2 text-sm leading-relaxed text-amber-800/90">
+                {(briefingLoading || !briefingChecked) ? (
+                  <div className="animate-pulse space-y-2">
+                    <div className="h-4 w-3/4 rounded bg-amber-200/50"></div>
+                    <div className="h-4 w-1/2 rounded bg-amber-200/50"></div>
+                  </div>
+                ) : dailyBriefing ? (
+                  <p className="font-medium">{dailyBriefing}</p>
+                ) : (
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                    <p className="text-amber-700/70">დააჭირეთ ღილაკს დღიური ბრიფინგის შესაქმნელად.</p>
+                    <button
+                      type="button"
+                      onClick={handleGenerateBriefing}
+                      className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-2 text-sm font-semibold text-white shadow-md transition-all duration-200 hover:from-amber-600 hover:to-orange-600 hover:shadow-lg active:scale-95"
+                    >
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                      Generate Briefing
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
 
         {/* Stats Grid */}
         <section>
