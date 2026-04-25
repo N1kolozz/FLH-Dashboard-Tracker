@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import { getEvents, createEvent, updateEvent, deleteEvent } from "@/app/actions/events";
+import { generateItinerary } from "@/app/actions/ai";
 import type { EventRow } from "@/app/actions/events";
 import MemberAvatarStack from "@/components/MemberAvatarStack";
 import MemberMultiSelect, { type MemberChoice } from "@/components/MemberMultiSelect";
@@ -240,6 +241,11 @@ export default function EventsPage({
   const [session] = useState<Session | null>(initialSession);
   const [isLoadingData, setIsLoadingData] = useState(false);
 
+  // AI Generator state
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [aiError, setAiError] = useState("");
+
   useEffect(() => {
     let cancelled = false;
     const cached = holidaysCacheRef.current[viewYear];
@@ -261,6 +267,34 @@ export default function EventsPage({
   }, [viewYear]);
 
   const holidaysByDate = useMemo(() => buildHolidaysByDate(publicHolidays), [publicHolidays]);
+
+  const handleGenerateItinerary = async () => {
+    if (!aiPrompt.trim()) return;
+    setIsGenerating(true);
+    setAiError("");
+
+    try {
+      const res = await generateItinerary(aiPrompt);
+      if (res.success && res.data) {
+        setEditing(prev => ({
+          ...prev,
+          title: res.data.title || prev.title,
+          department: res.data.department || prev.department,
+          description: res.data.description || prev.description,
+          location: res.data.location || prev.location,
+          time: res.data.time || prev.time,
+          endTime: res.data.endTime || prev.endTime,
+        }));
+        setAiPrompt("");
+      } else {
+        setAiError(res.error || "Failed to generate itinerary.");
+      }
+    } catch (error: any) {
+      setAiError("An unexpected error occurred.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   const refreshEvents = async ({ showLoading = false }: { showLoading?: boolean } = {}) => {
     if (showLoading) {
@@ -295,9 +329,9 @@ export default function EventsPage({
           current.map((event) =>
             event.id === nextEvent.id
               ? {
-                  ...nextEvent,
-                  createdAt: previousEvent?.createdAt ?? event.createdAt,
-                }
+                ...nextEvent,
+                createdAt: previousEvent?.createdAt ?? event.createdAt,
+              }
               : event
           )
         )
@@ -367,6 +401,8 @@ export default function EventsPage({
       date: date || "",
       ownerUserIds: session?.userId ? [Number(session.userId)] : [],
     });
+    setAiPrompt("");
+    setAiError("");
     setModalOpen(true);
   };
 
@@ -420,17 +456,17 @@ export default function EventsPage({
   const isFitLayout = calendarLayout === "fit";
   const weekLabel = weekDates.length > 0
     ? `${weekDates[0].toLocaleDateString(undefined, { month: "short", day: "numeric" })} - ${weekDates[6].toLocaleDateString(undefined, {
-        month: weekDates[0].getMonth() === weekDates[6].getMonth() ? undefined : "short",
-        day: "numeric",
-        year: weekDates[0].getFullYear() === weekDates[6].getFullYear() ? undefined : "numeric",
-      })}`
+      month: weekDates[0].getMonth() === weekDates[6].getMonth() ? undefined : "short",
+      day: "numeric",
+      year: weekDates[0].getFullYear() === weekDates[6].getFullYear() ? undefined : "numeric",
+    })}`
     : monthLabel;
   const selectedDayLabel = selectedDate
     ? new Date(`${selectedDate}T00:00:00`).toLocaleDateString(undefined, {
-        weekday: "long",
-        month: "long",
-        day: "numeric",
-      })
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+    })
     : "";
 
   const navigateCalendar = (direction: "prev" | "next") => {
@@ -451,8 +487,8 @@ export default function EventsPage({
   };
 
   const canEdit = session && (
-    session.role === "ADMIN" || 
-    session.role === "HEAD" || 
+    session.role === "ADMIN" ||
+    session.role === "HEAD" ||
     session.department === "Management"
   );
 
@@ -544,9 +580,8 @@ export default function EventsPage({
                   <div className="flex rounded-2xl bg-slate-100 p-1 text-sm">
                     <button
                       onClick={() => setCalendarView("month")}
-                      className={`rounded-xl px-4 py-2 font-medium transition-colors ${
-                        calendarView === "month" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
-                      }`}
+                      className={`rounded-xl px-4 py-2 font-medium transition-colors ${calendarView === "month" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
+                        }`}
                     >
                       Month
                     </button>
@@ -555,9 +590,8 @@ export default function EventsPage({
                         setCalendarCursor(selectedDate ?? fallbackWeekAnchor);
                         setCalendarView("week");
                       }}
-                      className={`rounded-xl px-4 py-2 font-medium transition-colors ${
-                        calendarView === "week" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
-                      }`}
+                      className={`rounded-xl px-4 py-2 font-medium transition-colors ${calendarView === "week" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
+                        }`}
                     >
                       Week
                     </button>
@@ -565,17 +599,15 @@ export default function EventsPage({
                   <div className="flex rounded-2xl bg-slate-100 p-1 text-sm">
                     <button
                       onClick={() => setCalendarLayout("slide")}
-                      className={`rounded-xl px-4 py-2 font-medium transition-colors ${
-                        calendarLayout === "slide" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
-                      }`}
+                      className={`rounded-xl px-4 py-2 font-medium transition-colors ${calendarLayout === "slide" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
+                        }`}
                     >
                       Slide
                     </button>
                     <button
                       onClick={() => setCalendarLayout("fit")}
-                      className={`rounded-xl px-4 py-2 font-medium transition-colors ${
-                        calendarLayout === "fit" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
-                      }`}
+                      className={`rounded-xl px-4 py-2 font-medium transition-colors ${calendarLayout === "fit" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
+                        }`}
                     >
                       Fit
                     </button>
@@ -629,9 +661,8 @@ export default function EventsPage({
                         return (
                           <div
                             key={idx}
-                            className={`${isFitLayout ? "min-h-[82px] sm:min-h-[108px]" : "min-h-[150px]"} border-b border-r border-slate-200/70 ${
-                              isWeekend ? "bg-slate-100/70" : "bg-slate-50/50"
-                            }`}
+                            className={`${isFitLayout ? "min-h-[82px] sm:min-h-[108px]" : "min-h-[150px]"} border-b border-r border-slate-200/70 ${isWeekend ? "bg-slate-100/70" : "bg-slate-50/50"
+                              }`}
                           />
                         );
                       }
@@ -647,25 +678,22 @@ export default function EventsPage({
                         <div
                           key={idx}
                           onClick={() => selectDate(dateStr)}
-                          className={`${isFitLayout ? "min-h-[82px] px-1 py-1.5 sm:min-h-[108px] sm:px-1.5 sm:py-2" : "min-h-[150px] px-3 py-3"} cursor-pointer border-b border-r border-slate-200/70 transition-all duration-200 ${
-                            isSelected
+                          className={`${isFitLayout ? "min-h-[82px] px-1 py-1.5 sm:min-h-[108px] sm:px-1.5 sm:py-2" : "min-h-[150px] px-3 py-3"} cursor-pointer border-b border-r border-slate-200/70 transition-all duration-200 ${isSelected
                               ? "bg-amber-50/80"
                               : isWeekend
                                 ? "bg-slate-50/75 hover:bg-amber-50/50"
                                 : "bg-white hover:bg-amber-50/40"
-                          }`}
+                            }`}
                         >
                           <div className="flex items-start justify-between gap-1">
                             <div
-                              className={`flex items-center justify-center font-semibold ring-1 ring-inset ${
-                                isFitLayout ? "h-6 w-6 rounded-xl text-[10px] sm:h-7 sm:w-7 sm:text-xs" : "h-9 w-9 rounded-2xl text-sm"
-                              } ${
-                                isToday
+                              className={`flex items-center justify-center font-semibold ring-1 ring-inset ${isFitLayout ? "h-6 w-6 rounded-xl text-[10px] sm:h-7 sm:w-7 sm:text-xs" : "h-9 w-9 rounded-2xl text-sm"
+                                } ${isToday
                                   ? "bg-amber-500 text-white ring-amber-500"
                                   : isSelected
                                     ? "bg-amber-100 text-amber-700 ring-amber-200"
                                     : "bg-white text-slate-700 ring-slate-200"
-                              }`}
+                                }`}
                             >
                               {day}
                             </div>
@@ -791,28 +819,25 @@ export default function EventsPage({
                         <div
                           key={dateStr}
                           onClick={() => selectDate(dateStr)}
-                          className={`${isFitLayout ? "min-h-[150px] px-1 py-1.5 sm:min-h-[200px] sm:px-1.5 sm:py-2" : "min-h-[280px] px-3 py-3"} cursor-pointer border-r border-slate-200/70 transition-all duration-200 ${
-                            isSelected
+                          className={`${isFitLayout ? "min-h-[150px] px-1 py-1.5 sm:min-h-[200px] sm:px-1.5 sm:py-2" : "min-h-[280px] px-3 py-3"} cursor-pointer border-r border-slate-200/70 transition-all duration-200 ${isSelected
                               ? "bg-amber-50/80"
                               : !isCurrentMonth
                                 ? "bg-slate-50/70 hover:bg-amber-50/40"
                                 : isWeekend
                                   ? "bg-slate-50/60 hover:bg-amber-50/40"
                                   : "bg-white hover:bg-amber-50/30"
-                          }`}
+                            }`}
                         >
                           <div className="flex items-start justify-between gap-1">
                             <div className="min-w-0">
                               <div
-                                className={`inline-flex items-center justify-center font-semibold ring-1 ring-inset ${
-                                  isFitLayout ? "h-6 min-w-6 rounded-xl px-2 text-[10px] sm:h-7 sm:min-w-7 sm:text-xs" : "h-9 min-w-9 rounded-2xl px-3 text-sm"
-                                } ${
-                                  isToday
+                                className={`inline-flex items-center justify-center font-semibold ring-1 ring-inset ${isFitLayout ? "h-6 min-w-6 rounded-xl px-2 text-[10px] sm:h-7 sm:min-w-7 sm:text-xs" : "h-9 min-w-9 rounded-2xl px-3 text-sm"
+                                  } ${isToday
                                     ? "bg-amber-500 text-white ring-amber-500"
                                     : isSelected
                                       ? "bg-amber-100 text-amber-700 ring-amber-200"
                                       : "bg-white text-slate-700 ring-slate-200"
-                                }`}
+                                  }`}
                               >
                                 {date.getDate()}
                               </div>
@@ -1077,8 +1102,44 @@ export default function EventsPage({
       )}
 
       {/* Modal */}
-      <Modal open={modalOpen} onClose={() => { setModalOpen(false); setEditing(EMPTY); }} title={editing.id ? (canEdit ? "Edit Event" : "View Event") : "New Event"}>
+      <Modal open={modalOpen} onClose={() => { setModalOpen(false); setEditing(EMPTY); setAiPrompt(""); setAiError(""); }} title={editing.id ? (canEdit ? "Edit Event" : "View Event") : "New Event"}>
         <div className="space-y-4">
+          {canEdit && !editing.id && (
+            <div className="rounded-2xl border border-amber-200/60 bg-gradient-to-br from-amber-50/50 to-orange-50/50 p-4 mb-2 shadow-sm">
+              <label className="mb-2 flex items-center gap-2 text-sm font-bold text-amber-900">
+                <svg className="h-5 w-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+               AI Itinerary Generator
+              </label>
+              <p className="text-xs text-amber-700/80 mb-3">Describe the event in a few words and AI will draft the full itinerary, required logistics, and schedule.</p>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <input
+                  type="text"
+                  value={aiPrompt}
+                  onChange={(e) => setAiPrompt(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleGenerateItinerary(); } }}
+                  placeholder="e.g. Summer festival, needs big sound system, 5 staff"
+                  className="flex-1 rounded-xl border border-amber-200/80 px-3 py-2.5 text-sm text-slate-700 placeholder-slate-400 shadow-sm focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-400/20 disabled:bg-slate-50"
+                  disabled={isGenerating}
+                />
+                <button
+                  onClick={(e) => { e.preventDefault(); handleGenerateItinerary(); }}
+                  disabled={isGenerating || !aiPrompt.trim()}
+                  className="flex shrink-0 items-center justify-center gap-2 rounded-xl bg-amber-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-amber-700 disabled:bg-amber-300 sm:w-auto"
+                >
+                  {isGenerating ? (
+                    <>
+                      <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Generating...
+                    </>
+                  ) : "Generate"}
+                </button>
+              </div>
+              {aiError && <p className="mt-2 text-xs font-medium text-rose-600">{aiError}</p>}
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Event Title *</label>
             <input disabled={!canEdit} type="text" value={editing.title} onChange={(e) => setEditing({ ...editing, title: e.target.value })} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 disabled:bg-slate-50" placeholder="e.g., Summer Program Kickoff" />
@@ -1111,7 +1172,14 @@ export default function EventsPage({
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
-            <textarea disabled={!canEdit} value={editing.description} onChange={(e) => setEditing({ ...editing, description: e.target.value })} rows={2} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 resize-none disabled:bg-slate-50" placeholder="Event details..." />
+            <textarea 
+              disabled={!canEdit} 
+              value={editing.description} 
+              onChange={(e) => setEditing({ ...editing, description: e.target.value })} 
+              rows={6} 
+              className="w-full text-slate-700 px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-300 focus:border-amber-400 resize-y min-h-[160px] disabled:bg-slate-50 leading-relaxed" 
+              placeholder="Event details..." 
+            />
           </div>
           <MemberMultiSelect
             members={members}
