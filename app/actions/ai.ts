@@ -67,9 +67,10 @@ Do NOT include any markdown formatting. Return strictly the raw JSON object.`;
     
     const parsed = JSON.parse(jsonString);
     return { success: true, data: parsed };
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Failed to generate itinerary. Please try again.";
     console.error("AI Generation error:", error);
-    return { success: false, error: error.message || "Failed to generate itinerary. Please try again." };
+    return { success: false, error: message };
   }
 }
 
@@ -99,7 +100,7 @@ export async function generateDailyBriefing() {
     ]);
 
     const stats = statsRes.rows[0];
-    const activeUsers = activityRes.rows.map((r: any) => r.full_name).filter(Boolean);
+    const activeUsers = activityRes.rows.map((r: Record<string, string>) => r.full_name).filter(Boolean);
     const sessionCount = parseInt(sessionRes.rows[0]?.count || '0');
     const projectCount = parseInt(stats.projects);
     const inventoryCount = parseInt(stats.inventory);
@@ -133,8 +134,9 @@ export async function generateDailyBriefing() {
     text = text.replace(/[*#`]/g, '').trim();
 
     return { success: true, briefing: text };
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
     console.error("Daily Briefing error:", error);
-    return { success: false, error: error.message || String(error) };
+    return { success: false, error: message };
   }
 }

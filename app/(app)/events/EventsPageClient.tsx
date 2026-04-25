@@ -289,7 +289,7 @@ export default function EventsPage({
       } else {
         setAiError(res.error || "Failed to generate itinerary.");
       }
-    } catch (error: any) {
+    } catch {
       setAiError("An unexpected error occurred.");
     } finally {
       setIsGenerating(false);
