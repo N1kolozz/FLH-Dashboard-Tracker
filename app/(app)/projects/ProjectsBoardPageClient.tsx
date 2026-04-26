@@ -576,9 +576,9 @@ export default function ProjectsBoardPageClient({
       />
 
       {/* Kanban Board */}
-      <div className="max-w-[1400px] mx-auto flex w-full flex-1 min-h-0 flex-col px-4 py-6 sm:px-6">
+      <div className="max-w-[1400px] mx-auto flex w-full flex-1 min-h-0 flex-col py-6 sm:px-6">
         {showMobileColumnDots && (
-          <div className="mb-3 flex items-center justify-center gap-2 lg:hidden">
+          <div className="mb-3 flex items-center justify-center gap-2 px-4 lg:hidden">
             {COLUMNS.map((column, index) => {
               const isActive = activeMobileColumn === index;
 
@@ -601,22 +601,26 @@ export default function ProjectsBoardPageClient({
         )}
 
         {isLoadingData ? (
-          <ProjectBoardSkeleton
-            counts={skeletonColumnCounts}
-            boardRef={boardRef}
-            columnRefs={columnRefs}
-          />
+          <div className="px-4 lg:px-0 flex-1 min-h-0">
+            <ProjectBoardSkeleton
+              counts={skeletonColumnCounts}
+              boardRef={boardRef}
+              columnRefs={columnRefs}
+            />
+          </div>
         ) : projects.length === 0 ? (
-          <EmptyState
-            title="No projects yet"
-            description="Create your first project to start tracking work on the kanban board."
-            icon={
-              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
-            }
-            action={canEdit ? { label: "Create Project", onClick: () => openNew() } : undefined}
-          />
+          <div className="px-4 lg:px-0">
+            <EmptyState
+              title="No projects yet"
+              description="Create your first project to start tracking work on the kanban board."
+              icon={
+                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+              }
+              action={canEdit ? { label: "Create Project", onClick: () => openNew() } : undefined}
+            />
+          </div>
         ) : (
           <DndContext
             autoScroll={!!canEdit}
@@ -628,7 +632,7 @@ export default function ProjectsBoardPageClient({
           >
             <div
               ref={boardRef}
-              className={`hide-scrollbar flex flex-1 min-h-0 gap-4 overflow-x-auto overflow-y-hidden pb-2 lg:grid lg:grid-cols-4 lg:overflow-visible lg:pb-0 ${
+              className={`hide-scrollbar flex flex-1 min-h-0 gap-4 overflow-x-auto overflow-y-hidden px-4 pb-2 lg:grid lg:grid-cols-4 lg:overflow-visible lg:px-0 lg:pb-0 overscroll-x-contain scroll-px-4 ${
                 isDragging ? "" : "scroll-smooth snap-x snap-mandatory"
               }`}
             >
