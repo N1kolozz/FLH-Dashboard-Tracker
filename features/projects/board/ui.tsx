@@ -64,7 +64,7 @@ export function ProjectBoardSkeleton({
           ref={(node) => {
             columnRefs.current[index] = node;
           }}
-          className={`flex min-h-0 w-full min-w-full shrink-0 snap-start snap-always flex-col overflow-hidden rounded-xl border border-slate-200 bg-white/70 ${column.color} border-t-2 lg:min-w-0 lg:w-full lg:snap-none`}
+          className={`flex min-h-0 w-full min-w-full shrink-0 snap-center snap-always flex-col overflow-hidden rounded-xl border border-slate-200 bg-white/70 ${column.color} border-t-2 lg:min-w-0 lg:w-full lg:snap-none`}
         >
           <div className="flex shrink-0 items-center justify-between px-4 py-3">
             <div className="flex items-center gap-2">
@@ -344,7 +344,7 @@ export function ProjectColumn({
   return (
     <div
       ref={setCombinedRef}
-      className={`relative flex min-h-0 w-full min-w-full shrink-0 snap-start snap-always flex-col overflow-hidden rounded-xl border border-slate-200 bg-white/70 ${column.color} border-t-2 transition-colors lg:min-w-0 lg:w-full lg:snap-none ${
+      className={`relative flex min-h-0 w-full min-w-full shrink-0 snap-center snap-always flex-col overflow-hidden rounded-xl border border-slate-200 bg-white/70 ${column.color} border-t-2 transition-colors lg:min-w-0 lg:w-full lg:snap-none ${
         isHighlighted ? "bg-blue-50/60 border-blue-200" : ""
       }`}
     >

@@ -633,7 +633,7 @@ export default function ProjectsBoardPageClient({
             <div
               ref={boardRef}
               className={`hide-scrollbar flex flex-1 min-h-0 gap-4 overflow-x-auto overflow-y-hidden px-4 pb-2 lg:grid lg:grid-cols-4 lg:overflow-visible lg:px-0 lg:pb-0 overscroll-x-contain scroll-px-4 ${
-                isDragging ? "" : "scroll-smooth snap-x snap-mandatory"
+                isDragging ? "" : "snap-x snap-mandatory"
               }`}
             >
               {COLUMNS.map((col, index) => {
