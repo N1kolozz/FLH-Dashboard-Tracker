@@ -253,14 +253,14 @@ export default function ProjectsBoardPageClient({
   };
 
   const scrollToMobileColumn = (index: number) => {
-    const board = boardRef.current;
     const column = columnRefs.current[index];
 
-    if (!board || !column) return;
+    if (!column) return;
 
-    board.scrollTo({
-      left: column.offsetLeft,
+    column.scrollIntoView({
       behavior: "smooth",
+      block: "nearest",
+      inline: "start",
     });
     setActiveMobileColumn(index);
   };
