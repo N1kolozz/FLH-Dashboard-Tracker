@@ -26,12 +26,12 @@ export const PLATFORM_CONFIG: Record<
   instagram: {
     label: "Instagram",
     color: "bg-purple-100 text-purple-700 border-purple-200",
-    dot: "bg-purple-500",
+    dot: "bg-purple-600",
   },
   tiktok: {
     label: "TikTok",
     color: "bg-slate-100 text-slate-700 border-slate-300",
-    dot: "bg-slate-700",
+    dot: "bg-slate-400",
   },
   facebook: {
     label: "Facebook",
