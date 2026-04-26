@@ -6,6 +6,7 @@ import {
   syncPushSubscription,
   updatePushPreferences,
 } from "@/lib/push";
+import { getSessionUserId } from "@/lib/permissions";
 
 type RouteBody = {
   endpoint?: string;
@@ -18,23 +19,29 @@ type RouteBody = {
   };
 };
 
-function getUserId(sessionUserId: string) {
-  const userId = Number(sessionUserId);
-  return Number.isInteger(userId) ? userId : null;
-}
-
 export const dynamic = "force-dynamic";
 
-export async function POST(request: Request) {
+async function requirePushUserId() {
   const session = await getSession();
   if (!session) {
-    return NextResponse.json({ error: "Not authorized" }, { status: 401 });
+    return {
+      response: NextResponse.json({ error: "Not authorized" }, { status: 401 }),
+    };
   }
 
-  const userId = getUserId(session.userId);
+  const userId = getSessionUserId(session);
   if (!userId) {
-    return NextResponse.json({ error: "Invalid session" }, { status: 400 });
+    return {
+      response: NextResponse.json({ error: "Invalid session" }, { status: 400 }),
+    };
   }
+
+  return { userId };
+}
+
+export async function POST(request: Request) {
+  const auth = await requirePushUserId();
+  if ("response" in auth) return auth.response;
 
   const body = (await request.json()) as RouteBody;
   if (!body.subscription) {
@@ -42,7 +49,7 @@ export async function POST(request: Request) {
   }
 
   const preferences = await syncPushSubscription(
-    userId,
+    auth.userId,
     body.subscription,
     request.headers.get("user-agent") ?? "unknown"
   );
@@ -51,22 +58,15 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ error: "Not authorized" }, { status: 401 });
-  }
-
-  const userId = getUserId(session.userId);
-  if (!userId) {
-    return NextResponse.json({ error: "Invalid session" }, { status: 400 });
-  }
+  const auth = await requirePushUserId();
+  if ("response" in auth) return auth.response;
 
   const body = (await request.json()) as RouteBody;
   if (!body.endpoint || !body.preferences) {
     return NextResponse.json({ error: "Missing endpoint or preferences" }, { status: 400 });
   }
 
-  const preferences = await updatePushPreferences(userId, body.endpoint, {
+  const preferences = await updatePushPreferences(auth.userId, body.endpoint, {
     news: body.preferences.news ?? true,
     events: body.preferences.events ?? true,
     projects: body.preferences.projects ?? true,
@@ -77,22 +77,15 @@ export async function PATCH(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ error: "Not authorized" }, { status: 401 });
-  }
-
-  const userId = getUserId(session.userId);
-  if (!userId) {
-    return NextResponse.json({ error: "Invalid session" }, { status: 400 });
-  }
+  const auth = await requirePushUserId();
+  if ("response" in auth) return auth.response;
 
   const body = (await request.json()) as RouteBody;
   if (!body.endpoint) {
     return NextResponse.json({ error: "Missing endpoint" }, { status: 400 });
   }
 
-  await deletePushSubscription(userId, body.endpoint);
+  await deletePushSubscription(auth.userId, body.endpoint);
 
   return NextResponse.json({ success: true });
 }

@@ -7,8 +7,7 @@ import {
 } from "@/lib/action-auth";
 import { getSessionUserId } from "@/lib/permissions";
 
-/* ─── Types ─── */
-
+// Review workflow types
 export interface ReviewRequest {
   id: number;
   entity_type: "project" | "content_post";
@@ -24,17 +23,59 @@ export interface ReviewRequest {
   entity_name?: string;
 }
 
-/* ─── Submit for Review ─── */
+type ReviewEntityType = ReviewRequest["entity_type"];
+type ReviewStatusSnapshot = {
+  status: ReviewRequest["status"];
+  reviewId: number;
+  feedback: string | null;
+};
+type ReviewStatusMap = Record<number, ReviewStatusSnapshot>;
+type LatestReviewStatusRow = {
+  entity_id: number;
+  review_id: number;
+  status: ReviewRequest["status"];
+  feedback: string | null;
+};
 
+// Shared by the project board and social calendar to avoid duplicate
+// "latest review per entity" queries drifting apart over time.
+async function getLatestReviewStatuses(
+  entityType: ReviewEntityType
+): Promise<ReviewStatusMap> {
+  const res = await pool.query<LatestReviewStatusRow>(
+    `SELECT DISTINCT ON (rr.entity_id)
+            rr.id as review_id,
+            rr.entity_id,
+            rr.status,
+            rr.feedback
+     FROM review_requests rr
+     WHERE rr.entity_type = $1
+     ORDER BY rr.entity_id, rr.created_at DESC`,
+    [entityType]
+  );
+
+  const reviewStatuses: ReviewStatusMap = {};
+  for (const row of res.rows) {
+    reviewStatuses[row.entity_id] = {
+      status: row.status,
+      reviewId: row.review_id,
+      feedback: row.feedback,
+    };
+  }
+
+  return reviewStatuses;
+}
+
+// Submit for review and mirror the pending state on the target entity so list
+// views can show the status without joining review_requests every time.
 export async function submitForReview(
-  entityType: "project" | "content_post",
+  entityType: ReviewEntityType,
   entityId: number
 ) {
   try {
     const session = await requireAuthenticatedSession();
     const userId = getSessionUserId(session);
 
-    // Check if there's already a pending review
     const existing = await pool.query(
       `SELECT id FROM review_requests 
        WHERE entity_type = $1 AND entity_id = $2 AND status = 'pending'`,
@@ -44,7 +85,6 @@ export async function submitForReview(
       return { error: "Already submitted for review" };
     }
 
-    // Update the entity's review status
     if (entityType === "project") {
       await pool.query(
         `UPDATE projects SET review_status = 'pending' WHERE id = $1`,
@@ -71,14 +111,12 @@ export async function submitForReview(
   }
 }
 
-/* ─── Approve Review ─── */
-
+// Approve review requests and keep the target entity visible with approved status.
 export async function approveReview(reviewId: number, feedback?: string) {
   try {
     const session = await requireHeadOrAdminSession();
     const userId = getSessionUserId(session);
 
-    // Get the review
     const reviewRes = await pool.query(
       `SELECT * FROM review_requests WHERE id = $1 AND status = 'pending'`,
       [reviewId]
@@ -89,7 +127,6 @@ export async function approveReview(reviewId: number, feedback?: string) {
 
     const review = reviewRes.rows[0];
 
-    // Update review status
     await pool.query(
       `UPDATE review_requests 
        SET status = 'approved', 
@@ -100,7 +137,6 @@ export async function approveReview(reviewId: number, feedback?: string) {
       [userId, feedback || null, reviewId]
     );
 
-    // Update entity review status
     if (review.entity_type === "project") {
       await pool.query(
         `UPDATE projects SET review_status = 'approved' WHERE id = $1`,
@@ -120,8 +156,8 @@ export async function approveReview(reviewId: number, feedback?: string) {
   }
 }
 
-/* ─── Reject Review ─── */
-
+// Reject review requests. Projects are kept as rejected records with feedback;
+// content posts are removed because rejected drafts should no longer appear.
 export async function rejectReview(reviewId: number, feedback: string) {
   try {
     const session = await requireHeadOrAdminSession();
@@ -131,7 +167,6 @@ export async function rejectReview(reviewId: number, feedback: string) {
       return { error: "Feedback is required when rejecting" };
     }
 
-    // Get the review
     const reviewRes = await pool.query(
       `SELECT * FROM review_requests WHERE id = $1 AND status = 'pending'`,
       [reviewId]
@@ -142,7 +177,6 @@ export async function rejectReview(reviewId: number, feedback: string) {
 
     const review = reviewRes.rows[0];
 
-    // Update review status
     await pool.query(
       `UPDATE review_requests 
        SET status = 'rejected', 
@@ -153,7 +187,6 @@ export async function rejectReview(reviewId: number, feedback: string) {
       [userId, feedback.trim(), reviewId]
     );
 
-    // On reject: mark project as rejected (soft-delete) or delete content post
     if (review.entity_type === "project") {
       await pool.query(
         `UPDATE projects SET status = 'rejected', review_status = 'rejected' WHERE id = $1`,
@@ -170,10 +203,9 @@ export async function rejectReview(reviewId: number, feedback: string) {
   }
 }
 
-/* ─── Get review status for an entity ─── */
-
+// Get review status for one entity detail view.
 export async function getReviewForEntity(
-  entityType: "project" | "content_post",
+  entityType: ReviewEntityType,
   entityId: number
 ): Promise<{ review: ReviewRequest | null }> {
   try {
@@ -196,8 +228,7 @@ export async function getReviewForEntity(
   }
 }
 
-/* ─── Get all pending reviews (for HEAD/ADMIN) ─── */
-
+// Get pending reviews for HEAD/ADMIN and ignore stale requests whose target was deleted.
 export async function getPendingReviews(): Promise<{
   reviews: ReviewRequest[];
   error?: string;
@@ -233,64 +264,19 @@ export async function getPendingReviews(): Promise<{
   }
 }
 
-/* ─── Get all review statuses for projects (batch) ─── */
-
-export async function getProjectReviewStatuses(): Promise<
-  Record<number, { status: string; reviewId: number; feedback: string | null }>
-> {
+// Batch review status helpers used by project and content-post list screens.
+export async function getProjectReviewStatuses(): Promise<ReviewStatusMap> {
   try {
-    const res = await pool.query(
-      `SELECT DISTINCT ON (rr.entity_id)
-              rr.id as review_id,
-              rr.entity_id,
-              rr.status,
-              rr.feedback
-       FROM review_requests rr
-       WHERE rr.entity_type = 'project'
-       ORDER BY rr.entity_id, rr.created_at DESC`
-    );
-
-    const map: Record<number, { status: string; reviewId: number; feedback: string | null }> = {};
-    for (const row of res.rows) {
-      map[row.entity_id] = {
-        status: row.status,
-        reviewId: row.review_id,
-        feedback: row.feedback,
-      };
-    }
-    return map;
+    return await getLatestReviewStatuses("project");
   } catch (error) {
     console.error("Error fetching review statuses:", error);
     return {};
   }
 }
 
-/* ─── Get all review statuses for content posts (batch) ─── */
-
-export async function getPostReviewStatuses(): Promise<
-  Record<number, { status: string; reviewId: number; feedback: string | null }>
-> {
+export async function getPostReviewStatuses(): Promise<ReviewStatusMap> {
   try {
-    const res = await pool.query(
-      `SELECT DISTINCT ON (rr.entity_id)
-              rr.id as review_id,
-              rr.entity_id,
-              rr.status,
-              rr.feedback
-       FROM review_requests rr
-       WHERE rr.entity_type = 'content_post'
-       ORDER BY rr.entity_id, rr.created_at DESC`
-    );
-
-    const map: Record<number, { status: string; reviewId: number; feedback: string | null }> = {};
-    for (const row of res.rows) {
-      map[row.entity_id] = {
-        status: row.status,
-        reviewId: row.review_id,
-        feedback: row.feedback,
-      };
-    }
-    return map;
+    return await getLatestReviewStatuses("content_post");
   } catch (error) {
     console.error("Error fetching post review statuses:", error);
     return {};

@@ -18,6 +18,7 @@ import { type MemberChoice } from "@/components/MemberMultiSelect";
 import EmptyState from "@/components/EmptyState";
 import type { Session } from "@/lib/auth";
 import { getStoredSkeletonMap, setStoredSkeletonMap } from "@/lib/loading-skeleton";
+import { normalizeOwnerUserIds } from "@/lib/owner-users";
 import {
   submitForReview,
   approveReview,
@@ -353,7 +354,7 @@ export default function ProjectsBoardPageClient({
     setEditing({
       ...EMPTY_PROJECT,
       status,
-      ownerUserIds: session?.userId ? [Number(session.userId)] : [],
+      ownerUserIds: normalizeOwnerUserIds(session?.userId ? [session.userId] : []),
     });
     setModalOpen(true);
   };

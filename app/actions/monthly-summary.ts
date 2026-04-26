@@ -4,6 +4,10 @@ import { pool } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { assertHeadOrAdmin } from "@/lib/permissions";
 import {
+  indexRowsByOwner,
+  normalizeOwnerUserIds,
+} from "@/lib/owner-users";
+import {
   MemberContribution,
   DepartmentSummary,
   MonthlySummaryData,
@@ -66,30 +70,6 @@ function monthLabel(month: string) {
   const [y, m] = month.split("-").map(Number);
   const d = new Date(y, m - 1, 1);
   return d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
-}
-
-function toOwnerIds(value: unknown): number[] {
-  if (!Array.isArray(value)) return [];
-  return value
-    .map((id) => Number(id))
-    .filter((id) => Number.isInteger(id));
-}
-
-function indexRowsByOwner<T extends { owner_user_ids: number[] }>(rows: T[]) {
-  const map = new Map<number, T[]>();
-
-  for (const row of rows) {
-    for (const ownerId of Array.from(new Set(toOwnerIds(row.owner_user_ids)))) {
-      const current = map.get(ownerId);
-      if (current) {
-        current.push(row);
-      } else {
-        map.set(ownerId, [row]);
-      }
-    }
-  }
-
-  return map;
 }
 
 function pushByKey<K, T>(map: Map<K, T[]>, key: K, item: T) {
@@ -246,7 +226,7 @@ export async function getMonthlySummary(
         }
       }
 
-      for (const ownerId of toOwnerIds(project.owner_user_ids)) {
+      for (const ownerId of normalizeOwnerUserIds(project.owner_user_ids)) {
         const ownerDepartment = userDepartmentById.get(ownerId);
         if (ownerDepartment) linkedDepartments.add(ownerDepartment);
       }
@@ -271,7 +251,7 @@ export async function getMonthlySummary(
         }
       }
 
-      for (const ownerId of toOwnerIds(event.owner_user_ids)) {
+      for (const ownerId of normalizeOwnerUserIds(event.owner_user_ids)) {
         const ownerDepartment = userDepartmentById.get(ownerId);
         if (ownerDepartment) linkedDepartments.add(ownerDepartment);
       }
@@ -287,7 +267,7 @@ export async function getMonthlySummary(
     }
 
     const ownerNames = (ids: number[]): string[] =>
-      toOwnerIds(ids)
+      normalizeOwnerUserIds(ids)
         .map((id) => userMap.get(id)?.name)
         .filter(Boolean) as string[];
 

@@ -1,7 +1,8 @@
 "use server";
 
 import { pool } from "@/lib/db";
-import { getSession, type Session } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
+import { canPublishNews, getSessionUserId } from "@/lib/permissions";
 import { createPushNotification, notifySubscribers } from "@/lib/push";
 
 export type DashboardNewsType = "announcement" | "event" | "project" | "review";
@@ -69,23 +70,6 @@ function formatDateLabel(label: string, value: string | null) {
     day: "numeric",
     year: "numeric",
   })}`;
-}
-
-function canPublishNews(session: Session | null) {
-  if (!session) return false;
-  const role = session.role.toUpperCase();
-  const department = session.department.toLowerCase();
-  return (
-    role === "ADMIN" ||
-    role === "HEAD" ||
-    role === "MANAGEMENT" ||
-    department === "management"
-  );
-}
-
-function sessionUserId(session: Session) {
-  const userId = Number(session.userId);
-  return Number.isInteger(userId) ? userId : null;
 }
 
 export async function getDashboardNews() {
@@ -260,11 +244,12 @@ export async function createNewsPost(data: { title: string; body: string }) {
       return { error: "Title is required" };
     }
 
+    const actorUserId = getSessionUserId(session);
     const res = await pool.query(
       `INSERT INTO news_posts (title, body, created_by_user_id)
        VALUES ($1, $2, $3)
        RETURNING id, created_at`,
-      [title, body, sessionUserId(session)]
+      [title, body, actorUserId]
     );
 
     const createdAt = res.rows[0].created_at;
@@ -272,7 +257,7 @@ export async function createNewsPost(data: { title: string; body: string }) {
     try {
       await notifySubscribers({
         topic: "news",
-        excludeUserId: sessionUserId(session),
+        excludeUserId: actorUserId,
         payload: createPushNotification({
           topic: "news",
           title: title,

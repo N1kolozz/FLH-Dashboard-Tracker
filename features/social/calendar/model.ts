@@ -1,9 +1,11 @@
 import type { ContentPostRow } from "@/app/actions/content-posts";
+import { normalizeOwnerUserIds } from "@/lib/owner-users";
 
 export type Platform = "instagram" | "tiktok" | "facebook";
 export type PostStatus = "draft" | "scheduled" | "published";
 export type CalendarLayout = "slide" | "fit";
 export type CalendarView = "month" | "week";
+export { getMonthDays, MONTHS, WEEKDAYS } from "@/lib/calendar-ui";
 
 export interface ContentPost {
   id: number;
@@ -16,23 +18,6 @@ export interface ContentPost {
   ownerUserIds: number[];
   createdAt: string;
 }
-
-export const MONTHS = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
-
-export const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 export const PLATFORM_CONFIG: Record<
   Platform,
@@ -103,7 +88,7 @@ export function rowToPost(row: ContentPostRow): ContentPost {
     time: row.time,
     status: row.status as PostStatus,
     notes: row.notes,
-    ownerUserIds: (row.owner_user_ids || []).map(Number),
+    ownerUserIds: normalizeOwnerUserIds(row.owner_user_ids),
     createdAt: row.created_at,
   };
 }
@@ -115,16 +100,4 @@ export function sortPosts(items: ContentPost[]) {
       a.time.localeCompare(b.time) ||
       new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
-}
-
-export function getMonthDays(year: number, month: number) {
-  const firstDay = new Date(year, month, 1);
-  let startDow = firstDay.getDay() - 1;
-  if (startDow < 0) startDow = 6;
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const cells: (number | null)[] = [];
-  for (let i = 0; i < startDow; i++) cells.push(null);
-  for (let day = 1; day <= daysInMonth; day++) cells.push(day);
-  while (cells.length % 7 !== 0) cells.push(null);
-  return cells;
 }

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState, useEffect } from "react";
+import { generateDailyBriefing } from "@/app/actions/ai";
 import {
   createNewsPost,
   getDashboardNews,
@@ -10,6 +11,7 @@ import {
 } from "@/app/actions/news";
 import Modal from "@/components/Modal";
 import PushNotificationManager from "@/components/PushNotificationManager";
+import { canPublishNews } from "@/lib/permissions";
 import type { Session } from "@/lib/auth";
 import type { DashboardCounts } from "@/app/actions/dashboard-stats";
 import type { StatsResponse } from "@/lib/queries/social";
@@ -21,9 +23,6 @@ const dashboardDateFormatter = new Intl.DateTimeFormat("en-US", {
   year: "numeric",
   timeZone: "UTC",
 });
-
-
-import { generateDailyBriefing } from "@/app/actions/ai";
 
 /* ─── Quick-stat card ─── */
 function QuickStat({
@@ -104,17 +103,6 @@ const NEWS_CONFIG: Record<
     ),
   },
 };
-
-function canPublishNews(session: Session | null) {
-  if (!session) return false;
-  const role = session.role.toUpperCase();
-  const department = session.department.toLowerCase();
-  return Boolean(
-    role === "HEAD" ||
-      role === "MANAGEMENT" ||
-      department === "management"
-  );
-}
 
 function formatNewsDate(value: string) {
   const date = new Date(value);

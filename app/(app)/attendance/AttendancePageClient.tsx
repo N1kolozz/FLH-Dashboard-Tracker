@@ -21,6 +21,7 @@ import {
   type AttendanceStatus,
 } from "@/types";
 import type { Session } from "@/lib/auth";
+import { canManageAttendanceAndWorkload } from "@/lib/permissions";
 import { avatarColor, getInitials } from "@/lib/member-avatar";
 
 type AttendanceFormState = {
@@ -87,15 +88,6 @@ const STATUS_CONFIG: Record<
   },
 };
 
-function canManageAttendance(session: Session | null) {
-  return Boolean(
-    session &&
-      (session.role === "ADMIN" ||
-        session.role === "HEAD" ||
-        session.department === "Management")
-  );
-}
-
 function formatDate(value: string) {
   if (!value) return "No date";
   return new Date(`${value}T00:00:00`).toLocaleDateString(undefined, {
@@ -158,7 +150,7 @@ export default function AttendancePage({
   const [savingRecordId, setSavingRecordId] = useState<number | null>(null);
   const [error, setError] = useState("");
 
-  const canManage = canManageAttendance(session);
+  const canManage = canManageAttendanceAndWorkload(session);
 
   const refreshDashboard = useCallback(async () => {
     const [sessionRes, statRes] = await Promise.all([

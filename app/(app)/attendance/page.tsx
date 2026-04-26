@@ -2,20 +2,12 @@ import AttendancePageClient from "./AttendancePageClient";
 import { getAttendanceSessionDetails, getAttendanceSessions, getAttendanceStats } from "@/app/actions/attendance";
 import { getEvents } from "@/app/actions/events";
 import { getSession } from "@/lib/auth";
-
-function canManageAttendance(session: Awaited<ReturnType<typeof getSession>>) {
-  return Boolean(
-    session &&
-      (session.role === "ADMIN" ||
-        session.role === "HEAD" ||
-        session.department === "Management")
-  );
-}
+import { canManageAttendanceAndWorkload } from "@/lib/permissions";
 
 export default async function AttendancePage() {
   const session = await getSession();
 
-  if (!canManageAttendance(session)) {
+  if (!canManageAttendanceAndWorkload(session)) {
     return (
       <AttendancePageClient
         initialSession={session}

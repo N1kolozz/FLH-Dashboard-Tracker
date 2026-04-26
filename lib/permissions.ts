@@ -1,4 +1,4 @@
-import { Session } from "./auth";
+import type { Session } from "./auth";
 
 /**
  * Ensures the session is valid and throws a standard error if not.
@@ -99,4 +99,18 @@ export function canManageAttendanceAndWorkload(session: Session | null): boolean
 
 export function assertCanManageAttendance(session: Session | null) {
   return assertCanManageDepartment(session, "Management", "Management");
+}
+
+export function canPublishNews(session: Session | null): boolean {
+  if (!session) return false;
+
+  const role = session.role.toUpperCase();
+  const department = session.department.toLowerCase();
+
+  return (
+    role === "ADMIN" ||
+    role === "HEAD" ||
+    role === "MANAGEMENT" ||
+    department === "management"
+  );
 }

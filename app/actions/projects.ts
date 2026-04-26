@@ -1,7 +1,10 @@
 "use server";
 
 import { getSession } from "@/lib/auth";
-import { assertCanManageProjects } from "@/lib/permissions";
+import {
+  assertCanManageProjects,
+  getSessionUserId,
+} from "@/lib/permissions";
 import { createPushNotification, notifySubscribers } from "@/lib/push";
 import {
   fetchAllProjects,
@@ -11,11 +14,6 @@ import {
   deleteProjectFromDB,
 } from "@/lib/dal/projects";
 import { logActivity } from "@/lib/activity";
-
-function sessionUserId(session: { userId: string } | null) {
-  const userId = Number(session?.userId);
-  return Number.isInteger(userId) ? userId : null;
-}
 
 export async function getProjects() {
   try {
@@ -51,7 +49,7 @@ export async function createProject(data: {
   try {
     const session = await getSession();
     assertCanManageProjects(session);
-    const actorUserId = sessionUserId(session);
+    const actorUserId = getSessionUserId(session);
     const row = await insertProject(data);
     const createdAt = row.created_at;
     const updatedAt = row.updated_at;
@@ -74,7 +72,12 @@ export async function createProject(data: {
       console.error("Error sending project push notification:", pushError);
     }
 
-    await logActivity("create_project", "/projects", { projectId: row.id, projectName: data.name }, actorUserId || undefined);
+    await logActivity(
+      "create_project",
+      "/projects",
+      { projectId: row.id, projectName: data.name },
+      actorUserId || undefined
+    );
 
     return {
       success: true,
@@ -106,11 +109,11 @@ export async function updateProject(
     tags: string[];
     ownerUserIds: number[];
   }
-  ) {
+) {
   try {
     const session = await getSession();
     assertCanManageProjects(session);
-    const actorUserId = sessionUserId(session);
+    const actorUserId = getSessionUserId(session);
     const row = await updateProjectInDB(id, data);
     const updatedAt = row?.updated_at;
 
@@ -132,7 +135,12 @@ export async function updateProject(
       console.error("Error sending project update notification:", pushError);
     }
 
-    await logActivity("update_project", "/projects", { projectId: id, projectName: data.name }, actorUserId || undefined);
+    await logActivity(
+      "update_project",
+      "/projects",
+      { projectId: id, projectName: data.name },
+      actorUserId || undefined
+    );
 
     return {
       success: true,
@@ -154,8 +162,13 @@ export async function deleteProject(id: number) {
     const session = await getSession();
     assertCanManageProjects(session);
     await deleteProjectFromDB(id);
-    const actorUserId = sessionUserId(session);
-    await logActivity("delete_project", "/projects", { projectId: id }, actorUserId || undefined);
+    const actorUserId = getSessionUserId(session);
+    await logActivity(
+      "delete_project",
+      "/projects",
+      { projectId: id },
+      actorUserId || undefined
+    );
     return { success: true };
   } catch (error) {
     console.error("Error deleting project:", error);

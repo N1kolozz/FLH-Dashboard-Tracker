@@ -2,6 +2,7 @@
 
 import { pool } from "@/lib/db";
 import { requireDepartmentManagerSession } from "@/lib/action-auth";
+import { normalizeOwnerUserIds } from "@/lib/owner-users";
 import { createPushNotification, notifySubscribers } from "@/lib/push";
 import { getSessionUserId } from "@/lib/permissions";
 import { logActivity } from "@/lib/activity";
@@ -70,7 +71,7 @@ export async function createEvent(data: {
         data.location,
         data.department,
         data.description,
-        Array.from(new Set(data.ownerUserIds)).filter((id) => Number.isInteger(id)),
+        normalizeOwnerUserIds(data.ownerUserIds),
       ]
     );
     const createdAt = res.rows[0].created_at;
@@ -137,7 +138,7 @@ export async function updateEvent(
         data.location,
         data.department,
         data.description,
-        Array.from(new Set(data.ownerUserIds)).filter((ownerId) => Number.isInteger(ownerId)),
+        normalizeOwnerUserIds(data.ownerUserIds),
         id,
       ]
     );

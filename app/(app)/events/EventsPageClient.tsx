@@ -19,9 +19,13 @@ import {
 import {
   getDateFromISO,
   getLocalISODate,
+  getMonthDays,
   getWeekDays,
+  MONTHS,
   shiftISODate,
+  WEEKDAYS,
 } from "@/lib/calendar-ui";
+import { normalizeOwnerUserIds } from "@/lib/owner-users";
 
 /* ─── Types ─── */
 type Department = "all" | "pr" | "logistics" | "projects" | "other";
@@ -55,9 +59,6 @@ const DEPT_SHORT_LABEL: Record<Department, string> = {
   projects: "PRO",
   other: "OTH",
 };
-
-const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 const EMPTY: CalEvent = {
   id: 0,
@@ -95,7 +96,7 @@ function rowToEvent(row: EventRow): CalEvent {
     location: row.location,
     department: row.department as Department,
     description: row.description,
-    ownerUserIds: (row.owner_user_ids || []).map(Number),
+    ownerUserIds: normalizeOwnerUserIds(row.owner_user_ids),
     createdAt: row.created_at,
   };
 }
@@ -107,18 +108,6 @@ function sortEvents(items: CalEvent[]) {
       a.time.localeCompare(b.time) ||
       new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
-}
-
-function getMonthDays(year: number, month: number) {
-  const firstDay = new Date(year, month, 1);
-  let startDow = firstDay.getDay() - 1; // Monday = 0
-  if (startDow < 0) startDow = 6;
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const cells: (number | null)[] = [];
-  for (let i = 0; i < startDow; i++) cells.push(null);
-  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
-  while (cells.length % 7 !== 0) cells.push(null);
-  return cells;
 }
 
 function LoadingStatCards() {
@@ -399,7 +388,7 @@ export default function EventsPage({
     setEditing({
       ...EMPTY,
       date: date || "",
-      ownerUserIds: session?.userId ? [Number(session.userId)] : [],
+      ownerUserIds: normalizeOwnerUserIds(session?.userId ? [session.userId] : []),
     });
     setAiPrompt("");
     setAiError("");

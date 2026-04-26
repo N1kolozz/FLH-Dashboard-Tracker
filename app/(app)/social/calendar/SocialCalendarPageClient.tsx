@@ -18,6 +18,7 @@ import {
   shiftISODate,
 } from "@/lib/calendar-ui";
 import type { Session } from "@/lib/auth";
+import { normalizeOwnerUserIds } from "@/lib/owner-users";
 import {
   submitForReview,
   approveReview,
@@ -274,7 +275,7 @@ export default function SocialCalendarPageClient({
     setEditing({
       ...EMPTY_POST,
       date: date || "",
-      ownerUserIds: session?.userId ? [Number(session.userId)] : [],
+      ownerUserIds: normalizeOwnerUserIds(session?.userId ? [session.userId] : []),
     });
     setModalOpen(true);
   };

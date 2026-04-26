@@ -2,6 +2,7 @@
 
 import { pool } from "@/lib/db";
 import { requireDepartmentManagerSession } from "@/lib/action-auth";
+import { normalizeOwnerUserIds } from "@/lib/owner-users";
 
 export interface ContentPostRow {
   id: number;
@@ -62,7 +63,7 @@ export async function createContentPost(data: {
         data.time,
         data.status,
         data.notes,
-        Array.from(new Set(data.ownerUserIds)).filter((id) => Number.isInteger(id)),
+        normalizeOwnerUserIds(data.ownerUserIds),
       ]
     );
     const createdAt = res.rows[0].created_at;
@@ -106,7 +107,7 @@ export async function updateContentPost(
         data.time,
         data.status,
         data.notes,
-        Array.from(new Set(data.ownerUserIds)).filter((ownerId) => Number.isInteger(ownerId)),
+        normalizeOwnerUserIds(data.ownerUserIds),
         id,
       ]
     );

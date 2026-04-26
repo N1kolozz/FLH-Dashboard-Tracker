@@ -1,4 +1,5 @@
 import { pool } from "@/lib/db";
+import { normalizeOwnerUserIds } from "@/lib/owner-users";
 import { ProjectRow } from "@/types";
 
 export async function fetchAllProjects(): Promise<ProjectRow[]> {
@@ -107,7 +108,7 @@ export async function insertProject(data: {
       data.deadline || null,
       data.team,
       data.tags,
-      Array.from(new Set(data.ownerUserIds)).filter((id) => Number.isInteger(id)),
+      normalizeOwnerUserIds(data.ownerUserIds),
     ]
   );
   return res.rows[0];
@@ -147,7 +148,7 @@ export async function updateProjectInDB(
       data.deadline || null,
       data.team,
       data.tags,
-      Array.from(new Set(data.ownerUserIds)).filter((ownerId) => Number.isInteger(ownerId)),
+      normalizeOwnerUserIds(data.ownerUserIds),
       id,
     ]
   );

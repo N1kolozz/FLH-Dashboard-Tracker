@@ -1,4 +1,5 @@
 import type { ProjectRow } from "@/types";
+import { normalizeOwnerUserIds } from "@/lib/owner-users";
 
 export type Priority = "low" | "medium" | "high";
 export type Status = "planning" | "in_progress" | "review" | "completed";
@@ -107,7 +108,7 @@ export function rowToProject(row: ProjectRow): Project {
     deadline: row.deadline || "",
     team: row.team,
     tags: row.tags || [],
-    ownerUserIds: (row.owner_user_ids || []).map(Number),
+    ownerUserIds: normalizeOwnerUserIds(row.owner_user_ids),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

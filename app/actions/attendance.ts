@@ -1,8 +1,11 @@
 "use server";
 
 import { pool } from "@/lib/db";
-import { getSession, type Session } from "@/lib/auth";
-import { assertCanManageAttendance } from "@/lib/permissions";
+import { getSession } from "@/lib/auth";
+import {
+  assertCanManageAttendance,
+  getSessionUserId,
+} from "@/lib/permissions";
 import { createPushNotification, notifySubscribers } from "@/lib/push";
 import { logActivity } from "@/lib/activity";
 import {
@@ -58,11 +61,6 @@ function normalizeStatus(status: string): AttendanceStatus {
     return status as AttendanceStatus;
   }
   return "pending";
-}
-
-function getSessionUserId(session: Session) {
-  const userId = Number(session.userId);
-  return Number.isInteger(userId) ? userId : null;
 }
 
 function formatAttendanceDate(value: string) {
@@ -356,8 +354,8 @@ export async function updateAttendanceSession(
   }
 ) {
   try {
-    const session = await getSession();
-    assertCanManageAttendance(session);
+    const session = assertCanManageAttendance(await getSession());
+    const actorUserId = getSessionUserId(session);
     const eventId =
       typeof data.eventId === "number" && Number.isInteger(data.eventId)
         ? data.eventId
@@ -401,11 +399,16 @@ export async function updateAttendanceSession(
         sessionId: id,
         title,
         meetingDate,
-        excludeUserId: session ? getSessionUserId(session) : null,
+        excludeUserId: actorUserId,
       });
     }
 
-    await logActivity("update_attendance", "/attendance", { sessionId: id, title }, session ? getSessionUserId(session) || undefined : undefined);
+    await logActivity(
+      "update_attendance",
+      "/attendance",
+      { sessionId: id, title },
+      actorUserId || undefined
+    );
 
     return { success: true };
   } catch (error) {
@@ -416,10 +419,15 @@ export async function updateAttendanceSession(
 
 export async function deleteAttendanceSession(id: number) {
   try {
-    const session = await getSession();
-    assertCanManageAttendance(session);
+    const session = assertCanManageAttendance(await getSession());
+    const actorUserId = getSessionUserId(session);
     await pool.query("DELETE FROM attendance_sessions WHERE id = $1", [id]);
-    await logActivity("delete_attendance", "/attendance", { sessionId: id }, session ? getSessionUserId(session) || undefined : undefined);
+    await logActivity(
+      "delete_attendance",
+      "/attendance",
+      { sessionId: id },
+      actorUserId || undefined
+    );
     return { success: true };
   } catch (error) {
     console.error("Error deleting attendance session:", error);
@@ -429,8 +437,8 @@ export async function deleteAttendanceSession(id: number) {
 
 export async function setAttendanceSessionActive(id: number, isActive: boolean) {
   try {
-    const session = await getSession();
-    assertCanManageAttendance(session);
+    const session = assertCanManageAttendance(await getSession());
+    const actorUserId = getSessionUserId(session);
     await syncAttendanceRecords(id);
     await pool.query(
       `UPDATE attendance_sessions
@@ -456,7 +464,7 @@ export async function setAttendanceSessionActive(id: number, isActive: boolean) 
           sessionId: id,
           title: sessionRes.rows[0].title,
           meetingDate: sessionRes.rows[0].meeting_date,
-          excludeUserId: session ? getSessionUserId(session) : null,
+          excludeUserId: actorUserId,
         });
       }
     }

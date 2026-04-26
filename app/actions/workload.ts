@@ -1,6 +1,7 @@
 "use server";
 
 import { pool } from "@/lib/db";
+import { indexRowsByOwner } from "@/lib/owner-users";
 
 export interface WorkloadMember {
   id: number;
@@ -47,30 +48,6 @@ interface OwnedEventRow {
   date: string;
   department: string;
   owner_user_ids: number[];
-}
-
-function toOwnerIds(value: unknown): number[] {
-  if (!Array.isArray(value)) return [];
-  return value
-    .map((id) => Number(id))
-    .filter((id) => Number.isInteger(id));
-}
-
-function indexRowsByOwner<T extends { owner_user_ids: number[] }>(rows: T[]) {
-  const map = new Map<number, T[]>();
-
-  for (const row of rows) {
-    for (const ownerId of Array.from(new Set(toOwnerIds(row.owner_user_ids)))) {
-      const current = map.get(ownerId);
-      if (current) {
-        current.push(row);
-      } else {
-        map.set(ownerId, [row]);
-      }
-    }
-  }
-
-  return map;
 }
 
 export async function getWorkloadData(): Promise<
