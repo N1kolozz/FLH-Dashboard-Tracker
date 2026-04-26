@@ -22,7 +22,7 @@ export function getSessionUserId(
 ): number | null {
   if (!session) return null;
   const userId = Number(session.userId);
-  return Number.isInteger(userId) ? userId : null;
+  return Number.isSafeInteger(userId) && userId > 0 ? userId : null;
 }
 
 /**
