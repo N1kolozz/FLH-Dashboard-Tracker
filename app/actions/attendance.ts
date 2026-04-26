@@ -26,6 +26,7 @@ const ATTENDANCE_STATUSES: AttendanceStatus[] = [
 ];
 
 const ATTENDANCE_AUDIENCE_CONDITION = `
+  u.role != 'ADMIN' AND
   (
     s.event_id IS NULL
     OR (
@@ -735,6 +736,7 @@ export async function getAttendanceStats() {
            )::float AS attendance_rate
          FROM users u
          LEFT JOIN attendance_records r ON r.user_id = u.id
+         WHERE u.role != 'ADMIN'
          GROUP BY u.id
          ORDER BY attendance_rate DESC NULLS LAST, recorded_count DESC, u.full_name ASC`
       ),
@@ -752,6 +754,7 @@ export async function getAttendanceStats() {
            )::float AS attendance_rate
          FROM users u
          LEFT JOIN attendance_records r ON r.user_id = u.id
+         WHERE u.role != 'ADMIN'
          GROUP BY u.department
          ORDER BY u.department ASC`
       ),

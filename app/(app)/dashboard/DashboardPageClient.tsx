@@ -15,6 +15,7 @@ import { canPublishNews } from "@/lib/permissions";
 import type { Session } from "@/lib/auth";
 import type { DashboardCounts } from "@/app/actions/dashboard-stats";
 import type { StatsResponse } from "@/lib/queries/social";
+import { Icons } from "@/components/Icons";
 
 const dashboardNumberFormatter = new Intl.NumberFormat("en-US");
 const dashboardDateFormatter = new Intl.DateTimeFormat("en-US", {
@@ -308,9 +309,9 @@ export default function DashboardPage({
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
           <h1 className="text-xl sm:text-2xl font-bold text-slate-900 flex items-center gap-2">
             Welcome back
-            <svg className="w-6 h-6 sm:w-7 sm:h-7 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-            </svg>
+            <span className="text-purple-500 drop-shadow-sm">
+              {Icons.wave}
+            </span>
           </h1>
           <p className="text-sm text-slate-600 mt-1">
             Here&apos;s an overview of Future Leaders Hub operations
@@ -329,9 +330,7 @@ export default function DashboardPage({
           <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-amber-400/20 blur-2xl" />
           <div className="flex flex-col sm:flex-row sm:items-start gap-4">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-inner">
-              <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
+              <span className="[&>svg]:h-6 [&>svg]:w-6">{Icons.ai}</span>
             </div>
             <div className="flex-1">
               <div className="flex items-center justify-between gap-3">
@@ -362,12 +361,9 @@ export default function DashboardPage({
                     <button
                       type="button"
                       onClick={handleGenerateBriefing}
-                      className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-2 text-sm font-semibold text-white shadow-md transition-all duration-200 hover:from-amber-600 hover:to-orange-600 hover:shadow-lg active:scale-95"
+                      className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-2 text-sm font-semibold text-white shadow-md transition-all duration-200 hover:from-amber-600 hover:to-orange-600 active:scale-95"
                     >
-                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                      </svg>
-                      Generate Briefing
+                      Generate
                     </button>
                   </div>
                 )}

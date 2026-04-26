@@ -151,6 +151,17 @@ body {
   background-clip: padding-box;
 }
 
+/* Waving hand animation */
+@keyframes wave {
+  0% { transform: rotate(0deg) scale(1); }
+  15% { transform: rotate(20deg) scale(1.1); }
+  30% { transform: rotate(-10deg) scale(1.1); }
+  45% { transform: rotate(20deg) scale(1.1); }
+  60% { transform: rotate(-10deg) scale(1.1); }
+  75% { transform: rotate(0deg) scale(1); }
+  100% { transform: rotate(0deg) scale(1); }
+}
+
 /* Modal animation */
 @keyframes modalIn {
   from {

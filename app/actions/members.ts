@@ -55,7 +55,7 @@ export async function addMember(formData: {
 export async function getMembers() {
   try {
     const res = await pool.query(
-      "SELECT id, full_name as name, role, department, email, position, created_at FROM users ORDER BY created_at DESC"
+      "SELECT id, full_name as name, role, department, email, position, created_at FROM users WHERE role != 'ADMIN' ORDER BY created_at DESC"
     );
     return { success: true, members: res.rows };
   } catch (error) {

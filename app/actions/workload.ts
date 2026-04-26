@@ -57,6 +57,7 @@ export async function getWorkloadData(): Promise<
     const usersRes = await pool.query(
       `SELECT id, full_name AS name, role, department, position, email
        FROM users
+       WHERE role != 'ADMIN'
        ORDER BY full_name ASC`
     );
     const users = usersRes.rows as WorkloadUserRow[];

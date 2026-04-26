@@ -22,8 +22,9 @@ export async function getDashboardCounts(): Promise<DashboardCounts> {
         pool.query(
           "SELECT COALESCE(SUM(amount), 0)::float as total FROM expenses WHERE date >= date_trunc('month', CURRENT_DATE)"
         ),
-        pool.query("SELECT COUNT(*) as count FROM users"),
+        pool.query("SELECT COUNT(*) as count FROM users WHERE role != 'ADMIN'"),
       ]);
+      
 
     return {
       projectCount: parseInt(projectsRes.rows[0].count),

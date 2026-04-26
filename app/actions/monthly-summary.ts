@@ -100,6 +100,7 @@ export async function getMonthlySummary(
       pool.query(
         `SELECT id, full_name AS name, department, role, COALESCE(position, '') AS position, email
          FROM users
+         WHERE role != 'ADMIN'
          ORDER BY department, full_name`
       ),
       pool.query(
