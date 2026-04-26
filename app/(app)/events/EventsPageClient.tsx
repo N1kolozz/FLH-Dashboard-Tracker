@@ -708,7 +708,6 @@ export default function EventsPage({
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setCalendarCursor(dateStr);
-                                    setSelectedDate(dateStr);
                                     setEditing(ev);
                                     setModalOpen(true);
                                   }}
@@ -745,7 +744,6 @@ export default function EventsPage({
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setCalendarCursor(dateStr);
-                                    setSelectedDate(dateStr);
                                     setEditing(ev);
                                     setModalOpen(true);
                                   }}
@@ -856,7 +854,6 @@ export default function EventsPage({
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setCalendarCursor(dateStr);
-                                    setSelectedDate(dateStr);
                                     setEditing(ev);
                                     setModalOpen(true);
                                   }}
@@ -893,7 +890,6 @@ export default function EventsPage({
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setCalendarCursor(dateStr);
-                                    setSelectedDate(dateStr);
                                     setEditing(ev);
                                     setModalOpen(true);
                                   }}
