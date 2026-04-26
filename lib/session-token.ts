@@ -103,8 +103,13 @@ function normalizeSession(payload: Partial<SessionClaims> | null): Session | nul
     return null;
   }
 
+  const normalizedUserId = Number(payload.userId);
+  if (!Number.isSafeInteger(normalizedUserId) || normalizedUserId <= 0) {
+    return null;
+  }
+
   return {
-    userId: String(payload.userId ?? ""),
+    userId: String(normalizedUserId),
     email: String(payload.email),
     role: String(payload.role),
     department: String(payload.department),
