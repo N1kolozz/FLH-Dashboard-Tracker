@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -97,6 +97,85 @@ export default function ProjectsBoardPageClient({
   const cardRefs = useRef<Record<number, HTMLDivElement | null>>({});
   const suppressOpenAfterDragRef = useRef(false);
   const suppressOpenTimeoutRef = useRef<number | null>(null);
+  const isDraggingRef = useRef(false);
+  const mobileSwipeRef = useRef({
+    tracking: false,
+    horizontal: false,
+    startX: 0,
+    startY: 0,
+    lastX: 0,
+    lastTime: 0,
+    velocityX: 0,
+    startIndex: 0,
+    startScrollLeft: 0,
+  });
+
+  const clampMobileColumnIndex = useCallback((index: number) => {
+    return Math.min(Math.max(index, 0), COLUMNS.length - 1);
+  }, []);
+
+  const getColumnScrollLeft = useCallback(
+    (index: number) => {
+      const board = boardRef.current;
+      const column = columnRefs.current[clampMobileColumnIndex(index)];
+
+      if (!board || !column) {
+        return 0;
+      }
+
+      const boardRect = board.getBoundingClientRect();
+      const columnRect = column.getBoundingClientRect();
+      const boardStyle = window.getComputedStyle(board);
+      const paddingLeft = Number.parseFloat(boardStyle.paddingLeft) || 0;
+      const maxScrollLeft = Math.max(0, board.scrollWidth - board.clientWidth);
+      const targetScrollLeft =
+        board.scrollLeft + columnRect.left - boardRect.left - paddingLeft;
+
+      return Math.min(Math.max(targetScrollLeft, 0), maxScrollLeft);
+    },
+    [clampMobileColumnIndex]
+  );
+
+  const getNearestMobileColumnIndex = useCallback(() => {
+    const board = boardRef.current;
+
+    if (!board) {
+      return 0;
+    }
+
+    let nextIndex = 0;
+    let smallestDistance = Number.POSITIVE_INFINITY;
+
+    COLUMNS.forEach((_, index) => {
+      const distance = Math.abs(getColumnScrollLeft(index) - board.scrollLeft);
+
+      if (distance < smallestDistance) {
+        smallestDistance = distance;
+        nextIndex = index;
+      }
+    });
+
+    return nextIndex;
+  }, [getColumnScrollLeft]);
+
+  const scrollToMobileColumn = useCallback(
+    (index: number, behavior: ScrollBehavior = "smooth") => {
+      const board = boardRef.current;
+
+      if (!board) {
+        return;
+      }
+
+      const nextIndex = clampMobileColumnIndex(index);
+
+      board.scrollTo({
+        left: getColumnScrollLeft(nextIndex),
+        behavior,
+      });
+      setActiveMobileColumn(nextIndex);
+    },
+    [clampMobileColumnIndex, getColumnScrollLeft]
+  );
 
   const sensors = useSensors(
     useSensor(MouseSensor, {
@@ -155,23 +234,7 @@ export default function ProjectsBoardPageClient({
     let frameId: number | null = null;
 
     const updateActiveColumn = () => {
-      const boardCenter = board.scrollLeft + board.clientWidth / 2;
-      let nextIndex = 0;
-      let smallestDistance = Number.POSITIVE_INFINITY;
-
-      columnRefs.current.forEach((column, index) => {
-        if (!column) return;
-
-        const columnCenter = column.offsetLeft + column.offsetWidth / 2;
-        const distance = Math.abs(columnCenter - boardCenter);
-
-        if (distance < smallestDistance) {
-          smallestDistance = distance;
-          nextIndex = index;
-        }
-      });
-
-      setActiveMobileColumn(nextIndex);
+      setActiveMobileColumn(getNearestMobileColumnIndex());
     };
 
     const queueUpdate = () => {
@@ -194,7 +257,157 @@ export default function ProjectsBoardPageClient({
         window.cancelAnimationFrame(frameId);
       }
     };
-  }, [isLoadingData, projects.length]);
+  }, [getNearestMobileColumnIndex, isLoadingData, projects.length]);
+
+  useEffect(() => {
+    const board = boardRef.current;
+    if (!board) return;
+
+    const isMobileBoard = () => window.matchMedia("(max-width: 1023px)").matches;
+    const resetSnapStyles = () => {
+      board.style.scrollBehavior = "";
+      board.style.scrollSnapType = "";
+    };
+    const releaseCardOpenSuppression = () => {
+      if (suppressOpenTimeoutRef.current !== null) {
+        window.clearTimeout(suppressOpenTimeoutRef.current);
+      }
+
+      suppressOpenTimeoutRef.current = window.setTimeout(() => {
+        suppressOpenAfterDragRef.current = false;
+        suppressOpenTimeoutRef.current = null;
+      }, 320);
+    };
+
+    const handleTouchStart = (event: TouchEvent) => {
+      if (!isMobileBoard() || isDraggingRef.current || event.touches.length !== 1) {
+        return;
+      }
+
+      const touch = event.touches[0];
+      const now = performance.now();
+
+      mobileSwipeRef.current = {
+        tracking: true,
+        horizontal: false,
+        startX: touch.clientX,
+        startY: touch.clientY,
+        lastX: touch.clientX,
+        lastTime: now,
+        velocityX: 0,
+        startIndex: getNearestMobileColumnIndex(),
+        startScrollLeft: board.scrollLeft,
+      };
+    };
+
+    const handleTouchMove = (event: TouchEvent) => {
+      const swipe = mobileSwipeRef.current;
+
+      if (!swipe.tracking || isDraggingRef.current || event.touches.length !== 1) {
+        return;
+      }
+
+      const touch = event.touches[0];
+      const deltaX = touch.clientX - swipe.startX;
+      const deltaY = touch.clientY - swipe.startY;
+      const absX = Math.abs(deltaX);
+      const absY = Math.abs(deltaY);
+
+      if (!swipe.horizontal) {
+        if (absX < 8 && absY < 8) {
+          return;
+        }
+
+        if (absY > absX * 1.1) {
+          swipe.tracking = false;
+          resetSnapStyles();
+          return;
+        }
+
+        swipe.horizontal = true;
+        suppressOpenAfterDragRef.current = true;
+        if (suppressOpenTimeoutRef.current !== null) {
+          window.clearTimeout(suppressOpenTimeoutRef.current);
+          suppressOpenTimeoutRef.current = null;
+        }
+        board.style.scrollBehavior = "auto";
+        board.style.scrollSnapType = "none";
+      }
+
+      if (event.cancelable) {
+        event.preventDefault();
+      }
+
+      const now = performance.now();
+      const elapsed = Math.max(1, now - swipe.lastTime);
+      swipe.velocityX = (touch.clientX - swipe.lastX) / elapsed;
+      swipe.lastX = touch.clientX;
+      swipe.lastTime = now;
+
+      const maxScrollLeft = Math.max(0, board.scrollWidth - board.clientWidth);
+      let nextScrollLeft = swipe.startScrollLeft - deltaX;
+
+      if (nextScrollLeft < 0) {
+        nextScrollLeft *= 0.35;
+      } else if (nextScrollLeft > maxScrollLeft) {
+        nextScrollLeft = maxScrollLeft + (nextScrollLeft - maxScrollLeft) * 0.35;
+      }
+
+      board.scrollLeft = nextScrollLeft;
+    };
+
+    const finishSwipe = () => {
+      const swipe = mobileSwipeRef.current;
+
+      if (!swipe.tracking) {
+        resetSnapStyles();
+        return;
+      }
+
+      swipe.tracking = false;
+
+      if (!swipe.horizontal) {
+        resetSnapStyles();
+        return;
+      }
+
+      resetSnapStyles();
+
+      const deltaX = swipe.lastX - swipe.startX;
+      const distanceThreshold = Math.min(120, board.clientWidth * 0.22);
+      const velocityThreshold = 0.45;
+      let nextIndex = swipe.startIndex;
+
+      if (deltaX <= -distanceThreshold || swipe.velocityX <= -velocityThreshold) {
+        nextIndex += 1;
+      } else if (deltaX >= distanceThreshold || swipe.velocityX >= velocityThreshold) {
+        nextIndex -= 1;
+      } else {
+        nextIndex = getNearestMobileColumnIndex();
+      }
+
+      scrollToMobileColumn(nextIndex);
+      releaseCardOpenSuppression();
+    };
+
+    board.addEventListener("touchstart", handleTouchStart, { passive: true });
+    board.addEventListener("touchmove", handleTouchMove, { passive: false });
+    board.addEventListener("touchend", finishSwipe, { passive: true });
+    board.addEventListener("touchcancel", finishSwipe, { passive: true });
+
+    return () => {
+      board.removeEventListener("touchstart", handleTouchStart);
+      board.removeEventListener("touchmove", handleTouchMove);
+      board.removeEventListener("touchend", finishSwipe);
+      board.removeEventListener("touchcancel", finishSwipe);
+      resetSnapStyles();
+    };
+  }, [
+    getNearestMobileColumnIndex,
+    isLoadingData,
+    projects.length,
+    scrollToMobileColumn,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -250,19 +463,6 @@ export default function ProjectsBoardPageClient({
       suppressOpenAfterDragRef.current = false;
       suppressOpenTimeoutRef.current = null;
     }, 120);
-  };
-
-  const scrollToMobileColumn = (index: number) => {
-    const column = columnRefs.current[index];
-
-    if (!column) return;
-
-    column.scrollIntoView({
-      behavior: "smooth",
-      block: "nearest",
-      inline: "start",
-    });
-    setActiveMobileColumn(index);
   };
 
   /* ─── CRUD ─── */
@@ -514,6 +714,10 @@ export default function ProjectsBoardPageClient({
     ? { height: `${dragPreviewHeight}px` }
     : undefined;
 
+  useEffect(() => {
+    isDraggingRef.current = isDragging;
+  }, [isDragging]);
+
   const daysUntilDeadline = (deadline: string) => {
     if (!deadline) return null;
     const diff = Math.ceil((new Date(deadline).getTime() - Date.now()) / 86400000);
@@ -632,7 +836,7 @@ export default function ProjectsBoardPageClient({
           >
             <div
               ref={boardRef}
-              className={`hide-scrollbar flex flex-1 min-h-0 gap-4 overflow-x-auto overflow-y-hidden px-4 pb-2 lg:grid lg:grid-cols-4 lg:overflow-visible lg:px-0 lg:pb-0 overscroll-x-contain scroll-px-4 ${
+              className={`hide-scrollbar flex flex-1 min-h-0 touch-pan-y gap-4 overflow-x-auto overflow-y-hidden px-4 pb-2 lg:grid lg:grid-cols-4 lg:overflow-visible lg:px-0 lg:pb-0 overscroll-x-contain scroll-px-4 ${
                 isDragging ? "" : "snap-x snap-mandatory"
               }`}
             >
