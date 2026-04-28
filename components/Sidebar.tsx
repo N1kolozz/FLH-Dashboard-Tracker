@@ -236,17 +236,25 @@ export default function Sidebar({ session }: { session: Session | null }) {
   return (
     <>
       {/* Mobile Top Navigation */}
-      <div className="md:hidden sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-purple-100/60 p-3 flex items-center gap-3">
+      <div className="md:hidden sticky top-0 z-30 flex items-center gap-3 overflow-hidden border-b border-white/50 bg-white/45 p-3 shadow-[0_14px_36px_-24px_rgba(30,41,59,0.75)] backdrop-blur-[22px] backdrop-saturate-150 supports-[backdrop-filter]:bg-white/35">
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/70 via-white/25 to-white/10"
+        />
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-white/80 to-transparent"
+        />
         <button
           onClick={() => setMobileOpen(true)}
-          className="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-purple-100 shadow-sm text-slate-600 hover:text-slate-800 transition-colors"
+          className="relative z-10 flex h-10 w-10 items-center justify-center rounded-xl border border-white/70 bg-white/45 text-slate-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_8px_22px_-16px_rgba(88,28,135,0.8)] backdrop-blur-xl transition-colors hover:bg-white/70 hover:text-slate-800 active:bg-white/80"
           aria-label="Open menu"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
-        <div className="flex items-center gap-2">
+        <div className="relative z-10 flex items-center gap-2">
           <FlhIconMark
             width={28}
             height={30}
