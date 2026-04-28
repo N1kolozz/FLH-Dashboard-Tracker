@@ -262,6 +262,23 @@ async function migrate() {
     console.log("✓ news_posts table ready");
 
     await client.query(`
+      CREATE TABLE IF NOT EXISTS daily_briefings (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        briefing_date DATE NOT NULL,
+        briefing TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, briefing_date)
+      );
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS daily_briefings_user_date_idx
+      ON daily_briefings (user_id, briefing_date DESC)
+    `);
+    console.log("daily_briefings table ready");
+
+    await client.query(`
       CREATE TABLE IF NOT EXISTS push_subscriptions (
         id SERIAL PRIMARY KEY,
         user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,

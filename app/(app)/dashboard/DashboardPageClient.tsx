@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { generateDailyBriefing } from "@/app/actions/ai";
 import {
   createNewsPost,
@@ -187,6 +187,7 @@ export default function DashboardPage({
   initialNewsItems,
   initialReviewItems,
   initialNewsError,
+  initialDailyBriefing,
 }: {
   initialSession: Session | null;
   initialCounts: DashboardCounts;
@@ -194,6 +195,7 @@ export default function DashboardPage({
   initialNewsItems: DashboardNewsItem[];
   initialReviewItems: DashboardNewsItem[];
   initialNewsError: string;
+  initialDailyBriefing: string | null;
 }) {
   const [session] = useState<Session | null>(initialSession);
   const [projectCount] = useState(initialCounts.projectCount);
@@ -209,36 +211,22 @@ export default function DashboardPage({
   const [newsForm, setNewsForm] = useState({ title: "", body: "" });
   const [newsSaving, setNewsSaving] = useState(false);
 
-  // Daily Briefing State (cached in localStorage, 1 request per day per user)
-  const BRIEFING_KEY = `flh_daily_briefing_${initialSession?.userId || 'anon'}`;
-  const [dailyBriefing, setDailyBriefing] = useState<string | null>(null);
+  const [dailyBriefing, setDailyBriefing] = useState<string | null>(initialDailyBriefing);
   const [briefingLoading, setBriefingLoading] = useState(false);
-  const [briefingChecked, setBriefingChecked] = useState(false);
-
-  // On mount, check localStorage for today's cached briefing
-  useEffect(() => {
-    try {
-      const cached = localStorage.getItem(BRIEFING_KEY);
-      if (cached) {
-        const { date, text } = JSON.parse(cached);
-        const today = new Date().toISOString().slice(0, 10);
-        if (date === today && text) {
-          setDailyBriefing(text);
-        }
-      }
-    } catch {}
-    setBriefingChecked(true);
-  }, [BRIEFING_KEY]);
+  const [briefingError, setBriefingError] = useState("");
 
   const handleGenerateBriefing = async () => {
+    if (briefingLoading || dailyBriefing) return;
+
     setBriefingLoading(true);
+    setBriefingError("");
     const res = await generateDailyBriefing();
     if (res.success && res.briefing) {
       setDailyBriefing(res.briefing);
-      const today = new Date().toISOString().slice(0, 10);
-      localStorage.setItem(BRIEFING_KEY, JSON.stringify({ date: today, text: res.briefing }));
     } else {
-      setDailyBriefing(null);
+      setBriefingError(
+        res.success ? "Briefing was not returned. Please try again." : res.error
+      );
     }
     setBriefingLoading(false);
   };
@@ -348,7 +336,7 @@ export default function DashboardPage({
                 )}
               </div>
               <div className="mt-2 text-sm leading-relaxed text-amber-800/90">
-                {(briefingLoading || !briefingChecked) ? (
+                {briefingLoading ? (
                   <div className="animate-pulse space-y-2">
                     <div className="h-4 w-3/4 rounded bg-amber-200/50"></div>
                     <div className="h-4 w-1/2 rounded bg-amber-200/50"></div>
@@ -358,10 +346,14 @@ export default function DashboardPage({
                 ) : (
                   <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                     <p className="text-amber-700/70">დააჭირეთ ღილაკს დღიური ბრიფინგის შესაქმნელად.</p>
+                    {briefingError ? (
+                      <p className="text-xs font-medium text-rose-600">{briefingError}</p>
+                    ) : null}
                     <button
                       type="button"
                       onClick={handleGenerateBriefing}
-                      className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-2 text-sm font-semibold text-white shadow-md transition-all duration-200 hover:from-amber-600 hover:to-orange-600 active:scale-95"
+                      disabled={briefingLoading}
+                      className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-2 text-sm font-semibold text-white shadow-md transition-all duration-200 hover:from-amber-600 hover:to-orange-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-70"
                     >
                       Generate
                     </button>

@@ -1,10 +1,133 @@
 "use server";
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import type { PoolClient } from "pg";
+import { pool } from "@/lib/db";
+import { requireAuthenticatedSession } from "@/lib/action-auth";
+import { getSessionUserId } from "@/lib/permissions";
 
 // Initialize the Google Generative AI SDK
 // The user will need to add GEMINI_API_KEY to their .env file
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+const BRIEFING_TIME_ZONE = "Asia/Tbilisi";
+const DAILY_BRIEFING_RETENTION_DAYS = 7;
+
+type DailyBriefingRow = {
+  briefing: string;
+};
+
+export type DailyBriefingResult =
+  | {
+      success: true;
+      briefing: string | null;
+      briefingDate: string;
+      alreadyGenerated: boolean;
+    }
+  | {
+      success: false;
+      error: string;
+    };
+
+function getBriefingDateKey(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: BRIEFING_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+function getBriefingHour(date = new Date()) {
+  const hour = new Intl.DateTimeFormat("en-US", {
+    timeZone: BRIEFING_TIME_ZONE,
+    hour: "2-digit",
+    hour12: false,
+  }).format(date);
+
+  return Number.parseInt(hour, 10);
+}
+
+function isNextDynamicServerError(error: unknown) {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "digest" in error &&
+    (error as { digest?: string }).digest === "DYNAMIC_SERVER_USAGE"
+  );
+}
+
+async function ensureDailyBriefingsTable() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS daily_briefings (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      briefing_date DATE NOT NULL,
+      briefing TEXT NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(user_id, briefing_date)
+    )
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS daily_briefings_user_date_idx
+    ON daily_briefings (user_id, briefing_date DESC)
+  `);
+}
+
+async function cleanupOldDailyBriefings(briefingDate: string) {
+  await pool.query(
+    `DELETE FROM daily_briefings
+     WHERE briefing_date < ($1::date - make_interval(days => $2::integer))::date`,
+    [briefingDate, DAILY_BRIEFING_RETENTION_DAYS]
+  );
+}
+
+async function getAuthenticatedBriefingUserId() {
+  const session = await requireAuthenticatedSession();
+  const userId = getSessionUserId(session);
+
+  if (!userId) {
+    throw new Error("Not authorized: Missing user id");
+  }
+
+  return userId;
+}
+
+export async function getDailyBriefingForToday(): Promise<DailyBriefingResult> {
+  try {
+    const userId = await getAuthenticatedBriefingUserId();
+    const briefingDate = getBriefingDateKey();
+
+    await ensureDailyBriefingsTable();
+    await cleanupOldDailyBriefings(briefingDate);
+
+    const existing = await pool.query<DailyBriefingRow>(
+      `SELECT briefing
+       FROM daily_briefings
+       WHERE user_id = $1 AND briefing_date = $2::date
+       LIMIT 1`,
+      [userId, briefingDate]
+    );
+
+    return {
+      success: true,
+      briefing: existing.rows[0]?.briefing ?? null,
+      briefingDate,
+      alreadyGenerated: existing.rows.length > 0,
+    };
+  } catch (error: unknown) {
+    if (isNextDynamicServerError(error)) {
+      throw error;
+    }
+
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("Daily Briefing lookup error:", error);
+    return { success: false, error: message };
+  }
+}
 
 export async function generateItinerary(prompt: string) {
   try {
@@ -74,30 +197,66 @@ Do NOT include any markdown formatting. Return strictly the raw JSON object.`;
   }
 }
 
-export async function generateDailyBriefing() {
+export async function generateDailyBriefing(): Promise<DailyBriefingResult> {
+  let client: PoolClient | null = null;
+
   try {
-    const { pool } = await import('@/lib/db');
-    
-    const [statsRes, activityRes, sessionRes] = await Promise.all([
-      pool.query(`
+    if (!process.env.GEMINI_API_KEY) {
+      return {
+        success: false,
+        error: "GEMINI_API_KEY is not set in your environment variables. Please add it to your .env file.",
+      };
+    }
+
+    const userId = await getAuthenticatedBriefingUserId();
+    const briefingDate = getBriefingDateKey();
+
+    await ensureDailyBriefingsTable();
+    await cleanupOldDailyBriefings(briefingDate);
+
+    client = await pool.connect();
+    await client.query("BEGIN");
+    await client.query(
+      `SELECT pg_advisory_xact_lock($1::integer, hashtext($2)::integer)`,
+      [userId, briefingDate]
+    );
+
+    const existing = await client.query<DailyBriefingRow>(
+      `SELECT briefing
+       FROM daily_briefings
+       WHERE user_id = $1 AND briefing_date = $2::date
+       LIMIT 1`,
+      [userId, briefingDate]
+    );
+
+    if (existing.rows[0]?.briefing) {
+      await client.query("COMMIT");
+      return {
+        success: true,
+        briefing: existing.rows[0].briefing,
+        briefingDate,
+        alreadyGenerated: true,
+      };
+    }
+
+    const statsRes = await client.query(`
         SELECT 
           (SELECT COUNT(*) FROM projects) as projects,
           (SELECT COUNT(*) FROM inventory_items) as inventory,
           (SELECT COUNT(*) FROM events WHERE date >= CURRENT_DATE) as events
-      `),
-      pool.query(`
+      `);
+    const activityRes = await client.query(`
         SELECT DISTINCT u.full_name
         FROM user_activities a
         JOIN users u ON a.user_id = u.id
         WHERE a.created_at >= NOW() - INTERVAL '24 hours'
         LIMIT 10
-      `),
-      pool.query(`
+      `);
+    const sessionRes = await client.query(`
         SELECT COUNT(DISTINCT user_id) as count
         FROM user_sessions
         WHERE start_time >= NOW() - INTERVAL '24 hours'
-      `)
-    ]);
+      `);
 
     const stats = statsRes.rows[0];
     const activeUsers = activityRes.rows.map((r: Record<string, string>) => r.full_name).filter(Boolean);
@@ -107,12 +266,11 @@ export async function generateDailyBriefing() {
     const eventCount = parseInt(stats.events);
 
     // Time-appropriate greeting hint
-    const hour = new Date().getHours();
+    const hour = getBriefingHour();
     let timeOfDay = "დილა";
     if (hour >= 12 && hour < 18) timeOfDay = "შუადღე";
     else if (hour >= 18) timeOfDay = "საღამო";
 
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
     const model = genAI.getGenerativeModel({ model: "gemini-3.1-flash-lite-preview" });
 
     const prompt = `დაწერე მოკლე დღიური ბრიფინგი (2-3 წინადადება) ქართულ ენაზე "Future Leaders Hub"-ის გუნდის წევრებისთვის.
@@ -133,10 +291,36 @@ export async function generateDailyBriefing() {
     // Clean up any stray markdown
     text = text.replace(/[*#`]/g, '').trim();
 
-    return { success: true, briefing: text };
+    const saved = await client.query<DailyBriefingRow>(
+      `INSERT INTO daily_briefings (user_id, briefing_date, briefing)
+       VALUES ($1, $2::date, $3)
+       ON CONFLICT (user_id, briefing_date)
+       DO UPDATE SET briefing = daily_briefings.briefing
+       RETURNING briefing`,
+      [userId, briefingDate, text]
+    );
+
+    await client.query("COMMIT");
+
+    return {
+      success: true,
+      briefing: saved.rows[0]?.briefing ?? text,
+      briefingDate,
+      alreadyGenerated: false,
+    };
   } catch (error: unknown) {
+    if (client) {
+      try {
+        await client.query("ROLLBACK");
+      } catch (rollbackError) {
+        console.error("Daily Briefing rollback error:", rollbackError);
+      }
+    }
+
     const message = error instanceof Error ? error.message : String(error);
     console.error("Daily Briefing error:", error);
     return { success: false, error: message };
+  } finally {
+    client?.release();
   }
 }

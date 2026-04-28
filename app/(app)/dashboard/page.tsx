@@ -1,15 +1,17 @@
 import DashboardPageClient from "./DashboardPageClient";
+import { getDailyBriefingForToday } from "@/app/actions/ai";
 import { getDashboardCounts } from "@/app/actions/dashboard-stats";
 import { getDashboardNews } from "@/app/actions/news";
 import { getSession } from "@/lib/auth";
 import { getSocialStats } from "@/lib/queries/social";
 
 export default async function DashboardPage() {
-  const [session, counts, newsResult, stats] = await Promise.all([
+  const [session, counts, newsResult, stats, briefingResult] = await Promise.all([
     getSession(),
     getDashboardCounts(),
     getDashboardNews(),
     getSocialStats(),
+    getDailyBriefingForToday(),
   ]);
 
   return (
@@ -22,6 +24,7 @@ export default async function DashboardPage() {
         "reviewItems" in newsResult ? newsResult.reviewItems ?? [] : []
       }
       initialNewsError={"error" in newsResult ? newsResult.error ?? "" : ""}
+      initialDailyBriefing={briefingResult.success ? briefingResult.briefing : null}
     />
   );
 }
