@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Session } from "@/lib/auth";
 import { logout } from "@/app/actions/auth";
 import FlhIconMark from "@/components/FlhIconMark";
@@ -14,6 +14,15 @@ export default function Sidebar({ session }: { session: Session | null }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const navRef = useRef<HTMLElement | null>(null);
+  const linkRefs = useRef<Record<string, HTMLAnchorElement | null>>({});
+  const [activeIndicator, setActiveIndicator] = useState({
+    top: 0,
+    left: 0,
+    width: 0,
+    height: 0,
+    visible: false,
+  });
 
   useEffect(() => {
     if (!mobileOpen) return;
@@ -40,6 +49,65 @@ export default function Sidebar({ session }: { session: Session | null }) {
   );
   const isHead = Boolean(session && (session.role === "ADMIN" || session.role === "HEAD"));
   const isAdmin = Boolean(session && session.role === "ADMIN");
+  const visibleSections = useMemo(
+    () =>
+      NAV_SECTIONS.map((section) => ({
+        ...section,
+        links: section.links.filter(
+          (link) =>
+            (!link.requiresAttendanceManager || canManageAttendance) &&
+            (!link.requiresWorkloadAccess || canViewWorkload) &&
+            (!link.requiresHeadRole || isHead) &&
+            (!link.requiresAdminRole || isAdmin)
+        ),
+      })).filter((section) => section.links.length > 0),
+    [canManageAttendance, canViewWorkload, isAdmin, isHead]
+  );
+  const activeHref =
+    visibleSections.flatMap((section) => section.links).find((link) => isActive(link.href))
+      ?.href ?? "";
+
+  const updateActiveIndicator = useCallback(() => {
+    const nav = navRef.current;
+    const activeLink = activeHref ? linkRefs.current[activeHref] : null;
+
+    if (!nav || !activeLink) {
+      setActiveIndicator((current) => ({ ...current, visible: false }));
+      return;
+    }
+
+    setActiveIndicator({
+      top: activeLink.offsetTop,
+      left: activeLink.offsetLeft,
+      width: activeLink.offsetWidth,
+      height: activeLink.offsetHeight,
+      visible: true,
+    });
+  }, [activeHref]);
+
+  useLayoutEffect(() => {
+    updateActiveIndicator();
+  }, [collapsed, mobileOpen, pathname, updateActiveIndicator, visibleSections]);
+
+  useEffect(() => {
+    updateActiveIndicator();
+
+    const nav = navRef.current;
+    const activeLink = activeHref ? linkRefs.current[activeHref] : null;
+    if (!nav) return;
+
+    const resizeObserver = new ResizeObserver(updateActiveIndicator);
+    resizeObserver.observe(nav);
+    if (activeLink) {
+      resizeObserver.observe(activeLink);
+    }
+
+    window.addEventListener("resize", updateActiveIndicator);
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", updateActiveIndicator);
+    };
+  }, [activeHref, updateActiveIndicator]);
 
   const handleLogout = async () => {
     await logout();
@@ -64,18 +132,21 @@ export default function Sidebar({ session }: { session: Session | null }) {
       </div>
 
       {/* Nav Links */}
-      <nav className="sidebar-scroll flex-1 overflow-y-auto px-2 py-3 space-y-4 min-h-0">
-        {NAV_SECTIONS.map((section, idx) => {
-          const visibleLinks = section.links.filter(
-            (link) =>
-              (!link.requiresAttendanceManager || canManageAttendance) &&
-              (!link.requiresWorkloadAccess || canViewWorkload) &&
-              (!link.requiresHeadRole || isHead) &&
-              (!link.requiresAdminRole || isAdmin)
-          );
-
-          if (visibleLinks.length === 0) return null;
-
+      <nav ref={navRef} className="sidebar-scroll relative flex-1 overflow-y-auto px-2 py-3 space-y-4 min-h-0">
+        <span
+          aria-hidden="true"
+          className={`pointer-events-none absolute rounded-xl bg-purple-100/80 shadow-sm ring-1 ring-purple-200/70 transition-[opacity,transform,width,height] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+            activeIndicator.visible ? "opacity-100" : "opacity-0"
+          }`}
+          style={{
+            height: activeIndicator.height,
+            left: activeIndicator.left,
+            top: 0,
+            transform: `translate3d(0, ${activeIndicator.top}px, 0)`,
+            width: activeIndicator.width,
+          }}
+        />
+        {visibleSections.map((section, idx) => {
           return (
             <div key={idx}>
               {section.title && !collapsed && (
@@ -87,17 +158,20 @@ export default function Sidebar({ session }: { session: Session | null }) {
                 <div className="border-t border-slate-100 mx-2 mb-2" />
               )}
               <div className="space-y-0.5">
-                {visibleLinks.map((link) => {
+                {section.links.map((link) => {
                   const active = isActive(link.href);
                   return (
                     <Link
                       key={link.href}
+                      ref={(node) => {
+                        linkRefs.current[link.href] = node;
+                      }}
                       href={link.href}
                       onClick={() => setMobileOpen(false)}
                       title={collapsed ? link.label : undefined}
-                      className={`flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-150 group ${
+                      className={`relative z-10 flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-colors duration-200 group ${
                         active
-                          ? "bg-purple-100/80 text-purple-700 shadow-sm"
+                          ? "text-purple-700"
                           : "text-slate-600 hover:bg-slate-100 hover:text-slate-800"
                       } ${collapsed ? "justify-center" : ""}`}
                     >
