@@ -9,23 +9,21 @@ export default function ActivityTracker() {
   const trackedPath = useRef<string | null>(null);
 
   useEffect(() => {
-    // Ping immediately when mounted
     pingSession();
 
-    // Ping every 60 seconds
     const interval = setInterval(() => {
       pingSession();
     }, 60000);
 
-    // End session on unmount or beforeunload
-    const handleBeforeUnload = () => {
+    // pagehide fires reliably on mobile PWA and iOS Safari; beforeunload does not
+    const handlePageHide = () => {
       endSession();
     };
-    window.addEventListener("beforeunload", handleBeforeUnload);
+    window.addEventListener("pagehide", handlePageHide);
 
     return () => {
       clearInterval(interval);
-      window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.removeEventListener("pagehide", handlePageHide);
     };
   }, []);
 
