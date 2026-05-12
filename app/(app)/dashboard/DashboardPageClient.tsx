@@ -314,38 +314,39 @@ export default function DashboardPage({
         />
 
         {/* Daily Briefing AI Widget */}
-        <div className="relative overflow-hidden rounded-2xl border border-amber-200/60 bg-gradient-to-r from-orange-50/80 via-amber-50/50 to-yellow-50/80 p-5 sm:p-6 shadow-[0_4px_20px_-4px_rgba(251,191,36,0.15)]">
-          <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-amber-400/20 blur-2xl" />
-          <div className="flex flex-col sm:flex-row sm:items-start gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-inner">
+        <div className="relative overflow-hidden rounded-2xl border border-purple-200/70 bg-gradient-to-r from-violet-50/80 via-purple-50/60 to-fuchsia-50/80 p-5 sm:p-6 shadow-[0_4px_24px_-6px_rgba(139,92,246,0.18)]">
+          <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full bg-purple-400/20 blur-3xl" />
+          <div className="absolute -bottom-10 -left-6 h-24 w-24 rounded-full bg-fuchsia-400/15 blur-3xl" />
+          <div className="relative flex flex-col sm:flex-row sm:items-start gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 via-purple-500 to-fuchsia-500 text-white shadow-lg shadow-purple-500/30 ring-1 ring-white/20">
               <span className="[&>svg]:h-6 [&>svg]:w-6">{Icons.ai}</span>
             </div>
             <div className="flex-1">
               <div className="flex items-center justify-between gap-3">
-                <h2 className="text-lg font-bold text-amber-900 flex items-center gap-2">
+                <h2 className="text-lg font-bold text-purple-900 flex items-center gap-2">
                   Daily AI Briefing
                   {briefingLoading && (
                     <span className="flex h-2 w-2 relative">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-purple-500"></span>
                     </span>
                   )}
                 </h2>
                 {dailyBriefing && (
-                  <span className="text-xs text-amber-600/60 font-medium">დღეს უკვე შეიქმნა ✓</span>
+                  <span className="text-xs text-purple-600/70 font-medium">დღეს უკვე შეიქმნა ✓</span>
                 )}
               </div>
-              <div className="mt-2 text-sm leading-relaxed text-amber-800/90">
+              <div className="mt-2 text-sm leading-relaxed text-purple-900/85">
                 {briefingLoading ? (
                   <div className="animate-pulse space-y-2">
-                    <div className="h-4 w-3/4 rounded bg-amber-200/50"></div>
-                    <div className="h-4 w-1/2 rounded bg-amber-200/50"></div>
+                    <div className="h-4 w-3/4 rounded bg-purple-200/60"></div>
+                    <div className="h-4 w-1/2 rounded bg-purple-200/60"></div>
                   </div>
                 ) : dailyBriefing ? (
                   <p className="font-medium">{dailyBriefing}</p>
                 ) : (
                   <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                    <p className="text-amber-700/70">დააჭირეთ ღილაკს დღიური ბრიფინგის შესაქმნელად.</p>
+                    <p className="text-purple-700/80">დააჭირეთ ღილაკს დღიური ბრიფინგის შესაქმნელად.</p>
                     {briefingError ? (
                       <p className="text-xs font-medium text-rose-600">{briefingError}</p>
                     ) : null}
@@ -353,7 +354,7 @@ export default function DashboardPage({
                       type="button"
                       onClick={handleGenerateBriefing}
                       disabled={briefingLoading}
-                      className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-2 text-sm font-semibold text-white shadow-md transition-all duration-200 hover:from-amber-600 hover:to-orange-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-70"
+                      className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 via-purple-600 to-fuchsia-600 px-4 py-2 text-sm font-semibold text-white shadow-md shadow-purple-500/30 ring-1 ring-white/10 transition-all duration-200 hover:from-violet-700 hover:via-purple-700 hover:to-fuchsia-700 hover:shadow-lg hover:shadow-purple-500/40 active:scale-95 disabled:cursor-not-allowed disabled:opacity-70"
                     >
                       Generate
                     </button>
