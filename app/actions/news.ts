@@ -48,6 +48,7 @@ type ProjectNewsRow = {
 
 function serializeTimestamp(value: Date | string) {
   if (value instanceof Date) return value.toISOString();
+  if (typeof value === "string") return value.replace(" ", "T");
   return value;
 }
 
