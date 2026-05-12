@@ -3,9 +3,9 @@ import type { MetadataRoute } from "next";
 export default function manifest(): MetadataRoute.Manifest {
   return {
     id: "/dashboard",
-    name: "FLH Dashboard",
-    short_name: "FLH Dashboard",
-    description: "Future Leaders Hub operations dashboard with team updates, events, and project tracking.",
+    name: "FLHUB",
+    short_name: "FLHUB",
+    description: "FLHUB operations dashboard with team updates, events, and project tracking.",
     start_url: "/dashboard",
     scope: "/",
     display: "standalone",

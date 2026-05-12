@@ -273,7 +273,7 @@ export async function generateDailyBriefing(): Promise<DailyBriefingResult> {
 
     const model = genAI.getGenerativeModel({ model: "gemini-3.1-flash-lite-preview" });
 
-    const prompt = `დაწერე მოკლე დღიური ბრიფინგი (2-3 წინადადება) ქართულ ენაზე "Future Leaders Hub"-ის გუნდის წევრებისთვის.
+    const prompt = `დაწერე მოკლე დღიური ბრიფინგი (2-3 წინადადება) ქართულ ენაზე "FLHUB"-ის გუნდის წევრებისთვის.
 
 მონაცემები:
 - აქტიური პროექტები: ${projectCount}

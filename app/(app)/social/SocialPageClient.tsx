@@ -627,7 +627,7 @@ export default function DashboardPage({
       {/* Footer */}
       <footer className="max-w-6xl mx-auto px-4 sm:px-6 py-6 border-t border-purple-100 mt-4">
         <p className="text-xs text-slate-500 text-center">
-          Future Leaders Hub Social Media Dashboard · Data collected daily via
+          FLHUB Social Media Dashboard · Data collected daily via
           automated scraping
         </p>
       </footer>

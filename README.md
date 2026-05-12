@@ -1,6 +1,6 @@
-# FLH Dashboard & Social Media Tracker
+# FLHUB & Social Media Tracker
 
-A full-stack operational dashboard for the **Future Leaders Hub (FLH)**. It combines a secure Role-Based Access Control (RBAC) internal portal with automated social media growth tracking across Instagram, TikTok, and Facebook.
+A full-stack operational dashboard for **FLHUB**. It combines a secure Role-Based Access Control (RBAC) internal portal with automated social media growth tracking across Instagram, TikTok, and Facebook.
 
 ## Features
 
@@ -73,7 +73,7 @@ Then add the generated values to `.env.local`, run the migration, and enable ale
 ## Project Structure
 
 ```
-flh-dashboard/
+flhub/
 ├── app/
 │   ├── (auth)/
 │   │   ├── login/page.tsx         # Login portal

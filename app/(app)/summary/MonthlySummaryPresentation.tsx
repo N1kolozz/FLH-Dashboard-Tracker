@@ -175,7 +175,7 @@ function TitleSlide({ data }: { data: MonthlySummaryData }) {
           {data.monthLabel}
         </p>
         <p className="text-sm text-white/40 mt-4">
-          Future Leaders Hub — NGO Operations Report
+          FLHUB — NGO Operations Report
         </p>
         <div data-pres-float className="mt-10 flex items-center gap-2 text-white/30 text-sm">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

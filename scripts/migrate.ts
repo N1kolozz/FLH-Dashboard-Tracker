@@ -521,17 +521,17 @@ async function migrate() {
     const accounts = [
       {
         platform: "instagram",
-        name: "Future Leaders Hub Instagram",
+        name: "FLHUB Instagram",
         url: "https://www.instagram.com/future_leaders_hub/",
       },
       {
         platform: "tiktok",
-        name: "Future Leaders Hub TikTok",
+        name: "FLHUB TikTok",
         url: "https://www.tiktok.com/@future_leaders_hub",
       },
       {
         platform: "facebook",
-        name: "Future Leaders Hub Facebook",
+        name: "FLHUB Facebook",
         url: "https://www.facebook.com/profile.php?id=61556110770300",
       },
     ];

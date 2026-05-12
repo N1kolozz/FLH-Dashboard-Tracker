@@ -14,9 +14,9 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  applicationName: "FLH Dashboard",
-  title: "FLH Dashboard",
-  description: "Future Leaders Hub — NGO Operations Dashboard",
+  applicationName: "FLHUB",
+  title: "FLHUB",
+  description: "FLHUB — NGO Operations Dashboard",
   manifest: "/manifest.webmanifest",
   icons: {
     icon: [
@@ -34,7 +34,7 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    title: "FLH Dashboard",
+    title: "FLHUB",
     statusBarStyle: "default",
   },
 };

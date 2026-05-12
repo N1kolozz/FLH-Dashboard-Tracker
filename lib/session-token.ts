@@ -1,6 +1,6 @@
 const SESSION_MAX_AGE_SECONDS = 7 * 24 * 60 * 60;
 const encoder = new TextEncoder();
-const LOCAL_DEV_SESSION_SECRET = "flh-dashboard-local-dev-session-secret";
+const LOCAL_DEV_SESSION_SECRET = "flhub-local-dev-session-secret";
 let warnedAboutMissingJwtSecret = false;
 
 export interface Session {

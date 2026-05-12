@@ -8,7 +8,7 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("push", (event) => {
   let payload = {
-    title: "FLH Dashboard",
+    title: "FLHUB",
     body: "dashboard-ში ახალი განახლებაა.",
     url: "/dashboard",
     tag: "flh-update",

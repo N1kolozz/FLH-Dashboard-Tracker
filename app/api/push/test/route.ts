@@ -27,7 +27,7 @@ export async function POST(request: Request) {
     body.subscription,
     createPushNotification({
       topic: "attendance",
-      title: "FLH Dashboard",
+      title: "FLHUB",
       body: "ტესტ შეტყობინება წარმატებით მოვიდა ამ მოწყობილობაზე.",
       url: "/dashboard",
       tag: "test-notification",

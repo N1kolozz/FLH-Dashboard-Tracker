@@ -302,7 +302,7 @@ export default function DashboardPage({
             </span>
           </h1>
           <p className="text-sm text-slate-600 mt-1">
-            Here&apos;s an overview of Future Leaders Hub operations
+            Here&apos;s an overview of FLHUB operations
           </p>
         </div>
       </header>

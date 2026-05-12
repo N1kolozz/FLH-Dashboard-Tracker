@@ -125,8 +125,8 @@ export default function Sidebar({ session }: { session: Session | null }) {
         />
         {!collapsed && (
           <div className="min-w-0">
-            <p className="text-sm font-bold text-slate-800 leading-none truncate">FLH Dashboard</p>
-            <p className="text-[10px] text-slate-500 mt-0.5">Future Leaders Hub</p>
+            <p className="text-sm font-bold text-slate-800 leading-none truncate">FLHUB</p>
+            <p className="text-[10px] text-slate-500 mt-0.5">Dashboard</p>
           </div>
         )}
       </div>
@@ -261,7 +261,7 @@ export default function Sidebar({ session }: { session: Session | null }) {
             title="FLH"
             className="h-7 w-7 shrink-0"
           />
-          <h2 className="text-sm font-bold text-slate-800 leading-none">FLH Dashboard</h2>
+          <h2 className="text-sm font-bold text-slate-800 leading-none">FLHUB</h2>
         </div>
       </div>
 
