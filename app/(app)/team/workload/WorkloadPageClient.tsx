@@ -139,13 +139,6 @@ function MemberWorkloadCard({
             </svg>
             <span className="text-[11px] font-bold text-blue-700">{member.activeProjects}</span>
           </div>
-          <div className="flex items-center gap-1 px-2 py-1 bg-violet-50 border border-violet-200 rounded-lg" title="Upcoming events">
-            <svg className="w-3 h-3 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            <span className="text-[11px] font-bold text-violet-700">{member.upcomingEvents}</span>
-          </div>
-
           {/* Expand chevron */}
           <svg
             className={`w-4 h-4 text-slate-400 transition-transform duration-200 ml-1 ${expanded ? "rotate-180" : ""}`}
@@ -193,36 +186,6 @@ function MemberWorkloadCard({
             )}
           </div>
 
-          {/* Upcoming Events */}
-          <div>
-            <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-              Upcoming Events ({member.upcomingEvents})
-            </p>
-            {member.eventDetails.length === 0 ? (
-              <p className="text-xs text-slate-400 italic">No upcoming events assigned</p>
-            ) : (
-              <div className="space-y-1.5">
-                {member.eventDetails.map((e) => {
-                  const dept = DEPT_CONFIG[e.department] || DEPT_CONFIG["Other"];
-                  return (
-                    <div key={e.id} className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 border border-slate-100">
-                      <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${dept.dot}`} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium text-slate-700 truncate">{e.title}</p>
-                        <p className="text-[10px] text-slate-400">{formatDate(e.date)} · {e.department}</p>
-                      </div>
-                    </div>
-                  );
-                })}
-                {member.upcomingEvents > 5 && (
-                  <p className="text-[10px] text-slate-400 text-center">+{member.upcomingEvents - 5} more</p>
-                )}
-              </div>
-            )}
-          </div>
         </div>
       )}
     </div>
@@ -367,15 +330,6 @@ export default function WorkloadPageClient({
               <span className="text-blue-600 font-bold">n</span>
             </div>
             <span>active projects</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="flex items-center gap-1 px-1.5 py-0.5 bg-violet-50 border border-violet-200 rounded">
-              <svg className="w-2.5 h-2.5 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-              <span className="text-violet-600 font-bold">n</span>
-            </div>
-            <span>upcoming events (90 days)</span>
           </div>
           <span className="ml-auto text-slate-300">Click a row to expand</span>
         </div>

@@ -1,3 +1,4 @@
+import FixedPortal from "@/components/FixedPortal";
 import MemberAvatarStack from "@/components/MemberAvatarStack";
 import MemberMultiSelect, { type MemberChoice } from "@/components/MemberMultiSelect";
 import Modal from "@/components/Modal";
@@ -183,6 +184,7 @@ export function SelectedDayDetailsDrawer({
   }
 
   return (
+    <FixedPortal>
     <div className="fixed inset-0 z-40">
       <button
         aria-label="Close day details"
@@ -294,6 +296,7 @@ export function SelectedDayDetailsDrawer({
         </div>
       </aside>
     </div>
+    </FixedPortal>
   );
 }
 

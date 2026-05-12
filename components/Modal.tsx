@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 interface ModalProps {
   open: boolean;
@@ -19,6 +20,11 @@ export default function Modal({
   maxWidth = "max-w-lg",
 }: ModalProps) {
   const backdropRef = useRef<HTMLDivElement>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -33,12 +39,12 @@ export default function Modal({
     };
   }, [open, onClose]);
 
-  if (!open) return null;
+  if (!open || !mounted) return null;
 
-  return (
+  return createPortal(
     <div
       ref={backdropRef}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-3 sm:p-4"
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-3 sm:p-4"
       onClick={(e) => {
         if (e.target === backdropRef.current) onClose();
       }}
@@ -63,6 +69,7 @@ export default function Modal({
           {children}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { getEvents, createEvent, updateEvent, deleteEvent } from "@/app/actions/events";
 import { generateItinerary } from "@/app/actions/ai";
 import type { EventRow } from "@/app/actions/events";
+import FixedPortal from "@/components/FixedPortal";
 import MemberAvatarStack from "@/components/MemberAvatarStack";
 import MemberMultiSelect, { type MemberChoice } from "@/components/MemberMultiSelect";
 import Modal from "@/components/Modal";
@@ -969,6 +970,7 @@ export default function EventsPage({
       </div>
 
       {view === "calendar" && selectedDate && (
+        <FixedPortal>
         <div className="fixed inset-0 z-40">
           <button
             aria-label="Close day details"
@@ -1031,7 +1033,7 @@ export default function EventsPage({
               {selectedDayEvents.length === 0 ? (
                 <p className="text-sm text-slate-500">
                   {selectedDayHolidays.length > 0
-                    ? "No FLH events scheduled for this day."
+                    ? "No FLHUB events scheduled for this day."
                     : "No events on this day."}
                 </p>
               ) : (
@@ -1084,6 +1086,7 @@ export default function EventsPage({
             </div>
           </aside>
         </div>
+        </FixedPortal>
       )}
 
       {/* Modal */}
