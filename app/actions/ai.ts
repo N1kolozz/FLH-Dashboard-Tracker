@@ -240,9 +240,8 @@ export async function generateDailyBriefing(): Promise<DailyBriefingResult> {
     }
 
     const statsRes = await client.query(`
-        SELECT 
+        SELECT
           (SELECT COUNT(*) FROM projects) as projects,
-          (SELECT COUNT(*) FROM inventory_items) as inventory,
           (SELECT COUNT(*) FROM events WHERE date >= CURRENT_DATE) as events
       `);
     const activityRes = await client.query(`
@@ -262,28 +261,36 @@ export async function generateDailyBriefing(): Promise<DailyBriefingResult> {
     const activeUsers = activityRes.rows.map((r: Record<string, string>) => r.full_name).filter(Boolean);
     const sessionCount = parseInt(sessionRes.rows[0]?.count || '0');
     const projectCount = parseInt(stats.projects);
-    const inventoryCount = parseInt(stats.inventory);
     const eventCount = parseInt(stats.events);
 
     // Time-appropriate greeting hint
     const hour = getBriefingHour();
     let timeOfDay = "დილა";
-    if (hour >= 12 && hour < 18) timeOfDay = "შუადღე";
-    else if (hour >= 18) timeOfDay = "საღამო";
+    let greeting = "დილა მშვიდობისა";
+    if (hour >= 12 && hour < 18) { timeOfDay = "შუადღე"; greeting = "შუადღე მშვიდობისა"; }
+    else if (hour >= 18) { timeOfDay = "საღამო"; greeting = "საღამო მშვიდობისა"; }
+
+    const activeUsersLine = activeUsers.length > 0
+      ? `ბოლო 24 საათში სისტემაში შემოვიდნენ: ${activeUsers.join(", ")}.`
+      : "ბოლო 24 საათში სისტემაში არცერთი მომხმარებელი არ დაფიქსირებულა.";
 
     const model = genAI.getGenerativeModel({ model: "gemini-3.1-flash-lite-preview" });
 
-    const prompt = `დაწერე მოკლე დღიური ბრიფინგი (2-3 წინადადება) ქართულ ენაზე "FLHUB"-ის გუნდის წევრებისთვის.
+    const prompt = `შენ ხარ FLHUB-ის ასისტენტი — ქართული ღონისძიებების სააგენტოს შიდა პლატფორმა. \
+დაწერე დღიური ბრიფინგი გუნდისთვის — 2-4 წინადადება, თბილი და ბუნებრივი ქართული ენით. \
+ტექსტი უნდა ჟღერდეს, თითქოს ადამიანი წერს კოლეგებს და არა მანქანა — გამოიყენე ცოცხალი, ბუნებრივი ფრაზები.
 
-მონაცემები:
+დღის მონაცემები:
+- ${timeOfDay === "დილა" ? "დღის დასაწყისი" : timeOfDay === "შუადღე" ? "შუადღე" : "სამუშაო დღის დასასრული"}
 - აქტიური პროექტები: ${projectCount}
-- ინვენტარის ერთეულები: ${inventoryCount}
 - მომავალი ღონისძიებები: ${eventCount}
-- ბოლო 24 საათში აქტიური მომხმარებლები: ${activeUsers.length > 0 ? activeUsers.join(", ") : "არცერთი"}
+- ${activeUsersLine}
 - სესიები ბოლო 24 საათში: ${sessionCount}
-- დღის დრო: ${timeOfDay}
 
-დაიწყე მისალმებით ("${timeOfDay} მშვიდობისა!"). მხოლოდ ქართული ენა. არანაირი markdown. მხოლოდ ბრიფინგის ტექსტი.`;
+დაიწყე "${greeting}"-ით. \
+მხოლოდ ქართული ენა. \
+არ გამოიყენო markdown, bullet point-ები ან სიები. \
+დაწერე მხოლოდ ბრიფინგის ტექსტი — თანმიმდევრული პარაგრაფი.`;
 
     const result = await model.generateContent(prompt);
     let text = result.response.text().trim();
