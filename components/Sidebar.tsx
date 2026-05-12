@@ -135,7 +135,7 @@ export default function Sidebar({ session }: { session: Session | null }) {
       <nav ref={navRef} className="sidebar-scroll relative flex-1 overflow-y-auto px-2 py-3 space-y-4 min-h-0">
         <span
           aria-hidden="true"
-          className={`pointer-events-none absolute rounded-xl bg-purple-100/80 shadow-sm ring-1 ring-purple-200/70 transition-[opacity,transform,width,height] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+          className={`pointer-events-none absolute rounded-xl bg-purple-100/80 shadow-sm ring-1 ring-purple-200/70 transition-[opacity,transform,width,height] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] ${
             activeIndicator.visible ? "opacity-100" : "opacity-0"
           }`}
           style={{

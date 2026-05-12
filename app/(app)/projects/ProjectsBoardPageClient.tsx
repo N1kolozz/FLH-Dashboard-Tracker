@@ -88,7 +88,7 @@ export default function ProjectsBoardPageClient({
     Record<number, { status: string; reviewId: number; feedback: string | null }>
   >(initialReviewStatuses);
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
-  const [reviewTarget, setReviewTarget] = useState<{ projectId: number; reviewId: number; projectName: string } | null>(null);
+  const [reviewTarget, setReviewTarget] = useState<{ projectId: number; reviewId: number; projectName: string; projectDescription: string } | null>(null);
   const [reviewFeedback, setReviewFeedback] = useState("");
   const [reviewSaving, setReviewSaving] = useState(false);
   const deepLinkHandledRef = useRef(false);
@@ -220,6 +220,7 @@ export default function ProjectsBoardPageClient({
           projectId: pid,
           reviewId: rid,
           projectName: targetProject.name,
+          projectDescription: targetProject.description,
         });
         setReviewFeedback("");
         setReviewModalOpen(true);
@@ -598,8 +599,8 @@ export default function ProjectsBoardPageClient({
     }
   };
 
-  const openReviewModal = (projectId: number, reviewId: number, projectName: string) => {
-    setReviewTarget({ projectId, reviewId, projectName });
+  const openReviewModal = (projectId: number, reviewId: number, projectName: string, projectDescription: string) => {
+    setReviewTarget({ projectId, reviewId, projectName, projectDescription });
     setReviewFeedback("");
     setReviewModalOpen(true);
   };
@@ -952,7 +953,7 @@ export default function ProjectsBoardPageClient({
           const status = reviewStatuses[editing.id];
           if (!status) return;
           setModalOpen(false);
-          openReviewModal(editing.id, status.reviewId, editing.name);
+          openReviewModal(editing.id, status.reviewId, editing.name, editing.description);
         }}
         formatProjectUpdate={formatProjectUpdate}
       />

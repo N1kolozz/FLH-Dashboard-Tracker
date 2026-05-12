@@ -2,6 +2,7 @@ import Sidebar from "@/components/Sidebar";
 import AttendancePrompt from "@/components/AttendancePrompt";
 import PwaRegistrar from "@/components/PwaRegistrar";
 import ActivityTracker from "@/components/ActivityTracker";
+import PageTransition from "@/components/PageTransition";
 import { getSession } from "@/lib/auth";
 import { getPendingAttendancePrompt } from "@/app/actions/attendance";
 
@@ -20,7 +21,9 @@ export default async function AppLayout({
       <PwaRegistrar />
       <ActivityTracker />
       <Sidebar session={session} />
-      <main className="min-w-0 flex-1 md:ml-0">{children}</main>
+      <main className="min-w-0 flex-1 md:ml-0">
+        <PageTransition>{children}</PageTransition>
+      </main>
       <AttendancePrompt initialPrompt={initialPrompt} />
     </div>
   );

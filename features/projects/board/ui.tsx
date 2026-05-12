@@ -674,7 +674,7 @@ export function ProjectReviewModal({
   onReject,
 }: {
   open: boolean;
-  reviewTarget: { projectId: number; reviewId: number; projectName: string } | null;
+  reviewTarget: { projectId: number; reviewId: number; projectName: string; projectDescription: string } | null;
   reviewFeedback: string;
   reviewSaving: boolean;
   onClose: () => void;
@@ -689,6 +689,14 @@ export function ProjectReviewModal({
           <div className="rounded-xl border border-purple-100 bg-purple-50/50 p-4">
             <p className="text-sm text-slate-500">Project</p>
             <p className="text-base font-bold text-slate-900">{reviewTarget.projectName}</p>
+            {reviewTarget.projectDescription ? (
+              <>
+                <p className="mt-3 text-xs font-medium uppercase tracking-wide text-slate-500">Description</p>
+                <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-slate-700">
+                  {reviewTarget.projectDescription}
+                </p>
+              </>
+            ) : null}
           </div>
 
           <div>
