@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
 
     const csv = lines.join("\n");
     const timestamp = new Date().toISOString().slice(0, 10);
-    const fileName = `flh-report-${range}-${timestamp}.csv`;
+    const fileName = `flhub-report-${range}-${timestamp}.csv`;
 
     return new NextResponse(csv, {
       status: 200,

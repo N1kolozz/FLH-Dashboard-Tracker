@@ -11,7 +11,7 @@ self.addEventListener("push", (event) => {
     title: "FLHUB",
     body: "dashboard-ში ახალი განახლებაა.",
     url: "/dashboard",
-    tag: "flh-update",
+    tag: "flhub-update",
     icon: "/apple-touch-icon.png",
     badge: "/pwa-icon/192",
     topic: "news",

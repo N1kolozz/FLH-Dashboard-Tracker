@@ -296,7 +296,7 @@ export default function DashboardPage({
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `flh-report-${insightsRange}.csv`;
+      a.download = `flhub-report-${insightsRange}.csv`;
       document.body.appendChild(a);
       a.click();
       a.remove();
