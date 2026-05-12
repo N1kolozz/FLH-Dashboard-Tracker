@@ -37,7 +37,7 @@ export async function createExpense(data: {
   notes: string;
 }) {
   try {
-    const session = await requireDepartmentManagerSession("Logistics");
+    const session = await requireDepartmentManagerSession("Projects");
     const actorUserId = getSessionUserId(session);
     const res = await pool.query(
       `INSERT INTO expenses (description, amount, category, date, paid_by, notes)
@@ -81,7 +81,7 @@ export async function updateExpense(
   }
 ) {
   try {
-    const session = await requireDepartmentManagerSession("Logistics");
+    const session = await requireDepartmentManagerSession("Projects");
     const actorUserId = getSessionUserId(session);
     await pool.query(
       `UPDATE expenses SET description=$1, amount=$2, category=$3, date=$4, paid_by=$5, notes=$6 WHERE id=$7`,
@@ -105,7 +105,7 @@ export async function updateExpense(
 
 export async function deleteExpense(id: number) {
   try {
-    const session = await requireDepartmentManagerSession("Logistics");
+    const session = await requireDepartmentManagerSession("Projects");
     const actorUserId = getSessionUserId(session);
     await pool.query("DELETE FROM expenses WHERE id = $1", [id]);
     await logActivity("delete_expense", "/logistics/expenses", { expenseId: id }, actorUserId || undefined);

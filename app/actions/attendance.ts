@@ -35,7 +35,6 @@ const ATTENDANCE_AUDIENCE_CONDITION = `
         LOWER(COALESCE(e.department, 'all')) = 'all'
         OR LOWER(COALESCE(e.department, '')) = LOWER(u.department)
         OR (LOWER(e.department) = 'pr' AND u.department = 'PR & Social')
-        OR (LOWER(e.department) = 'logistics' AND u.department = 'Logistics')
         OR (LOWER(e.department) = 'projects' AND u.department = 'Projects')
         OR (LOWER(e.department) = 'management' AND u.department = 'Management')
         OR (LOWER(e.department) = 'other' AND u.department = 'Other')

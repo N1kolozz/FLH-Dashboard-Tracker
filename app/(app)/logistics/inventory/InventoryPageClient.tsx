@@ -189,7 +189,7 @@ export default function InventoryPage({
   const canEdit = session && (
     session.role === "ADMIN" || 
     session.role === "HEAD" || 
-    session.department === "Logistics"
+    session.department === "Projects"
   );
 
   const refreshItems = async (showLoading = true) => {

@@ -17,13 +17,6 @@ const DEPT_COLORS: Record<string, { gradient: string; accent: string; badge: str
     dot: "bg-purple-400",
     light: "bg-purple-50",
   },
-  Logistics: {
-    gradient: "from-blue-600 to-cyan-600",
-    accent: "text-blue-300",
-    badge: "bg-blue-500/30 text-blue-200 border-blue-400/30",
-    dot: "bg-blue-400",
-    light: "bg-blue-50",
-  },
   Projects: {
     gradient: "from-emerald-600 to-teal-600",
     accent: "text-emerald-300",

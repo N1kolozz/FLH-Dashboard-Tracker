@@ -174,7 +174,7 @@ export default function ExpensesPage({
   const canEdit = session && (
     session.role === "ADMIN" || 
     session.role === "HEAD" || 
-    session.department === "Logistics"
+    session.department === "Projects"
   );
 
   const saveExpenseHandler = async () => {
