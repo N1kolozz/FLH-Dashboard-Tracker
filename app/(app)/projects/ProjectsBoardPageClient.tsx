@@ -907,13 +907,13 @@ export default function ProjectsBoardPageClient({
               })}
             </div>
 
-            <DragOverlay>
+            <DragOverlay dropAnimation={null}>
               {draggedProject ? (
                 <div
                   style={dragPreviewWidth ? { width: `${dragPreviewWidth}px` } : undefined}
                   className="pointer-events-none"
                 >
-                  <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-gradient-to-b from-white via-white to-slate-50/80 p-4 shadow-2xl">
+                  <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-2xl">
                     <ProjectCardContent
                       project={draggedProject}
                       owners={draggedOwners}

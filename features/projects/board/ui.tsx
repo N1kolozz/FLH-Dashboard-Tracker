@@ -16,31 +16,17 @@ import {
   type Status,
 } from "@/features/projects/board/model";
 
-function CardSection({
-  label,
-  icon,
+function CardLabel({
   children,
   className = "",
 }: {
-  label: string;
-  icon: ReactNode;
   children: ReactNode;
   className?: string;
 }) {
   return (
-    <div
-      className={`rounded-xl border border-slate-200/80 bg-slate-50/80 px-3 py-2.5 ${className}`}
-    >
-      <div className="flex items-start gap-2.5">
-        <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white text-slate-400 shadow-sm ring-1 ring-slate-200/80">
-          {icon}
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="mb-1 text-[11px] font-semibold text-slate-500">{label}</p>
-          {children}
-        </div>
-      </div>
-    </div>
+    <p className={`text-[11px] font-semibold uppercase tracking-wide text-slate-400 ${className}`}>
+      {children}
+    </p>
   );
 }
 
@@ -77,23 +63,17 @@ export function ProjectBoardSkeleton({
             {Array.from({ length: counts[column.id] }).map((_, idx) => (
               <div
                 key={idx}
-                className="animate-pulse rounded-2xl border border-slate-200/80 bg-gradient-to-b from-white via-white to-slate-50/80 p-4"
+                className="animate-pulse rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
               >
-                <div className="mb-4 flex items-start justify-between gap-3">
-                  <div className="h-5 w-14 rounded-full bg-slate-200" />
-                  <div className="h-5 w-16 rounded-full bg-slate-100" />
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <div className="h-5 w-16 rounded-md bg-slate-200" />
+                  <div className="h-5 w-14 rounded-md bg-slate-100" />
                 </div>
-                <div className="space-y-2.5">
-                  <div className="rounded-xl border border-slate-200/80 bg-slate-50/80 px-3 py-2.5">
-                    <div className="flex gap-2.5">
-                      <div className="h-7 w-7 rounded-lg bg-slate-100" />
-                      <div className="flex-1 space-y-2">
-                        <div className="h-3 w-20 rounded-full bg-slate-100" />
-                        <div className="h-4 w-32 rounded-full bg-slate-200" />
-                      </div>
-                    </div>
-                  </div>
-                  <div className="h-16 rounded-xl bg-slate-100" />
+                <div className="mb-2 h-5 w-32 rounded-md bg-slate-200" />
+                <div className="mb-4 h-3 w-48 rounded-md bg-slate-100" />
+                <div className="border-t border-slate-100 pt-3 space-y-2">
+                  <div className="h-3 w-20 rounded-md bg-slate-100" />
+                  <div className="h-4 w-24 rounded-md bg-slate-200" />
                 </div>
               </div>
             ))}
@@ -120,48 +100,49 @@ export function ProjectCardContent({
   return (
     <>
       <div
-        className={`absolute inset-x-0 top-0 h-1 ${PRIORITY_CONFIG[project.priority].accent}`}
+        className={`absolute inset-x-0 top-0 h-2 ${PRIORITY_CONFIG[project.priority].accent}`}
       />
 
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-1.5">
+      {/* Status Row: Priority + Deadline/Review */}
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5">
           <span
-            className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold ${PRIORITY_CONFIG[project.priority].classes}`}
+            className={`inline-flex items-center rounded-md border px-2 py-1 text-[11px] font-semibold uppercase tracking-wide ${PRIORITY_CONFIG[project.priority].classes}`}
           >
             {PRIORITY_CONFIG[project.priority].label}
           </span>
           {reviewStatus?.status === "approved" && (
-            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
-              <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+            <span className="inline-flex items-center gap-1 rounded-md border border-emerald-300 bg-emerald-50 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-700">
+              <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
               </svg>
-              Reviewed
+              Approved
             </span>
           )}
           {reviewStatus?.status === "pending" && (
-            <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+            <span className="inline-flex items-center gap-1 rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-700">
               <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 8v4m0 4v.01" />
               </svg>
-              Pending Review
+              Review
             </span>
           )}
         </div>
         {deadlineDelta !== null && (
           <span
-            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold ${
+            className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-semibold uppercase tracking-wide ${
               deadlineDelta < 0
-                ? "bg-rose-50 text-rose-600"
+                ? "border-rose-300 bg-rose-50 text-rose-700"
                 : deadlineDelta <= 3
-                  ? "bg-amber-50 text-amber-700"
-                  : "bg-slate-100 text-slate-500"
+                  ? "border-amber-300 bg-amber-50 text-amber-700"
+                  : "border-slate-300 bg-slate-100 text-slate-600"
             }`}
           >
-            <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                strokeWidth={2}
+                strokeWidth={2.5}
                 d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
               />
             </svg>
@@ -174,88 +155,41 @@ export function ProjectCardContent({
         )}
       </div>
 
-      <div className="space-y-2.5">
-        <CardSection
-          label="Project Name"
-          icon={
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M3 7a2 2 0 012-2h5l2 2h7a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"
-              />
-            </svg>
-          }
-        >
-          <h4 className="break-words text-[15px] font-semibold leading-snug text-slate-900">
-            {project.name}
-          </h4>
-        </CardSection>
+      {/* Title */}
+      <h4 className="mb-2 break-words text-base font-bold leading-tight text-slate-900">
+        {project.name}
+      </h4>
 
-        {project.description && (
-          <CardSection
-            label="Description"
-            icon={
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M7 8h10M7 12h7m-7 4h10M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z"
-                />
-              </svg>
-            }
-          >
-            <p className="line-clamp-3 text-xs leading-relaxed text-slate-600">
-              {project.description}
-            </p>
-          </CardSection>
-        )}
+      {/* Description (optional) */}
+      {project.description && (
+        <p className="mb-4 line-clamp-2 text-xs leading-relaxed text-slate-500">
+          {project.description}
+        </p>
+      )}
 
+      {/* Footer: Team + Owners */}
+      <div className="border-t border-slate-100 pt-3 space-y-2">
         {project.team && (
-          <CardSection
-            label="Team / Assignee"
-            icon={
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"
-                />
-              </svg>
-            }
-          >
-            <p className="break-words text-sm font-medium text-slate-700">{project.team}</p>
-          </CardSection>
+          <div>
+            <CardLabel className="mb-1">Team</CardLabel>
+            <p className="text-sm font-medium text-slate-700">{project.team}</p>
+          </div>
         )}
 
         {owners.length > 0 && (
-          <CardSection
-            label="Owners"
-            icon={
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"
-                />
-              </svg>
-            }
-          >
+          <div>
+            <CardLabel className="mb-1">Owners</CardLabel>
             <div className="flex items-center gap-2">
               <MemberAvatarStack
                 names={owners.map((owner) => owner.name)}
-                size="md"
+                size="sm"
                 maxVisible={4}
               />
               <p className="truncate text-xs text-slate-600">
                 {owners.map((owner) => owner.name).join(", ")}
               </p>
             </div>
-          </CardSection>
+          </div>
         )}
       </div>
     </>
@@ -295,7 +229,7 @@ export function DraggableProjectCard({
     <div
       ref={setCombinedRef}
       onClick={() => onOpen(project)}
-      className={`group relative overflow-hidden rounded-2xl border border-slate-200/80 bg-gradient-to-b from-white via-white to-slate-50/80 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 ${
+      className={`group relative overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-all duration-200 ${
         canEdit ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"
       } ${isDimmed ? "opacity-50" : ""}`}
       {...attributes}
