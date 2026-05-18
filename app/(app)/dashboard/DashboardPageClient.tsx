@@ -314,53 +314,59 @@ export default function DashboardPage({
         />
 
         {/* Daily Briefing AI Widget */}
-        <div className="relative overflow-hidden rounded-2xl border border-purple-200/70 bg-gradient-to-r from-violet-50/80 via-purple-50/60 to-fuchsia-50/80 p-5 sm:p-6 shadow-[0_4px_24px_-6px_rgba(139,92,246,0.18)]">
-          <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full bg-purple-400/20 blur-3xl" />
-          <div className="absolute -bottom-10 -left-6 h-24 w-24 rounded-full bg-fuchsia-400/15 blur-3xl" />
-          <div className="relative flex flex-col sm:flex-row sm:items-start gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 via-purple-500 to-fuchsia-500 text-white shadow-lg shadow-purple-500/30 ring-1 ring-white/20">
-              <span className="[&>svg]:h-6 [&>svg]:w-6">{Icons.ai}</span>
-            </div>
-            <div className="flex-1">
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="text-lg font-bold text-purple-900 flex items-center gap-2">
-                  Daily AI Briefing
+        <div className="relative overflow-hidden rounded-2xl bg-[#1c0a3e] p-5 sm:p-6 shadow-[0_0_0_1px_rgba(167,139,250,0.12),0_8px_48px_-8px_rgba(109,40,217,0.55)]">
+          {/* Top shimmer line */}
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-violet-300/70 to-transparent" />
+
+          <div className="flex items-start justify-between gap-3 mb-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10 ring-1 ring-white/20">
+                <span className="text-violet-200 [&>svg]:h-[18px] [&>svg]:w-[18px]">{Icons.ai}</span>
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-semibold tracking-[-0.01em] text-white">Daily AI Briefing</h2>
                   {briefingLoading && (
-                    <span className="flex h-2 w-2 relative">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-purple-500"></span>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-violet-300/15 px-2 py-0.5 text-[10px] font-medium text-violet-200 ring-1 ring-violet-300/25">
+                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-violet-300" />
+                      LIVE
                     </span>
                   )}
-                </h2>
-                {dailyBriefing && (
-                  <span className="text-xs text-purple-600/70 font-medium">დღეს უკვე შეიქმნა ✓</span>
-                )}
+                </div>
+                <p className="font-georgian mt-0.5 text-[11px] font-light text-white/45">ყოველდღიური ბრიფინგი</p>
               </div>
-              <div className="mt-2 text-sm leading-relaxed text-purple-900/85">
-                {briefingLoading ? (
-                  <div className="animate-pulse space-y-2">
-                    <div className="h-4 w-3/4 rounded bg-purple-200/60"></div>
-                    <div className="h-4 w-1/2 rounded bg-purple-200/60"></div>
-                  </div>
-                ) : dailyBriefing ? (
-                  <p className="font-medium">{dailyBriefing}</p>
-                ) : (
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                    <p className="text-purple-700/80">დააჭირეთ ღილაკს დღიური ბრიფინგის შესაქმნელად.</p>
-                    {briefingError ? (
-                      <p className="text-xs font-medium text-rose-600">{briefingError}</p>
-                    ) : null}
-                    <button
-                      type="button"
-                      onClick={handleGenerateBriefing}
-                      disabled={briefingLoading}
-                      className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 via-purple-600 to-fuchsia-600 px-4 py-2 text-sm font-semibold text-white shadow-md shadow-purple-500/30 ring-1 ring-white/10 transition-all duration-200 hover:from-violet-700 hover:via-purple-700 hover:to-fuchsia-700 hover:shadow-lg hover:shadow-purple-500/40 active:scale-95 disabled:cursor-not-allowed disabled:opacity-70"
-                    >
-                      Generate
-                    </button>
-                  </div>
-                )}
-              </div>
+            </div>
+            {dailyBriefing && (
+              <span className="font-georgian mt-1 shrink-0 text-[10px] font-light text-white/35">შეიქმნა ✓</span>
+            )}
+          </div>
+
+          <div className="border-t border-white/[0.08] pt-4">
+            <div className="font-georgian text-[13.5px] font-light leading-[1.9] tracking-[0.01em] text-white/80">
+              {briefingLoading ? (
+                <div className="animate-pulse space-y-2.5">
+                  <div className="h-3 w-full rounded-full bg-white/[0.10]" />
+                  <div className="h-3 w-4/5 rounded-full bg-white/[0.10]" />
+                  <div className="h-3 w-3/5 rounded-full bg-white/[0.10]" />
+                </div>
+              ) : dailyBriefing ? (
+                <p>{dailyBriefing}</p>
+              ) : (
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <p className="text-white/45">დააჭირეთ ღილაკს დღიური ბრიფინგის შესაქმნელად.</p>
+                  {briefingError ? (
+                    <p className="text-xs font-medium text-rose-300">{briefingError}</p>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={handleGenerateBriefing}
+                    disabled={briefingLoading}
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-white/[0.10] px-3.5 py-2 text-xs font-semibold text-white/90 ring-1 ring-white/[0.15] transition-all duration-200 hover:bg-white/[0.18] hover:text-white hover:ring-white/[0.22] active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Generate
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>

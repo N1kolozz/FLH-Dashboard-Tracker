@@ -138,7 +138,7 @@ export async function generateItinerary(prompt: string) {
       };
     }
 
-    const model = genAI.getGenerativeModel({ model: "gemma-4-31b-it" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     const systemInstruction = `You are an expert event planner AI. You help generate structured event itineraries and logistics details based on brief user inputs.
 You MUST output all text (title, description, and location) in grammatically correct, formal Georgian language (ქართული).
@@ -150,7 +150,7 @@ CRITICAL GEORGIAN TERMINOLOGY RULES:
 
 You MUST output a valid JSON object with EXACTLY the following fields:
 - "title": A short, professional title for the event in Georgian (string).
-- "department": One of the following exact string values representing the best fit: "pr", "logistics", "projects", "all", "other".
+- "department": One of the following exact string values representing the best fit: "pr", "projects", "other". Use "projects" for anything logistics or operations-related.
 - "description": A detailed itinerary, list of required logistics/equipment, and team roles, formatted professionally with line breaks, in Georgian (string).
 - "location": A short string representing the location in Georgian if mentioned, or "" (empty string).
 - "time": A suggested start time in HH:mm format (e.g., "09:00" or "14:30") if implied, or "" (empty string).

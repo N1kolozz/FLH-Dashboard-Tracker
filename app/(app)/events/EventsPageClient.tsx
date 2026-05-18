@@ -1093,12 +1093,15 @@ export default function EventsPage({
       <Modal open={modalOpen} onClose={() => { setModalOpen(false); setEditing(EMPTY); setAiPrompt(""); setAiError(""); }} title={editing.id ? (canEdit ? "Edit Event" : "View Event") : "New Event"}>
         <div className="space-y-4">
           {canEdit && !editing.id && (
-            <div className="rounded-2xl border border-amber-200/60 bg-gradient-to-br from-amber-50/50 to-orange-50/50 p-4 mb-2 shadow-sm">
-              <label className="mb-2 flex items-center gap-2 text-sm font-bold text-amber-900">
-                <svg className="h-5 w-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-               AI Generator
+            <div className="relative overflow-hidden rounded-2xl bg-[#1c0a3e] p-4 mb-2 shadow-[0_0_0_1px_rgba(167,139,250,0.12),0_4px_24px_-4px_rgba(109,40,217,0.45)]">
+              <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-violet-300/70 to-transparent" />
+              <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-white">
+                <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-white/10 ring-1 ring-white/20">
+                  <svg className="h-3.5 w-3.5 text-violet-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                </div>
+                AI Generator
               </label>
-              <p className="text-xs text-amber-700/80 mb-3">Describe the event in a few words and AI will draft the full itinerary, required logistics, and schedule.</p>
+              <p className="text-xs text-white/45 mb-3">Describe the event in a few words and AI will draft the full itinerary, required logistics, and schedule.</p>
               <div className="flex flex-col gap-2 sm:flex-row">
                 <input
                   type="text"
@@ -1106,13 +1109,13 @@ export default function EventsPage({
                   onChange={(e) => setAiPrompt(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleGenerateItinerary(); } }}
                   placeholder="e.g. Summer festival, needs big sound system, 5 staff"
-                  className="flex-1 rounded-xl border border-amber-200/80 px-3 py-2.5 text-sm text-slate-700 placeholder-slate-400 shadow-sm focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-400/20 disabled:bg-slate-50"
+                  className="flex-1 rounded-xl border-0 px-3 py-2.5 text-sm text-slate-800 placeholder-slate-400 ring-1 ring-white/20 focus:outline-none focus:ring-2 focus:ring-violet-300/50 disabled:opacity-50"
                   disabled={isGenerating}
                 />
                 <button
                   onClick={(e) => { e.preventDefault(); handleGenerateItinerary(); }}
                   disabled={isGenerating || !aiPrompt.trim()}
-                  className="flex shrink-0 items-center justify-center gap-2 rounded-xl bg-amber-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-amber-700 disabled:bg-amber-300 sm:w-auto"
+                  className="flex shrink-0 items-center justify-center gap-2 rounded-xl bg-white/10 px-5 py-2.5 text-sm font-semibold text-white/90 ring-1 ring-white/15 transition-all hover:bg-white/18 hover:text-white hover:ring-white/22 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
                 >
                   {isGenerating ? (
                     <>
@@ -1125,7 +1128,7 @@ export default function EventsPage({
                   ) : "Generate"}
                 </button>
               </div>
-              {aiError && <p className="mt-2 text-xs font-medium text-rose-600">{aiError}</p>}
+              {aiError && <p className="mt-2 text-xs font-medium text-rose-300">{aiError}</p>}
             </div>
           )}
           <div>
@@ -1150,7 +1153,7 @@ export default function EventsPage({
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Department</label>
               <select disabled={!canEdit} value={editing.department} onChange={(e) => setEditing({ ...editing, department: e.target.value as Department })} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 disabled:bg-slate-50">
-                {(Object.keys(DEPT_CONFIG) as Department[]).map((d) => (<option key={d} value={d}>{DEPT_CONFIG[d].label}</option>))}
+                {(Object.keys(DEPT_CONFIG) as Department[]).filter((d) => d !== "all" && d !== "logistics").map((d) => (<option key={d} value={d}>{DEPT_CONFIG[d].label}</option>))}
               </select>
             </div>
             <div>

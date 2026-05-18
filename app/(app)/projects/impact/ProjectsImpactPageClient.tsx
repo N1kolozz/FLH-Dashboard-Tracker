@@ -319,7 +319,7 @@ function ImpactPageContent({
         )}
 
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-col gap-3">
             <div>
               <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Filters</h2>
               <p className="mt-1 text-sm text-slate-500">
@@ -327,7 +327,7 @@ function ImpactPageContent({
               </p>
             </div>
 
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-5">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
               <select
                 value={filterProjectId}
                 onChange={(event) => setFilterProjectId(event.target.value)}

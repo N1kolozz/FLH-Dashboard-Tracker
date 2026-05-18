@@ -147,6 +147,10 @@ body {
     text-wrap: balance;
   }
 
+  .font-georgian {
+    font-family: var(--font-georgian), system-ui, sans-serif;
+  }
+
   .hide-scrollbar {
     -ms-overflow-style: none;
     scrollbar-width: none;
