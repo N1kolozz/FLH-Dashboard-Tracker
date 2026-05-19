@@ -373,9 +373,6 @@ export default function DashboardPage({
 
         {/* Stats Grid */}
         <section>
-          <h2 className="text-sm font-semibold text-slate-600 uppercase tracking-wide mb-3">
-            At a Glance
-          </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <QuickStat
               label="Total Followers"
@@ -445,14 +442,8 @@ export default function DashboardPage({
         <section className="min-h-0 overflow-hidden rounded-lg border border-purple-200 bg-gradient-to-br from-white via-purple-50/70 to-fuchsia-50/60 p-4 shadow-sm sm:p-5">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-purple-600">
+              <p className="text-xl font-semibold uppercase tracking-wide text-purple-700">
                 News
-              </p>
-              <h2 className="mt-1 text-xl font-bold text-slate-900">
-                Latest updates
-              </h2>
-              <p className="mt-1 text-sm text-slate-600">
-                Fresh updates for everyone in the hub.
               </p>
             </div>
             {userCanPublishNews && (
