@@ -49,6 +49,7 @@ import {
   ProjectFormModal,
   ProjectReviewModal,
 } from "@/features/projects/board/ui";
+import FixedPortal from "@/components/FixedPortal";
 
 export default function ProjectsBoardPageClient({
   initialSession,
@@ -719,6 +720,17 @@ export default function ProjectsBoardPageClient({
     isDraggingRef.current = isDragging;
   }, [isDragging]);
 
+  useEffect(() => {
+    if (isDragging) {
+      document.body.style.cursor = "grabbing";
+    } else {
+      document.body.style.cursor = "";
+    }
+    return () => {
+      document.body.style.cursor = "";
+    };
+  }, [isDragging]);
+
   const daysUntilDeadline = (deadline: string) => {
     if (!deadline) return null;
     const diff = Math.ceil((new Date(deadline).getTime() - Date.now()) / 86400000);
@@ -907,23 +919,25 @@ export default function ProjectsBoardPageClient({
               })}
             </div>
 
-            <DragOverlay dropAnimation={null}>
-              {draggedProject ? (
-                <div
-                  style={dragPreviewWidth ? { width: `${dragPreviewWidth}px` } : undefined}
-                  className="pointer-events-none"
-                >
-                  <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-2xl">
-                    <ProjectCardContent
-                      project={draggedProject}
-                      owners={draggedOwners}
-                      daysUntilDeadline={daysUntilDeadline}
-                      reviewStatus={reviewStatuses[draggedProject.id] || null}
-                    />
+            <FixedPortal>
+              <DragOverlay dropAnimation={null}>
+                {draggedProject ? (
+                  <div
+                    style={dragPreviewWidth ? { width: `${dragPreviewWidth}px` } : undefined}
+                    className="pointer-events-none"
+                  >
+                    <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-2xl">
+                      <ProjectCardContent
+                        project={draggedProject}
+                        owners={draggedOwners}
+                        daysUntilDeadline={daysUntilDeadline}
+                        reviewStatus={reviewStatuses[draggedProject.id] || null}
+                      />
+                    </div>
                   </div>
-                </div>
-              ) : null}
-            </DragOverlay>
+                ) : null}
+              </DragOverlay>
+            </FixedPortal>
           </DndContext>
         )}
       </div>
