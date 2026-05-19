@@ -401,6 +401,42 @@ export async function sendPushToSubscription(
   }
 }
 
+export async function broadcastTestNotification(payload: PushNotificationPayload) {
+  if (!isPushConfigured()) {
+    return { sent: 0, failed: 0, skipped: true };
+  }
+
+  const result = await pool.query<StoredSubscriptionRow>(
+    `SELECT endpoint, p256dh, auth FROM push_subscriptions`
+  );
+
+  let sent = 0;
+  let failed = 0;
+
+  await Promise.all(
+    result.rows.map(async (row) => {
+      const response = await sendPushToSubscription(
+        {
+          endpoint: row.endpoint,
+          keys: { p256dh: row.p256dh, auth: row.auth },
+        },
+        payload
+      );
+
+      if (response.ok) {
+        sent += 1;
+        await markPushSuccess(row.endpoint);
+        return;
+      }
+
+      failed += 1;
+      await markPushFailure(row.endpoint, response.reason, response.shouldDelete);
+    })
+  );
+
+  return { sent, failed, skipped: false };
+}
+
 export async function notifySubscribers(options: {
   topic: PushTopic;
   payload: PushNotificationPayload;

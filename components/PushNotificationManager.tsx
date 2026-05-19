@@ -335,7 +335,23 @@ export default function PushNotificationManager({
         throw new Error("Failed to send test notification");
       }
 
-      setStatusMessage("Test notification sent.");
+      const data = (await response.json()) as {
+        broadcast?: boolean;
+        sent?: number;
+        failed?: number;
+      };
+
+      if (data.broadcast) {
+        const sent = data.sent ?? 0;
+        const failed = data.failed ?? 0;
+        setStatusMessage(
+          failed > 0
+            ? `Test sent to ${sent} device${sent === 1 ? "" : "s"} (${failed} failed).`
+            : `Test sent to ${sent} device${sent === 1 ? "" : "s"}.`
+        );
+      } else {
+        setStatusMessage("Test notification sent.");
+      }
     } catch (error) {
       console.error("Failed to send test notification:", error);
       setStatusMessage("Could not send a test notification right now.");
