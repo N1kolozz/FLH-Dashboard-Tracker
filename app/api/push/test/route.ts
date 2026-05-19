@@ -35,6 +35,7 @@ export async function POST(request: Request) {
       sent: result.sent,
       failed: result.failed,
       skipped: result.skipped ?? false,
+      failures: result.failures,
     });
   }
 

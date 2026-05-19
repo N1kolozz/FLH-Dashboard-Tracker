@@ -401,17 +401,34 @@ export async function sendPushToSubscription(
   }
 }
 
+export type BroadcastFailureDetail = {
+  endpointHost: string;
+  status: number;
+  reason: string;
+  userName: string | null;
+  userEmail: string | null;
+  deleted: boolean;
+};
+
+type BroadcastRow = StoredSubscriptionRow & {
+  full_name: string | null;
+  email: string | null;
+};
+
 export async function broadcastTestNotification(payload: PushNotificationPayload) {
   if (!isPushConfigured()) {
-    return { sent: 0, failed: 0, skipped: true };
+    return { sent: 0, failed: 0, skipped: true, failures: [] as BroadcastFailureDetail[] };
   }
 
-  const result = await pool.query<StoredSubscriptionRow>(
-    `SELECT endpoint, p256dh, auth FROM push_subscriptions`
+  const result = await pool.query<BroadcastRow>(
+    `SELECT ps.endpoint, ps.p256dh, ps.auth, u.full_name, u.email
+     FROM push_subscriptions ps
+     LEFT JOIN users u ON u.id = ps.user_id`
   );
 
   let sent = 0;
   let failed = 0;
+  const failures: BroadcastFailureDetail[] = [];
 
   await Promise.all(
     result.rows.map(async (row) => {
@@ -430,11 +447,31 @@ export async function broadcastTestNotification(payload: PushNotificationPayload
       }
 
       failed += 1;
+      let endpointHost = row.endpoint;
+      try {
+        endpointHost = new URL(row.endpoint).host;
+      } catch {
+        // keep raw endpoint if URL parsing fails
+      }
+
+      failures.push({
+        endpointHost,
+        status: response.status,
+        reason: response.reason.slice(0, 200),
+        userName: row.full_name,
+        userEmail: row.email,
+        deleted: response.shouldDelete,
+      });
+
+      console.error(
+        `[push] broadcast failed for ${row.full_name ?? row.email ?? "unknown"} @ ${endpointHost}: ${response.status} ${response.reason}`
+      );
+
       await markPushFailure(row.endpoint, response.reason, response.shouldDelete);
     })
   );
 
-  return { sent, failed, skipped: false };
+  return { sent, failed, skipped: false, failures };
 }
 
 export async function notifySubscribers(options: {

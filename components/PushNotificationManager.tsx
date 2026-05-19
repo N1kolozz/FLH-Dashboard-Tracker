@@ -339,14 +339,43 @@ export default function PushNotificationManager({
         broadcast?: boolean;
         sent?: number;
         failed?: number;
+        failures?: Array<{
+          endpointHost: string;
+          status: number;
+          reason: string;
+          userName: string | null;
+          userEmail: string | null;
+          deleted: boolean;
+        }>;
       };
 
       if (data.broadcast) {
         const sent = data.sent ?? 0;
         const failed = data.failed ?? 0;
+        const failures = data.failures ?? [];
+
+        if (failures.length > 0) {
+          console.group(`[push test] ${failed} failure${failed === 1 ? "" : "s"}`);
+          failures.forEach((failure) => {
+            const who = failure.userName ?? failure.userEmail ?? "unknown user";
+            console.warn(
+              `${who} @ ${failure.endpointHost} — ${failure.status} ${failure.reason}${failure.deleted ? " [removed stale subscription]" : ""}`
+            );
+          });
+          console.groupEnd();
+        }
+
+        const failedSummary =
+          failures.length > 0
+            ? failures
+                .slice(0, 3)
+                .map((failure) => failure.userName ?? failure.userEmail ?? failure.endpointHost)
+                .join(", ") + (failures.length > 3 ? `, +${failures.length - 3} more` : "")
+            : "";
+
         setStatusMessage(
           failed > 0
-            ? `Test sent to ${sent} device${sent === 1 ? "" : "s"} (${failed} failed).`
+            ? `Test sent to ${sent}, failed for ${failed} (${failedSummary}). See console.`
             : `Test sent to ${sent} device${sent === 1 ? "" : "s"}.`
         );
       } else {
