@@ -113,12 +113,12 @@ function sortEvents(items: CalEvent[]) {
 
 function LoadingStatCards() {
   return (
-    <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+    <div className="grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4">
       {Array.from({ length: 4 }).map((_, idx) => (
-        <div key={idx} className="animate-pulse rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm">
-          <div className="h-3 w-20 rounded-full bg-slate-200" />
-          <div className="mt-3 h-9 w-16 rounded-2xl bg-slate-200" />
-          <div className="mt-2 h-4 w-32 rounded-full bg-slate-100" />
+        <div key={idx} className="animate-pulse rounded-2xl border border-slate-200/80 bg-white/90 p-3 shadow-sm sm:p-4">
+          <div className="h-3 w-16 rounded-full bg-slate-200 sm:w-20" />
+          <div className="mt-1.5 h-7 w-12 rounded-2xl bg-slate-200 sm:mt-3 sm:h-9 sm:w-16" />
+          <div className="mt-2 hidden h-4 w-32 rounded-full bg-slate-100 sm:block" />
         </div>
       ))}
     </div>
@@ -529,26 +529,26 @@ export default function EventsPage({
             {isLoadingData ? (
               <LoadingStatCards />
             ) : (
-              <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-                <div className="rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">This Month</p>
-                  <p className="mt-3 text-3xl font-semibold text-slate-900">{monthEvents.length}</p>
-                  <p className="mt-1 text-sm text-slate-500">Events scheduled in {MONTHS[viewMonth]}</p>
+              <div className="grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4">
+                <div className="rounded-2xl border border-slate-200/80 bg-white/90 p-3 shadow-sm sm:p-4">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400 sm:text-[11px] sm:tracking-[0.24em]">This Month</p>
+                  <p className="mt-1.5 text-2xl font-semibold leading-tight text-slate-900 sm:mt-3 sm:text-3xl">{monthEvents.length}</p>
+                  <p className="mt-1 hidden text-sm text-slate-500 sm:block">Events scheduled in {MONTHS[viewMonth]}</p>
                 </div>
-                <div className="rounded-2xl border border-amber-200/70 bg-gradient-to-br from-white to-amber-50/70 p-4 shadow-sm">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-amber-500">Upcoming</p>
-                  <p className="mt-3 text-3xl font-semibold text-amber-600">{upcomingEvents.length}</p>
-                  <p className="mt-1 text-sm text-slate-500">Next events ready to track</p>
+                <div className="rounded-2xl border border-amber-200/70 bg-gradient-to-br from-white to-amber-50/70 p-3 shadow-sm sm:p-4">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-amber-500 sm:text-[11px] sm:tracking-[0.24em]">Upcoming</p>
+                  <p className="mt-1.5 text-2xl font-semibold leading-tight text-amber-600 sm:mt-3 sm:text-3xl">{upcomingEvents.length}</p>
+                  <p className="mt-1 hidden text-sm text-slate-500 sm:block">Next events ready to track</p>
                 </div>
-                <div className="rounded-2xl border border-blue-200/70 bg-gradient-to-br from-white to-blue-50/70 p-4 shadow-sm">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-blue-500">Active Days</p>
-                  <p className="mt-3 text-3xl font-semibold text-blue-600">{activeDaysCount}</p>
-                  <p className="mt-1 text-sm text-slate-500">Days with at least one event</p>
+                <div className="rounded-2xl border border-blue-200/70 bg-gradient-to-br from-white to-blue-50/70 p-3 shadow-sm sm:p-4">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-blue-500 sm:text-[11px] sm:tracking-[0.24em]">Active Days</p>
+                  <p className="mt-1.5 text-2xl font-semibold leading-tight text-blue-600 sm:mt-3 sm:text-3xl">{activeDaysCount}</p>
+                  <p className="mt-1 hidden text-sm text-slate-500 sm:block">Days with at least one event</p>
                 </div>
-                <div className="rounded-2xl border border-emerald-200/70 bg-gradient-to-br from-white to-emerald-50/70 p-4 shadow-sm">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-500">Departments</p>
-                  <p className="mt-3 text-3xl font-semibold text-emerald-600">{departmentCount}</p>
-                  <p className="mt-1 text-sm text-slate-500">Teams represented this month</p>
+                <div className="rounded-2xl border border-emerald-200/70 bg-gradient-to-br from-white to-emerald-50/70 p-3 shadow-sm sm:p-4">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-emerald-500 sm:text-[11px] sm:tracking-[0.24em]">Departments</p>
+                  <p className="mt-1.5 text-2xl font-semibold leading-tight text-emerald-600 sm:mt-3 sm:text-3xl">{departmentCount}</p>
+                  <p className="mt-1 hidden text-sm text-slate-500 sm:block">Teams represented this month</p>
                 </div>
               </div>
             )}

@@ -89,11 +89,13 @@ export function ProjectCardContent({
   owners,
   daysUntilDeadline,
   reviewStatus,
+  actionSlot,
 }: {
   project: Project;
   owners: MemberChoice[];
   daysUntilDeadline: (deadline: string) => number | null;
   reviewStatus?: ProjectReviewStatus | null;
+  actionSlot?: ReactNode;
 }) {
   const deadlineDelta = daysUntilDeadline(project.deadline);
 
@@ -128,31 +130,34 @@ export function ProjectCardContent({
             </span>
           )}
         </div>
-        {deadlineDelta !== null && (
-          <span
-            className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-semibold uppercase tracking-wide ${
-              deadlineDelta < 0
-                ? "border-rose-300 bg-rose-50 text-rose-700"
-                : deadlineDelta <= 3
-                  ? "border-amber-300 bg-amber-50 text-amber-700"
-                  : "border-slate-300 bg-slate-100 text-slate-600"
-            }`}
-          >
-            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2.5}
-                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-              />
-            </svg>
-            {deadlineDelta < 0
-              ? `${Math.abs(deadlineDelta)}d overdue`
-              : deadlineDelta === 0
-                ? "Due today"
-                : `${deadlineDelta}d left`}
-          </span>
-        )}
+        <div className="flex items-center gap-1.5">
+          {deadlineDelta !== null && (
+            <span
+              className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-semibold uppercase tracking-wide ${
+                deadlineDelta < 0
+                  ? "border-rose-300 bg-rose-50 text-rose-700"
+                  : deadlineDelta <= 3
+                    ? "border-amber-300 bg-amber-50 text-amber-700"
+                    : "border-slate-300 bg-slate-100 text-slate-600"
+              }`}
+            >
+              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2.5}
+                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                />
+              </svg>
+              {deadlineDelta < 0
+                ? `${Math.abs(deadlineDelta)}d overdue`
+                : deadlineDelta === 0
+                  ? "Due today"
+                  : `${deadlineDelta}d left`}
+            </span>
+          )}
+          {actionSlot}
+        </div>
       </div>
 
       {/* Title */}
@@ -203,6 +208,7 @@ export function DraggableProjectCard({
   isDimmed,
   cardRefs,
   onOpen,
+  onEdit,
   daysUntilDeadline,
   reviewStatus,
 }: {
@@ -212,6 +218,7 @@ export function DraggableProjectCard({
   isDimmed: boolean;
   cardRefs: MutableRefObject<Record<number, HTMLDivElement | null>>;
   onOpen: (project: Project) => void;
+  onEdit?: (project: Project) => void;
   daysUntilDeadline: (deadline: string) => number | null;
   reviewStatus?: ProjectReviewStatus | null;
 }) {
@@ -224,6 +231,30 @@ export function DraggableProjectCard({
     setNodeRef(node);
     cardRefs.current[project.id] = node;
   };
+
+  const editButton =
+    canEdit && onEdit ? (
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          onEdit(project);
+        }}
+        onPointerDown={(event) => event.stopPropagation()}
+        aria-label="Edit project"
+        title="Edit project"
+        className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 transition-colors hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
+      >
+        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+          />
+        </svg>
+      </button>
+    ) : null;
 
   return (
     <div
@@ -240,6 +271,7 @@ export function DraggableProjectCard({
         owners={owners}
         daysUntilDeadline={daysUntilDeadline}
         reviewStatus={reviewStatus}
+        actionSlot={editButton}
       />
     </div>
   );
@@ -670,6 +702,291 @@ export function ProjectReviewModal({
           </div>
         </div>
       ) : null}
+    </Modal>
+  );
+}
+
+function DetailField({
+  icon,
+  label,
+  value,
+  hint,
+  tone = "slate",
+}: {
+  icon: ReactNode;
+  label: string;
+  value: ReactNode;
+  hint?: ReactNode;
+  tone?: "slate" | "emerald" | "rose" | "amber" | "blue";
+}) {
+  const toneClasses = {
+    slate: "border-slate-200 bg-slate-50/60",
+    emerald: "border-emerald-200 bg-emerald-50/60",
+    rose: "border-rose-200 bg-rose-50/60",
+    amber: "border-amber-200 bg-amber-50/60",
+    blue: "border-blue-200 bg-blue-50/60",
+  };
+  const iconTone = {
+    slate: "text-slate-500",
+    emerald: "text-emerald-600",
+    rose: "text-rose-600",
+    amber: "text-amber-600",
+    blue: "text-blue-600",
+  };
+
+  return (
+    <div className={`rounded-xl border p-3 ${toneClasses[tone]}`}>
+      <div className="flex items-center gap-1.5">
+        <span className={iconTone[tone]}>{icon}</span>
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+      </div>
+      <p className="mt-1 break-words text-sm font-medium text-slate-800">{value}</p>
+      {hint ? <p className="mt-0.5 text-xs text-slate-500">{hint}</p> : null}
+    </div>
+  );
+}
+
+export function ProjectDetailModal({
+  open,
+  project,
+  owners,
+  reviewStatus,
+  canEdit,
+  daysUntilDeadline,
+  formatProjectUpdate,
+  onClose,
+  onEdit,
+}: {
+  open: boolean;
+  project: Project | null;
+  owners: MemberChoice[];
+  reviewStatus: ProjectReviewStatus | null;
+  canEdit: boolean;
+  daysUntilDeadline: (deadline: string) => number | null;
+  formatProjectUpdate: (value: string) => string;
+  onClose: () => void;
+  onEdit?: (project: Project) => void;
+}) {
+  if (!project) {
+    return (
+      <Modal open={open} onClose={onClose} title="Project details" maxWidth="max-w-2xl">
+        <div />
+      </Modal>
+    );
+  }
+
+  const deadlineDelta = daysUntilDeadline(project.deadline);
+  const statusLabel = COLUMNS.find((column) => column.id === project.status)?.label ?? project.status;
+  const formattedDeadline = project.deadline
+    ? new Date(`${project.deadline}T00:00:00`).toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
+    : "No deadline";
+  const deadlineHint =
+    deadlineDelta === null
+      ? null
+      : deadlineDelta < 0
+        ? `${Math.abs(deadlineDelta)}d overdue`
+        : deadlineDelta === 0
+          ? "Due today"
+          : `${deadlineDelta}d left`;
+  const deadlineTone: "slate" | "rose" | "amber" =
+    deadlineDelta === null || deadlineDelta > 7
+      ? "slate"
+      : deadlineDelta < 0
+        ? "rose"
+        : "amber";
+
+  return (
+    <Modal open={open} onClose={onClose} title="Project details" maxWidth="max-w-2xl">
+      <div className="space-y-5">
+        <div>
+          <h3 className="break-words text-xl font-bold leading-tight text-slate-900">
+            {project.name}
+          </h3>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <span
+              className={`inline-flex items-center rounded-md border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide ${PRIORITY_CONFIG[project.priority].classes}`}
+            >
+              {PRIORITY_CONFIG[project.priority].label} priority
+            </span>
+            <span className="inline-flex items-center rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-700">
+              {statusLabel}
+            </span>
+            {reviewStatus?.status === "approved" && (
+              <span className="inline-flex items-center gap-1 rounded-md border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-700">
+                <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                </svg>
+                Approved
+              </span>
+            )}
+            {reviewStatus?.status === "pending" && (
+              <span className="inline-flex items-center gap-1 rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-700">
+                <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 8v4m0 4v.01" />
+                </svg>
+                Pending review
+              </span>
+            )}
+            {reviewStatus?.status === "rejected" && (
+              <span className="inline-flex items-center gap-1 rounded-md border border-rose-300 bg-rose-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-rose-700">
+                <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                Rejected
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div>
+          <div className="flex items-center gap-1.5">
+            <svg className="h-4 w-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12h6m-6 4h6m-7 5h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+            </svg>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              Description
+            </p>
+          </div>
+          <p className="mt-1.5 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">
+            {project.description?.trim() || "No description added yet."}
+          </p>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <DetailField
+            tone={deadlineTone}
+            label="Deadline"
+            value={formattedDeadline}
+            hint={deadlineHint}
+            icon={
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            }
+          />
+          <DetailField
+            label="Last update"
+            value={formatProjectUpdate(project.updatedAt)}
+            icon={
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            }
+          />
+          <DetailField
+            label="Team"
+            value={project.team?.trim() || "Not assigned"}
+            icon={
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
+            }
+          />
+          <DetailField
+            label="Owners"
+            value={
+              owners.length === 0
+                ? "Unassigned"
+                : `${owners.length} ${owners.length === 1 ? "person" : "people"}`
+            }
+            icon={
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6 0a4 4 0 11-8 0 4 4 0 018 0zm6-4a4 4 0 11-8 0 4 4 0 018 0z" />
+              </svg>
+            }
+          />
+        </div>
+
+        {owners.length > 0 ? (
+          <div>
+            <div className="flex items-center gap-1.5">
+              <svg className="h-4 w-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                Assigned owners
+              </p>
+            </div>
+            <div className="mt-2 flex items-start gap-2.5">
+              <MemberAvatarStack
+                names={owners.map((owner) => owner.name)}
+                size="sm"
+                maxVisible={6}
+              />
+              <div className="flex flex-1 flex-wrap gap-1.5">
+                {owners.map((owner) => (
+                  <span
+                    key={owner.id}
+                    className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700"
+                  >
+                    {owner.name}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {reviewStatus?.status === "rejected" && reviewStatus.feedback ? (
+          <div className="rounded-xl border border-rose-200 bg-rose-50 p-3">
+            <div className="flex items-center gap-1.5">
+              <svg className="h-4 w-4 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+              </svg>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-rose-700">
+                Rejection feedback
+              </p>
+            </div>
+            <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-rose-700">
+              {reviewStatus.feedback}
+            </p>
+          </div>
+        ) : null}
+
+        {reviewStatus?.status === "approved" && reviewStatus.feedback ? (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+            <div className="flex items-center gap-1.5">
+              <svg className="h-4 w-4 text-emerald-600" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+              </svg>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-700">
+                Reviewer note
+              </p>
+            </div>
+            <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-emerald-700">
+              {reviewStatus.feedback}
+            </p>
+          </div>
+        ) : null}
+
+        {canEdit && onEdit ? (
+          <div className="flex flex-col-reverse gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex items-center justify-center rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+            >
+              Close
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                onEdit(project);
+              }}
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              Edit project
+            </button>
+          </div>
+        ) : null}
+      </div>
     </Modal>
   );
 }

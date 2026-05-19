@@ -46,6 +46,7 @@ import {
   ProjectBoardSkeleton,
   ProjectCardContent,
   ProjectColumn,
+  ProjectDetailModal,
   ProjectFormModal,
   ProjectReviewModal,
 } from "@/features/projects/board/ui";
@@ -92,6 +93,7 @@ export default function ProjectsBoardPageClient({
   const [reviewTarget, setReviewTarget] = useState<{ projectId: number; reviewId: number; projectName: string; projectDescription: string } | null>(null);
   const [reviewFeedback, setReviewFeedback] = useState("");
   const [reviewSaving, setReviewSaving] = useState(false);
+  const [detailProject, setDetailProject] = useState<Project | null>(null);
   const deepLinkHandledRef = useRef(false);
   const boardRef = useRef<HTMLDivElement | null>(null);
   const columnRefs = useRef<Array<HTMLDivElement | null>>([]);
@@ -694,6 +696,15 @@ export default function ProjectsBoardPageClient({
       return;
     }
 
+    setDetailProject(project);
+  };
+
+  const handleEditProject = (project: Project) => {
+    if (suppressOpenAfterDragRef.current) {
+      return;
+    }
+
+    setDetailProject(null);
     openEdit(project);
   };
 
@@ -900,6 +911,7 @@ export default function ProjectsBoardPageClient({
                             isDimmed={dragId === p.id}
                             cardRefs={cardRefs}
                             onOpen={handleOpenProject}
+                            onEdit={canEdit ? handleEditProject : undefined}
                             daysUntilDeadline={daysUntilDeadline}
                             reviewStatus={rs}
                           />
@@ -985,6 +997,18 @@ export default function ProjectsBoardPageClient({
         onFeedbackChange={setReviewFeedback}
         onApprove={handleApproveReview}
         onReject={handleRejectReview}
+      />
+
+      <ProjectDetailModal
+        open={detailProject !== null}
+        project={detailProject}
+        owners={detailProject ? getOwnerMembers(detailProject.ownerUserIds) : []}
+        reviewStatus={detailProject ? reviewStatuses[detailProject.id] ?? null : null}
+        canEdit={!!canEdit}
+        daysUntilDeadline={daysUntilDeadline}
+        formatProjectUpdate={formatProjectUpdate}
+        onClose={() => setDetailProject(null)}
+        onEdit={canEdit ? handleEditProject : undefined}
       />
     </div>
   );

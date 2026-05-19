@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createCipheriv, createECDH, createHmac, randomBytes } from "crypto";
+import { createCipheriv, createECDH, createHash, createHmac, randomBytes } from "crypto";
 import { importJWK, SignJWT } from "jose";
 import { pool } from "@/lib/db";
 
@@ -229,7 +229,12 @@ function encryptPushPayload(subscription: BrowserPushSubscription, payload: stri
 }
 
 function sanitizeTopic(tag: string) {
-  return tag.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 32);
+  // Apple's web push gateway returns 400 BadWebPushTopic when the Topic header
+  // isn't a valid base64url-decodable string (e.g., "test-notification" is 17
+  // chars, and 17 mod 4 === 1 which is not a valid base64url length). Hash the
+  // tag to a deterministic 16-char base64url string — same tag → same topic,
+  // so collapse semantics are preserved, and 16 mod 4 === 0 so APNs accepts it.
+  return createHash("sha256").update(tag).digest("base64url").slice(0, 16);
 }
 
 export function createPushNotification(input: Omit<PushNotificationPayload, "icon" | "badge"> & {
