@@ -1,7 +1,7 @@
 "use server";
 
 import { pool } from "@/lib/db";
-import { requireDepartmentManagerSession } from "@/lib/action-auth";
+import { requireAuthenticatedSession, requireDepartmentManagerSession } from "@/lib/action-auth";
 
 export interface ImpactRecordRow {
   id: number;
@@ -27,6 +27,7 @@ async function getProjectName(projectId: number) {
 
 export async function getImpactRecords() {
   try {
+    await requireAuthenticatedSession();
     const res = await pool.query(
       `SELECT
          ir.id,

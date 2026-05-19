@@ -1,7 +1,7 @@
 "use server";
 
 import { pool } from "@/lib/db";
-import { requireDepartmentManagerSession } from "@/lib/action-auth";
+import { requireAuthenticatedSession, requireDepartmentManagerSession } from "@/lib/action-auth";
 import { normalizeOwnerUserIds } from "@/lib/owner-users";
 import { createPushNotification, notifySubscribers } from "@/lib/push";
 import { getSessionUserId } from "@/lib/permissions";
@@ -22,6 +22,7 @@ export interface EventRow {
 
 export async function getEvents() {
   try {
+    await requireAuthenticatedSession();
     const res = await pool.query(
       `SELECT
          e.id,

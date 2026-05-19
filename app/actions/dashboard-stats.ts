@@ -1,6 +1,7 @@
 "use server";
 
 import { pool } from "@/lib/db";
+import { requireAuthenticatedSession } from "@/lib/action-auth";
 
 export interface DashboardCounts {
   projectCount: number;
@@ -12,6 +13,7 @@ export interface DashboardCounts {
 
 export async function getDashboardCounts(): Promise<DashboardCounts> {
   try {
+    await requireAuthenticatedSession();
     const [projectsRes, inventoryRes, eventsRes, expensesRes, teamRes] =
       await Promise.all([
         pool.query("SELECT COUNT(*) as count FROM projects"),

@@ -1,7 +1,7 @@
 "use server";
 
 import { pool } from "@/lib/db";
-import { requireDepartmentManagerSession } from "@/lib/action-auth";
+import { requireAuthenticatedSession, requireDepartmentManagerSession } from "@/lib/action-auth";
 import { getSessionUserId } from "@/lib/permissions";
 import { logActivity } from "@/lib/activity";
 
@@ -27,6 +27,7 @@ export interface InventoryItemRow {
 
 export async function getInventoryItems() {
   try {
+    await requireAuthenticatedSession();
     const itemsRes = await pool.query(
       "SELECT id, name, category, quantity, status, location, condition, notes, created_at FROM inventory_items ORDER BY created_at DESC"
     );

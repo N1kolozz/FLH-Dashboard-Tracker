@@ -1,6 +1,7 @@
 "use server";
 
 import { pool } from "@/lib/db";
+import { requireAuthenticatedSession } from "@/lib/action-auth";
 import { indexRowsByOwner } from "@/lib/owner-users";
 
 export interface WorkloadMember {
@@ -54,6 +55,7 @@ export async function getWorkloadData(): Promise<
   { success: true; members: WorkloadMember[] } | { error: string }
 > {
   try {
+    await requireAuthenticatedSession();
     const usersRes = await pool.query(
       `SELECT id, full_name AS name, role, department, position, email
        FROM users

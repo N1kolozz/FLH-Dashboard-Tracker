@@ -1,7 +1,7 @@
 "use server";
 
 import { pool } from "@/lib/db";
-import { requireDepartmentManagerSession } from "@/lib/action-auth";
+import { requireAuthenticatedSession, requireDepartmentManagerSession } from "@/lib/action-auth";
 import { getSessionUserId } from "@/lib/permissions";
 import { logActivity } from "@/lib/activity";
 
@@ -18,6 +18,7 @@ export interface ExpenseRow {
 
 export async function getExpenses() {
   try {
+    await requireAuthenticatedSession();
     const res = await pool.query(
       "SELECT id, description, amount::float, category, date::text, paid_by, notes, created_at FROM expenses ORDER BY date DESC, created_at DESC"
     );

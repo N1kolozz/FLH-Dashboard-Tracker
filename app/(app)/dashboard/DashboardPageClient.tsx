@@ -314,7 +314,7 @@ export default function DashboardPage({
         />
 
         {/* Daily Briefing AI Widget */}
-        <div className="relative overflow-hidden rounded-2xl bg-[#1c0a3e] p-5 sm:p-6 shadow-[0_0_0_1px_rgba(167,139,250,0.12),0_8px_48px_-8px_rgba(109,40,217,0.55)]">
+        <div className="relative overflow-hidden rounded-2xl bg-[#1c0a3e] p-5 sm:p-6">
           {/* Top shimmer line */}
           <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-violet-300/70 to-transparent" />
 

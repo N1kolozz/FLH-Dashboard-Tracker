@@ -209,6 +209,7 @@ export async function getReviewForEntity(
   entityId: number
 ): Promise<{ review: ReviewRequest | null }> {
   try {
+    await requireAuthenticatedSession();
     const res = await pool.query(
       `SELECT rr.*, 
               u1.full_name as submitted_by_name, 
@@ -267,6 +268,7 @@ export async function getPendingReviews(): Promise<{
 // Batch review status helpers used by project and content-post list screens.
 export async function getProjectReviewStatuses(): Promise<ReviewStatusMap> {
   try {
+    await requireAuthenticatedSession();
     return await getLatestReviewStatuses("project");
   } catch (error) {
     console.error("Error fetching review statuses:", error);
@@ -276,6 +278,7 @@ export async function getProjectReviewStatuses(): Promise<ReviewStatusMap> {
 
 export async function getPostReviewStatuses(): Promise<ReviewStatusMap> {
   try {
+    await requireAuthenticatedSession();
     return await getLatestReviewStatuses("content_post");
   } catch (error) {
     console.error("Error fetching post review statuses:", error);

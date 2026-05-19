@@ -1,6 +1,7 @@
 "use server";
 
 import { getSession } from "@/lib/auth";
+import { requireAuthenticatedSession } from "@/lib/action-auth";
 import {
   assertCanManageProjects,
   getSessionUserId,
@@ -17,6 +18,7 @@ import { logActivity } from "@/lib/activity";
 
 export async function getProjects() {
   try {
+    await requireAuthenticatedSession();
     const projects = await fetchAllProjects();
     return { success: true, projects };
   } catch (error) {
@@ -28,6 +30,7 @@ export async function getProjects() {
 /* Get rejected projects for portfolio page */
 export async function getRejectedProjects() {
   try {
+    await requireAuthenticatedSession();
     const projects = await fetchRejectedProjects();
     return { success: true, projects };
   } catch (error) {

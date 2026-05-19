@@ -2,6 +2,7 @@
 
 import { pool } from "@/lib/db";
 import { getSession } from "@/lib/auth";
+import { requireAuthenticatedSession } from "@/lib/action-auth";
 import { canPublishNews, getSessionUserId } from "@/lib/permissions";
 import { createPushNotification, notifySubscribers } from "@/lib/push";
 
@@ -75,6 +76,7 @@ function formatDateLabel(label: string, value: string | null) {
 
 export async function getDashboardNews() {
   try {
+    await requireAuthenticatedSession();
     const [announcementsRes, eventsRes, projectsRes] = await Promise.all([
       pool.query(
         `SELECT

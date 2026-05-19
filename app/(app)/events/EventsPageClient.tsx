@@ -1093,7 +1093,7 @@ export default function EventsPage({
       <Modal open={modalOpen} onClose={() => { setModalOpen(false); setEditing(EMPTY); setAiPrompt(""); setAiError(""); }} title={editing.id ? (canEdit ? "Edit Event" : "View Event") : "New Event"}>
         <div className="space-y-4">
           {canEdit && !editing.id && (
-            <div className="relative overflow-hidden rounded-2xl bg-[#1c0a3e] p-4 mb-2 shadow-[0_0_0_1px_rgba(167,139,250,0.12),0_4px_24px_-4px_rgba(109,40,217,0.45)]">
+            <div className="relative overflow-hidden rounded-2xl bg-[#1c0a3e] p-4 mb-2">
               <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-violet-300/70 to-transparent" />
               <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-white">
                 <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-white/10 ring-1 ring-white/20">

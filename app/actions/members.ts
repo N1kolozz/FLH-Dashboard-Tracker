@@ -2,6 +2,7 @@
 
 import { pool } from "@/lib/db";
 import { getSession } from "@/lib/auth";
+import { requireAuthenticatedSession } from "@/lib/action-auth";
 import {
   assertCanAssignPrivilegedRole,
   assertHeadOrAdmin,
@@ -54,6 +55,7 @@ export async function addMember(formData: {
 
 export async function getMembers() {
   try {
+    await requireAuthenticatedSession();
     const res = await pool.query(
       "SELECT id, full_name as name, role, department, email, position, created_at FROM users WHERE role != 'ADMIN' ORDER BY created_at DESC"
     );

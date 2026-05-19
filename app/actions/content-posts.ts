@@ -1,7 +1,7 @@
 "use server";
 
 import { pool } from "@/lib/db";
-import { requireDepartmentManagerSession } from "@/lib/action-auth";
+import { requireAuthenticatedSession, requireDepartmentManagerSession } from "@/lib/action-auth";
 import { normalizeOwnerUserIds } from "@/lib/owner-users";
 
 export interface ContentPostRow {
@@ -18,6 +18,7 @@ export interface ContentPostRow {
 
 export async function getContentPosts() {
   try {
+    await requireAuthenticatedSession();
     const res = await pool.query(
       `SELECT
          cp.id,
