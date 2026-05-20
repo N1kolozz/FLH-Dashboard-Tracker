@@ -362,7 +362,6 @@ export default function InventoryPage({
     return true;
   });
 
-  const lowStockItems = items.filter((i) => i.status === "available" && i.quantity <= 2 && i.quantity > 0);
   const inventorySkeletonCount = resolveSkeletonCount(items.length, cachedItemCount);
 
   return (
@@ -434,16 +433,6 @@ export default function InventoryPage({
       </header>
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-4">
-        {/* Low-stock alerts */}
-        {!isLoadingData && lowStockItems.length > 0 && (
-          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-            <p className="text-sm font-semibold text-amber-700 mb-1">⚠️ Low Stock Alert</p>
-            <p className="text-sm text-amber-600">
-              {lowStockItems.map((i) => `${i.name} (${i.quantity} left)`).join(" · ")}
-            </p>
-          </div>
-        )}
-
         {isLoadingData ? (
           viewMode === "grid" ? (
             <InventoryGridSkeleton count={inventorySkeletonCount} />

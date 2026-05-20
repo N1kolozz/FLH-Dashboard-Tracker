@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { getMonthlySummary } from "@/app/actions/monthly-summary";
 import type { MonthlySummaryData } from "@/types";
 import MonthlySummaryPresentation from "./MonthlySummaryPresentation";
+import FixedPortal from "@/components/FixedPortal";
 import FlhIconMark from "@/components/FlhIconMark";
 
 function formatMonthLabel(m: string) {
@@ -100,16 +101,6 @@ export default function MonthlySummaryPageClient({
           <p className="text-sm text-slate-500">Only the HEAD and ADMIN roles can access the Monthly Summary feature.</p>
         </div>
       </div>
-    );
-  }
-
-  // Presentation mode
-  if (presenting && data) {
-    return (
-      <MonthlySummaryPresentation
-        data={data}
-        onExit={() => setPresenting(false)}
-      />
     );
   }
 
@@ -285,6 +276,15 @@ export default function MonthlySummaryPageClient({
           </>
         ) : null}
       </div>
+
+      {presenting && data && (
+        <FixedPortal>
+          <MonthlySummaryPresentation
+            data={data}
+            onExit={() => setPresenting(false)}
+          />
+        </FixedPortal>
+      )}
     </div>
   );
 }
