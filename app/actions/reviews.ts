@@ -6,6 +6,7 @@ import {
   requireHeadOrAdminSession,
 } from "@/lib/action-auth";
 import { getSessionUserId } from "@/lib/permissions";
+import { createPushNotification, notifySubscribers } from "@/lib/push";
 
 // Review workflow types
 export interface ReviewRequest {
@@ -103,6 +104,47 @@ export async function submitForReview(
        RETURNING id, created_at`,
       [entityType, entityId, userId]
     );
+
+    if (entityType === "content_post") {
+      try {
+        const postRes = await pool.query<{ caption: string; platform: string }>(
+          `SELECT caption, platform FROM content_posts WHERE id = $1`,
+          [entityId]
+        );
+        const post = postRes.rows[0];
+
+        const headAdminRes = await pool.query<{ id: number }>(
+          `SELECT id FROM users WHERE role IN ('HEAD', 'ADMIN')`,
+        );
+        const headAdminIds = headAdminRes.rows.map((r) => r.id);
+
+        if (headAdminIds.length > 0 && post) {
+          const PLATFORM_LABEL: Record<string, string> = {
+            instagram: "Instagram",
+            tiktok: "TikTok",
+            facebook: "Facebook",
+          };
+          const platformLabel = PLATFORM_LABEL[post.platform] ?? post.platform;
+          const caption = post.caption ? ` — ${post.caption.slice(0, 60)}${post.caption.length > 60 ? "…" : ""}` : "";
+
+          const reviewId = res.rows[0].id as number;
+          await notifySubscribers({
+            topic: "content",
+            userIds: headAdminIds,
+            excludeUserId: userId,
+            payload: createPushNotification({
+              topic: "content",
+              title: `პოსტი საჭიროებს შემოწმებას: ${platformLabel}`,
+              body: `შეამოწმეთ კონტენტ კალენდარი${caption}.`,
+              url: `/social/calendar?postId=${entityId}&reviewId=${reviewId}`,
+              tag: `content-review-${entityId}`,
+            }),
+          });
+        }
+      } catch (pushError) {
+        console.error("Error sending review submission push notification:", pushError);
+      }
+    }
 
     return { success: true, id: res.rows[0].id };
   } catch (error) {

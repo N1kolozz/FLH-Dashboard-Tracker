@@ -305,6 +305,10 @@ async function migrate() {
       ALTER TABLE push_subscriptions
       ADD COLUMN IF NOT EXISTS topic_attendance BOOLEAN NOT NULL DEFAULT TRUE
     `);
+    await client.query(`
+      ALTER TABLE push_subscriptions
+      ADD COLUMN IF NOT EXISTS topic_content BOOLEAN NOT NULL DEFAULT TRUE
+    `);
     console.log("✓ push_subscriptions table ready");
 
     await client.query(`

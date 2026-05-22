@@ -9,6 +9,7 @@ export const PUSH_TOPIC_LABELS = {
   events: "Events",
   projects: "Projects",
   attendance: "Attendance",
+  content: "Content Calendar",
 } as const;
 
 export type PushTopic = keyof typeof PUSH_TOPIC_LABELS;
@@ -45,6 +46,7 @@ type PreferenceRow = {
   topic_events: boolean;
   topic_projects: boolean;
   topic_attendance: boolean;
+  topic_content: boolean;
 };
 
 const DEFAULT_PUSH_PREFERENCES: PushPreferences = {
@@ -52,6 +54,7 @@ const DEFAULT_PUSH_PREFERENCES: PushPreferences = {
   events: true,
   projects: true,
   attendance: true,
+  content: true,
 };
 
 const TOPIC_COLUMN_MAP: Record<PushTopic, string> = {
@@ -59,6 +62,7 @@ const TOPIC_COLUMN_MAP: Record<PushTopic, string> = {
   events: "topic_events",
   projects: "topic_projects",
   attendance: "topic_attendance",
+  content: "topic_content",
 };
 
 function toPreferences(row?: Partial<PreferenceRow> | null): PushPreferences {
@@ -67,6 +71,7 @@ function toPreferences(row?: Partial<PreferenceRow> | null): PushPreferences {
     events: row?.topic_events ?? DEFAULT_PUSH_PREFERENCES.events,
     projects: row?.topic_projects ?? DEFAULT_PUSH_PREFERENCES.projects,
     attendance: row?.topic_attendance ?? DEFAULT_PUSH_PREFERENCES.attendance,
+    content: row?.topic_content ?? DEFAULT_PUSH_PREFERENCES.content,
   };
 }
 
@@ -271,7 +276,7 @@ export async function syncPushSubscription(
            auth = EXCLUDED.auth,
            user_agent = EXCLUDED.user_agent,
            updated_at = CURRENT_TIMESTAMP
-     RETURNING topic_news, topic_events, topic_projects, topic_attendance`,
+     RETURNING topic_news, topic_events, topic_projects, topic_attendance, topic_content`,
     [
       userId,
       subscription.endpoint,
@@ -295,15 +300,17 @@ export async function updatePushPreferences(
          topic_events = $2,
          topic_projects = $3,
          topic_attendance = $4,
+         topic_content = $5,
          updated_at = CURRENT_TIMESTAMP
-     WHERE endpoint = $5
-       AND user_id = $6
-     RETURNING topic_news, topic_events, topic_projects, topic_attendance`,
+     WHERE endpoint = $6
+       AND user_id = $7
+     RETURNING topic_news, topic_events, topic_projects, topic_attendance, topic_content`,
     [
       preferences.news,
       preferences.events,
       preferences.projects,
       preferences.attendance,
+      preferences.content,
       endpoint,
       userId,
     ]

@@ -44,6 +44,7 @@ import {
   LoadingStatCards,
 } from "@/features/social/calendar/skeletons";
 import {
+  PostDetailModal,
   PostFormModal,
   PostReviewModal,
   SelectedDayDetailsDrawer,
@@ -90,6 +91,7 @@ export default function SocialCalendarPageClient({
   const [reviewTarget, setReviewTarget] = useState<{ postId: number; reviewId: number; postCaption: string } | null>(null);
   const [reviewFeedback, setReviewFeedback] = useState("");
   const [reviewSaving, setReviewSaving] = useState(false);
+  const [detailPost, setDetailPost] = useState<ContentPost | null>(null);
   const deepLinkHandledRef = useRef(false);
 
   const canEdit = session && (
@@ -285,6 +287,15 @@ export default function SocialCalendarPageClient({
     setSelectedDate(null);
     setEditing(post);
     setModalOpen(true);
+  };
+
+  const openPostPreview = (post: ContentPost) => {
+    setDetailPost(post);
+  };
+
+  const openPostEdit = (post: ContentPost, dateStr?: string) => {
+    setDetailPost(null);
+    openPostModal(post, dateStr);
   };
 
   const handleSubmitForApproval = async () => {
@@ -541,7 +552,7 @@ export default function SocialCalendarPageClient({
                               key={p.id}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                openPostModal(p, dateStr);
+                                openPostPreview(p);
                               }}
                               className={`rounded-md border px-1 py-0.5 text-[9px] font-semibold sm:px-1.5 ${PLATFORM_CONFIG[p.platform].color}`}
                               title={p.caption}
@@ -575,14 +586,28 @@ export default function SocialCalendarPageClient({
                               key={p.id}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                openPostModal(p, dateStr);
+                                openPostPreview(p);
                               }}
-                              className={`rounded-xl border px-2.5 py-2 text-[11px] font-medium transition-transform hover:-translate-y-0.5 ${PLATFORM_CONFIG[p.platform].color}`}
+                              className={`group/card relative rounded-xl border px-2.5 py-2 text-[11px] font-medium transition-transform hover:-translate-y-0.5 ${PLATFORM_CONFIG[p.platform].color}`}
                               title={p.caption}
                             >
                               <div className="flex items-center justify-between gap-2">
                                 <span className="truncate">{PLATFORM_CONFIG[p.platform].label}</span>
-                                {p.time && <span className="shrink-0 text-[10px] opacity-75">{p.time}</span>}
+                                <div className="flex shrink-0 items-center gap-1">
+                                  {p.time && <span className="text-[10px] opacity-75">{p.time}</span>}
+                                  {canEdit && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => { e.stopPropagation(); openPostEdit(p, dateStr); }}
+                                      aria-label="Edit post"
+                                      className="inline-flex h-5 w-5 items-center justify-center rounded border border-current/20 bg-white/60 opacity-0 transition-opacity hover:bg-white/90 group-hover/card:opacity-100"
+                                    >
+                                      <svg className="h-2.5 w-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                      </svg>
+                                    </button>
+                                  )}
+                                </div>
                               </div>
                               <p className="mt-1 line-clamp-2 text-[11px] leading-snug opacity-90">
                                 {p.caption}
@@ -686,7 +711,7 @@ export default function SocialCalendarPageClient({
                               key={p.id}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                openPostModal(p, dateStr);
+                                openPostPreview(p);
                               }}
                               className={`rounded-md border px-1 py-0.5 text-[9px] font-semibold sm:px-1.5 ${PLATFORM_CONFIG[p.platform].color}`}
                               title={p.caption}
@@ -720,14 +745,28 @@ export default function SocialCalendarPageClient({
                               key={p.id}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                openPostModal(p, dateStr);
+                                openPostPreview(p);
                               }}
-                              className={`rounded-xl border px-3 py-2.5 text-[11px] font-medium transition-transform hover:-translate-y-0.5 ${PLATFORM_CONFIG[p.platform].color}`}
+                              className={`group/card relative rounded-xl border px-3 py-2.5 text-[11px] font-medium transition-transform hover:-translate-y-0.5 ${PLATFORM_CONFIG[p.platform].color}`}
                               title={p.caption}
                             >
                               <div className="flex items-center justify-between gap-2">
                                 <span className="truncate">{PLATFORM_CONFIG[p.platform].label}</span>
-                                {p.time && <span className="shrink-0 text-[10px] opacity-75">{p.time}</span>}
+                                <div className="flex shrink-0 items-center gap-1">
+                                  {p.time && <span className="text-[10px] opacity-75">{p.time}</span>}
+                                  {canEdit && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => { e.stopPropagation(); openPostEdit(p, dateStr); }}
+                                      aria-label="Edit post"
+                                      className="inline-flex h-5 w-5 items-center justify-center rounded border border-current/20 bg-white/60 opacity-0 transition-opacity hover:bg-white/90 group-hover/card:opacity-100"
+                                    >
+                                      <svg className="h-2.5 w-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                      </svg>
+                                    </button>
+                                  )}
+                                </div>
                               </div>
                               <p className="mt-1.5 line-clamp-3 text-[11px] leading-snug opacity-90">
                                 {p.caption}
@@ -762,7 +801,20 @@ export default function SocialCalendarPageClient({
           if (!selectedDate) return;
           openNew(selectedDate);
         }}
-        onOpenPost={(post) => openPostModal(post)}
+        onOpenPost={(post) => openPostPreview(post)}
+        onEditPost={canEdit ? (post) => openPostEdit(post) : undefined}
+      />
+
+      <PostDetailModal
+        open={detailPost !== null}
+        post={detailPost}
+        canEdit={!!canEdit}
+        members={members}
+        reviewStatus={detailPost?.id ? reviewStatuses[detailPost.id] ?? null : null}
+        onClose={() => setDetailPost(null)}
+        onEdit={() => {
+          if (detailPost) openPostEdit(detailPost);
+        }}
       />
 
       <PostFormModal

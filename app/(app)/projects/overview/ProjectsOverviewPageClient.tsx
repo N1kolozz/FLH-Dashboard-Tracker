@@ -9,7 +9,6 @@ import Modal from "@/components/Modal";
 import ProjectsSubnav from "@/components/ProjectsSubnav";
 import {
   ATTENTION_BADGE_CLASSES,
-  ATTENTION_CARD_CLASSES,
   EMPTY_OUTCOME_SUMMARY,
   PRIORITY_CONFIG,
   STATUS_CONFIG,
@@ -17,13 +16,9 @@ import {
   formatDate,
   formatDateTime,
   formatDeadlineLabel,
-  formatOwnerSummary,
   formatRelativeUpdate,
-  getAttentionDescription,
-  getAttentionItems,
   getDaysUntilDeadline,
   getPortfolioAttentionLabel,
-  getPrimaryAttentionTone,
   mergeOutcomeSummary,
   normalizeProjectName,
   rowToOutcome,
@@ -37,7 +32,6 @@ import {
   type Status,
 } from "@/features/projects/overview/model";
 import {
-  OverviewPanelSkeleton,
   OverviewStatSkeleton,
   OverviewTableSkeleton,
   PortfolioBadge,
@@ -114,14 +108,12 @@ export default function ProjectsOverviewPage({
           outcomeSummaries.byLegacyName.get(normalizeProjectName(project.name)) ?? EMPTY_OUTCOME_SUMMARY;
         const outcomeSummary = mergeOutcomeSummary(linkedOutcomeSummary, legacyOutcomeSummary);
         const daysUntilDeadline = getDaysUntilDeadline(project.deadline);
-        const attentionItems = getAttentionItems(project, daysUntilDeadline, outcomeSummary);
-
         return {
           ...project,
           ownerNames,
           daysUntilDeadline,
-          attentionItems,
-          attentionScore: attentionItems.reduce((sum, item) => sum + item.weight, 0),
+          attentionItems: [],
+          attentionScore: 0,
           outcomeSummary,
         };
       })
@@ -165,9 +157,6 @@ export default function ProjectsOverviewPage({
       project.daysUntilDeadline >= 0 &&
       project.daysUntilDeadline <= 7
   ).length;
-  const attentionProjects = enrichedProjects
-    .filter((project) => project.attentionItems.length > 0 && project.status !== "rejected")
-    .slice(0, 5);
   const legacyOutcomeCount = outcomes.filter((record) => record.projectId === null).length;
 
   return (
@@ -257,147 +246,6 @@ export default function ProjectsOverviewPage({
               color="text-emerald-600"
             />
           </div>
-        )}
-
-        {isLoadingData ? (
-          <OverviewPanelSkeleton rows={3} />
-        ) : (
-          <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
-            <div className="border-b border-slate-100 bg-gradient-to-r from-slate-50 via-white to-blue-50/50 p-5 sm:p-6">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                <div className="max-w-2xl">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-sm">
-                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={1.8}
-                          d="M12 9v4m0 4h.01M4.93 19h14.14c1.54 0 2.5-1.67 1.73-3L13.73 3c-.77-1.33-2.69-1.33-3.46 0L3.2 16c-.77 1.33.19 3 1.73 3z"
-                        />
-                      </svg>
-                    </div>
-                    <div>
-                      <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
-                        Needs Attention
-                      </h2>
-                      <p className="mt-1 text-sm text-slate-500">
-                        The projects that need a decision, owner follow-up, or deadline focus next.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 shadow-sm">
-                    {attentionProjects.length} flagged
-                  </span>
-                  <Link
-                    href="/projects"
-                    className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
-                  >
-                    Open board
-                  </Link>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-5 sm:p-6">
-              {attentionProjects.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-emerald-200 bg-emerald-50/70 p-5 text-sm text-emerald-800">
-                  Everything looks calm right now. No projects are currently flagged by the overview rules.
-                </div>
-              ) : (
-                <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
-                  {attentionProjects.map((project) => {
-                    const primaryTone = getPrimaryAttentionTone(project.attentionItems);
-                    const cardStyles = ATTENTION_CARD_CLASSES[primaryTone];
-
-                    return (
-                      <article
-                        key={project.id}
-                        className={`relative flex h-full flex-col overflow-hidden rounded-2xl border p-5 shadow-sm ${cardStyles.card}`}
-                      >
-                        <div className={`absolute inset-x-0 top-0 h-1.5 ${cardStyles.accent}`} />
-
-                        <div className="min-w-0">
-                          <h3 className="line-clamp-2 break-words text-xl font-semibold leading-tight text-slate-900">
-                            {project.name}
-                          </h3>
-                          <p className="mt-2 line-clamp-3 text-sm leading-6 text-slate-500">
-                            {getAttentionDescription(project)}
-                          </p>
-                        </div>
-
-                        <div className="mt-4 flex flex-wrap items-center gap-2">
-                          <span
-                            className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${PRIORITY_CONFIG[project.priority].classes}`}
-                          >
-                            {PRIORITY_CONFIG[project.priority].label} Priority
-                          </span>
-                          <span
-                            className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${STATUS_CONFIG[project.status].classes}`}
-                          >
-                            {STATUS_CONFIG[project.status].label}
-                          </span>
-                        </div>
-
-                        <div className="mt-4 grid gap-3 md:grid-cols-2">
-                          <div className={`rounded-2xl border p-3 ${cardStyles.metric}`}>
-                            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                              Owner
-                            </p>
-                            <p className="mt-1 break-words text-sm font-medium leading-6 text-slate-800">
-                              {formatOwnerSummary(project.ownerNames)}
-                            </p>
-                          </div>
-                          <div className={`rounded-2xl border p-3 ${cardStyles.metric}`}>
-                            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                              Deadline
-                            </p>
-                            <p className="mt-1 text-sm font-medium leading-6 text-slate-800">
-                              {formatDeadlineLabel(project)}
-                            </p>
-                          </div>
-                          <div className={`rounded-2xl border p-3 ${cardStyles.metric}`}>
-                            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                              Last Update
-                            </p>
-                            <p className="mt-1 text-sm font-medium leading-6 text-slate-800">
-                              {formatRelativeUpdate(project.updatedAt)}
-                            </p>
-                          </div>
-                          <div className={`rounded-2xl border p-3 ${cardStyles.metric}`}>
-                            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                              Outcomes
-                            </p>
-                            <p className="mt-1 text-sm font-medium leading-6 text-slate-800">
-                              {project.outcomeSummary.activities} activit
-                              {project.outcomeSummary.activities === 1 ? "y" : "ies"}
-                            </p>
-                            <p className="text-sm leading-6 text-slate-500">
-                              {project.outcomeSummary.peopleReached.toLocaleString()} reached
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="mt-4 flex flex-wrap gap-2">
-                          {project.attentionItems.map((item) => (
-                            <span
-                              key={`${project.id}-${item.label}`}
-                              className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${ATTENTION_BADGE_CLASSES[item.tone]}`}
-                            >
-                              {item.label}
-                            </span>
-                          ))}
-                        </div>
-                      </article>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </section>
         )}
 
         <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">

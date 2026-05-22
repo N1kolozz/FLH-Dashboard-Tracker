@@ -24,6 +24,13 @@ function csvEscape(value: string | number | null): string {
   return str;
 }
 
+// Wrap date strings in ="..." so Excel treats them as text and never
+// auto-converts them to date serials, preventing the #### display bug.
+function csvDate(value: string | null): string {
+  if (!value) return "";
+  return `="${value}"`;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const appTimeZone = process.env.APP_TIMEZONE || "UTC";
@@ -67,7 +74,7 @@ export async function GET(request: NextRequest) {
       header.join(","),
       ...result.rows.map((row) =>
         [
-          csvEscape(row.date),
+          csvDate(row.date),
           csvEscape(row.platform),
           csvEscape(row.followers),
           csvEscape(row.total_likes),

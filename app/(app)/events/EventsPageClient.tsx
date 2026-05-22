@@ -219,6 +219,7 @@ export default function EventsPage({
   );
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<CalEvent>(EMPTY);
+  const [detailEvent, setDetailEvent] = useState<CalEvent | null>(null);
   const [viewMonth, setViewMonth] = useState(() => new Date().getMonth());
   const [viewYear, setViewYear] = useState(() => new Date().getFullYear());
   const [calendarCursor, setCalendarCursor] = useState(() => getLocalISODate());
@@ -391,6 +392,14 @@ export default function EventsPage({
       date: date || "",
       ownerUserIds: normalizeOwnerUserIds(session?.userId ? [session.userId] : []),
     });
+    setAiPrompt("");
+    setAiError("");
+    setModalOpen(true);
+  };
+
+  const openEventEdit = (ev: CalEvent) => {
+    setDetailEvent(null);
+    setEditing(ev);
     setAiPrompt("");
     setAiError("");
     setModalOpen(true);
@@ -709,8 +718,7 @@ export default function EventsPage({
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setCalendarCursor(dateStr);
-                                    setEditing(ev);
-                                    setModalOpen(true);
+                                    setDetailEvent(ev);
                                   }}
                                   className={`rounded-md border px-1 py-0.5 text-[9px] font-semibold sm:px-1.5 ${DEPT_CONFIG[ev.department].color}`}
                                   title={ev.title}
@@ -745,15 +753,28 @@ export default function EventsPage({
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setCalendarCursor(dateStr);
-                                    setEditing(ev);
-                                    setModalOpen(true);
+                                    setDetailEvent(ev);
                                   }}
-                                  className={`rounded-xl border px-2.5 py-2 text-[11px] font-medium transition-transform hover:-translate-y-0.5 ${DEPT_CONFIG[ev.department].color}`}
+                                  className={`group/card relative rounded-xl border px-2.5 py-2 text-[11px] font-medium transition-transform hover:-translate-y-0.5 ${DEPT_CONFIG[ev.department].color}`}
                                   title={ev.title}
                                 >
                                   <div className="flex items-center justify-between gap-2">
                                     <span className="truncate">{DEPT_CONFIG[ev.department].label}</span>
-                                    {ev.time && <span className="shrink-0 text-[10px] opacity-75">{ev.time}</span>}
+                                    <div className="flex shrink-0 items-center gap-1">
+                                      {ev.time && <span className="text-[10px] opacity-75">{ev.time}</span>}
+                                      {canEdit && (
+                                        <button
+                                          type="button"
+                                          onClick={(e) => { e.stopPropagation(); openEventEdit(ev); }}
+                                          aria-label="Edit event"
+                                          className="inline-flex h-5 w-5 items-center justify-center rounded border border-current/20 bg-white/60 opacity-0 transition-opacity hover:bg-white/90 group-hover/card:opacity-100"
+                                        >
+                                          <svg className="h-2.5 w-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                          </svg>
+                                        </button>
+                                      )}
+                                    </div>
                                   </div>
                                   <p className="mt-1 line-clamp-2 text-[11px] leading-snug opacity-90">
                                     {ev.title}
@@ -855,8 +876,7 @@ export default function EventsPage({
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setCalendarCursor(dateStr);
-                                    setEditing(ev);
-                                    setModalOpen(true);
+                                    setDetailEvent(ev);
                                   }}
                                   className={`rounded-md border px-1 py-0.5 text-[9px] font-semibold sm:px-1.5 ${DEPT_CONFIG[ev.department].color}`}
                                   title={ev.title}
@@ -891,15 +911,28 @@ export default function EventsPage({
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setCalendarCursor(dateStr);
-                                    setEditing(ev);
-                                    setModalOpen(true);
+                                    setDetailEvent(ev);
                                   }}
-                                  className={`rounded-xl border px-3 py-2.5 text-[11px] font-medium transition-transform hover:-translate-y-0.5 ${DEPT_CONFIG[ev.department].color}`}
+                                  className={`group/card relative rounded-xl border px-3 py-2.5 text-[11px] font-medium transition-transform hover:-translate-y-0.5 ${DEPT_CONFIG[ev.department].color}`}
                                   title={ev.title}
                                 >
                                   <div className="flex items-center justify-between gap-2">
                                     <span className="truncate">{DEPT_CONFIG[ev.department].label}</span>
-                                    {ev.time && <span className="shrink-0 text-[10px] opacity-75">{ev.time}</span>}
+                                    <div className="flex shrink-0 items-center gap-1">
+                                      {ev.time && <span className="text-[10px] opacity-75">{ev.time}</span>}
+                                      {canEdit && (
+                                        <button
+                                          type="button"
+                                          onClick={(e) => { e.stopPropagation(); openEventEdit(ev); }}
+                                          aria-label="Edit event"
+                                          className="inline-flex h-5 w-5 items-center justify-center rounded border border-current/20 bg-white/60 opacity-0 transition-opacity hover:bg-white/90 group-hover/card:opacity-100"
+                                        >
+                                          <svg className="h-2.5 w-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                          </svg>
+                                        </button>
+                                      )}
+                                    </div>
                                   </div>
                                   <p className="mt-1.5 line-clamp-3 text-[11px] leading-snug opacity-90">
                                     {ev.title}
@@ -933,8 +966,8 @@ export default function EventsPage({
                 return (
                   <div
                     key={ev.id}
-                    onClick={() => { setEditing(ev); setModalOpen(true); }}
-                    className="flex items-center gap-4 rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm transition-colors hover:bg-amber-50/40 cursor-pointer"
+                    onClick={() => setDetailEvent(ev)}
+                    className="group flex items-center gap-4 rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm transition-colors hover:bg-amber-50/40 cursor-pointer"
                   >
                     <div className="text-center shrink-0 w-14">
                       <p className="text-2xl font-bold text-slate-900">{new Date(ev.date + "T00:00:00").getDate()}</p>
@@ -958,9 +991,23 @@ export default function EventsPage({
                         </div>
                       )}
                     </div>
-                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border shrink-0 ${DEPT_CONFIG[ev.department].color}`}>
-                      {DEPT_CONFIG[ev.department].label}
-                    </span>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${DEPT_CONFIG[ev.department].color}`}>
+                        {DEPT_CONFIG[ev.department].label}
+                      </span>
+                      {canEdit && (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); openEventEdit(ev); }}
+                          aria-label="Edit event"
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-400 opacity-0 transition-all hover:border-amber-300 hover:bg-amber-50 hover:text-amber-700 group-hover:opacity-100"
+                        >
+                          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
                   </div>
                 );
               })
@@ -1044,17 +1091,31 @@ export default function EventsPage({
                     return (
                       <div
                         key={ev.id}
-                        onClick={() => { setEditing(ev); setModalOpen(true); }}
-                        className="cursor-pointer rounded-2xl border border-slate-200/80 bg-slate-50/80 p-4 transition-colors hover:bg-amber-50/50"
+                        onClick={() => setDetailEvent(ev)}
+                        className="group cursor-pointer rounded-2xl border border-slate-200/80 bg-slate-50/80 p-4 transition-colors hover:bg-amber-50/50"
                       >
                         <div className="flex items-start gap-3">
                           <div className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${DEPT_CONFIG[ev.department].dot}`} />
                           <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <p className="text-sm font-semibold text-slate-900">{ev.title}</p>
-                              <span className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold ${DEPT_CONFIG[ev.department].color}`}>
-                                {DEPT_CONFIG[ev.department].label}
-                              </span>
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                                <p className="text-sm font-semibold text-slate-900">{ev.title}</p>
+                                <span className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold ${DEPT_CONFIG[ev.department].color}`}>
+                                  {DEPT_CONFIG[ev.department].label}
+                                </span>
+                              </div>
+                              {canEdit && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); openEventEdit(ev); }}
+                                  aria-label="Edit event"
+                                  className="shrink-0 inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-400 opacity-0 transition-all hover:border-amber-300 hover:bg-amber-50 hover:text-amber-700 group-hover:opacity-100"
+                                >
+                                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                  </svg>
+                                </button>
+                              )}
                             </div>
                             <p className="mt-1 text-xs text-slate-500">
                               {ev.time
@@ -1088,6 +1149,85 @@ export default function EventsPage({
         </div>
         </FixedPortal>
       )}
+
+      <Modal open={detailEvent !== null} onClose={() => setDetailEvent(null)} title="Event Details">
+        {detailEvent && (() => {
+          const owners = getOwnerMembers(detailEvent.ownerUserIds);
+          return (
+            <div className="space-y-4">
+              <div className="flex flex-wrap gap-2">
+                <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${DEPT_CONFIG[detailEvent.department].color}`}>
+                  {DEPT_CONFIG[detailEvent.department].label}
+                </span>
+              </div>
+
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Title</p>
+                <p className="mt-0.5 text-base font-semibold text-slate-900">{detailEvent.title}</p>
+              </div>
+
+              <div className="flex flex-wrap gap-6">
+                {detailEvent.date && (
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Date</p>
+                    <p className="mt-0.5 text-sm font-medium text-slate-800">
+                      {new Date(`${detailEvent.date}T00:00:00`).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
+                    </p>
+                  </div>
+                )}
+                {(detailEvent.time || detailEvent.endTime) && (
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Time</p>
+                    <p className="mt-0.5 text-sm font-medium text-slate-800">
+                      {detailEvent.time || "—"}{detailEvent.endTime ? ` – ${detailEvent.endTime}` : ""}
+                    </p>
+                  </div>
+                )}
+                {detailEvent.location && (
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Location</p>
+                    <p className="mt-0.5 text-sm font-medium text-slate-800">{detailEvent.location}</p>
+                  </div>
+                )}
+              </div>
+
+              {detailEvent.description ? (
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Description</p>
+                  <p className="mt-1 max-h-48 overflow-y-auto text-sm leading-relaxed text-slate-700 whitespace-pre-wrap">{detailEvent.description}</p>
+                </div>
+              ) : null}
+
+              {owners.length > 0 ? (
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Owners</p>
+                  <div className="mt-2 flex items-center gap-2">
+                    <MemberAvatarStack names={owners.map((o) => o.name)} size="sm" />
+                    <p className="text-xs text-slate-500">{owners.map((o) => o.name).join(", ")}</p>
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="flex gap-3 pt-1">
+                <button
+                  onClick={() => setDetailEvent(null)}
+                  className="flex-1 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50"
+                >
+                  Close
+                </button>
+                {canEdit ? (
+                  <button
+                    onClick={() => openEventEdit(detailEvent)}
+                    className="flex-1 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-700"
+                  >
+                    Edit Event
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          );
+        })()}
+      </Modal>
 
       {/* Modal */}
       <Modal open={modalOpen} onClose={() => { setModalOpen(false); setEditing(EMPTY); setAiPrompt(""); setAiError(""); }} title={editing.id ? (canEdit ? "Edit Event" : "View Event") : "New Event"}>
@@ -1153,7 +1293,7 @@ export default function EventsPage({
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Department</label>
               <select disabled={!canEdit} value={editing.department} onChange={(e) => setEditing({ ...editing, department: e.target.value as Department })} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 disabled:bg-slate-50">
-                {(Object.keys(DEPT_CONFIG) as Department[]).filter((d) => d !== "all" && d !== "logistics").map((d) => (<option key={d} value={d}>{DEPT_CONFIG[d].label}</option>))}
+                {(Object.keys(DEPT_CONFIG) as Department[]).filter((d) => d !== "logistics").map((d) => (<option key={d} value={d}>{DEPT_CONFIG[d].label}</option>))}
               </select>
             </div>
             <div>

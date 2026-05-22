@@ -168,6 +168,7 @@ export function SelectedDayDetailsDrawer({
   onClose,
   onAddPost,
   onOpenPost,
+  onEditPost,
 }: {
   selectedDate: string | null;
   selectedDayLabel: string;
@@ -178,6 +179,7 @@ export function SelectedDayDetailsDrawer({
   onClose: () => void;
   onAddPost: () => void;
   onOpenPost: (post: ContentPost) => void;
+  onEditPost?: (post: ContentPost) => void;
 }) {
   if (!selectedDate) {
     return null;
@@ -255,19 +257,34 @@ export function SelectedDayDetailsDrawer({
                   <div
                     key={post.id}
                     onClick={() => onOpenPost(post)}
-                    className="cursor-pointer rounded-2xl border border-slate-200/80 bg-slate-50/80 p-4 transition-colors hover:bg-violet-50/50"
+                    className="group cursor-pointer rounded-2xl border border-slate-200/80 bg-slate-50/80 p-4 transition-colors hover:bg-violet-50/50"
                   >
                     <div className="flex items-start gap-3">
                       <div className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${PLATFORM_CONFIG[post.platform].dot}`} />
                       <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="line-clamp-2 text-sm font-semibold text-slate-900">{post.caption}</p>
-                          <span className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold ${PLATFORM_CONFIG[post.platform].color}`}>
-                            {PLATFORM_CONFIG[post.platform].label}
-                          </span>
-                          <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${STATUS_CONFIG[post.status].classes}`}>
-                            {STATUS_CONFIG[post.status].label}
-                          </span>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex min-w-0 flex-wrap items-center gap-2">
+                            <p className="line-clamp-2 text-sm font-semibold text-slate-900">{post.caption}</p>
+                            <span className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold ${PLATFORM_CONFIG[post.platform].color}`}>
+                              {PLATFORM_CONFIG[post.platform].label}
+                            </span>
+                            <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${STATUS_CONFIG[post.status].classes}`}>
+                              {STATUS_CONFIG[post.status].label}
+                            </span>
+                          </div>
+                          {onEditPost ? (
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); onEditPost(post); }}
+                              aria-label="Edit post"
+                              title="Edit post"
+                              className="shrink-0 inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-400 opacity-0 transition-all hover:border-purple-300 hover:bg-purple-50 hover:text-purple-700 group-hover:opacity-100"
+                            >
+                              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                              </svg>
+                            </button>
+                          ) : null}
                         </div>
                         <p className="mt-1 text-xs text-slate-500">
                           {post.time ? `Scheduled for ${post.time}` : "Time not set yet"}
@@ -359,8 +376,8 @@ export function PostFormModal({
             onChange={(event) =>
               onPostChange({ ...post, caption: event.target.value })
             }
-            rows={3}
-            className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-300 disabled:bg-slate-50"
+            rows={6}
+            className="w-full resize-y rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-300 disabled:bg-slate-50 min-h-[140px]"
             placeholder="Post caption or content idea..."
           />
         </div>
@@ -439,7 +456,7 @@ export function PostFormModal({
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <span className="font-semibold">Pending approval from HEAD/Admin</span>
+                <span className="font-semibold">Pending approval from HEAD</span>
               </div>
             ) : null}
             {(!reviewStatus || reviewStatus.status === "rejected") && canEdit ? (
@@ -492,6 +509,118 @@ export function PostFormModal({
   );
 }
 
+export function PostDetailModal({
+  open,
+  post,
+  canEdit,
+  members,
+  reviewStatus,
+  onClose,
+  onEdit,
+}: {
+  open: boolean;
+  post: ContentPost | null;
+  canEdit: boolean;
+  members: MemberChoice[];
+  reviewStatus: { status: string; reviewId: number; feedback: string | null } | null;
+  onClose: () => void;
+  onEdit: () => void;
+}) {
+  if (!post) return null;
+  const owners = members.filter((m) => post.ownerUserIds.includes(m.id));
+
+  return (
+    <Modal open={open} onClose={onClose} title="Post Details">
+      <div className="space-y-4">
+        <div className="flex flex-wrap gap-2">
+          <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${PLATFORM_CONFIG[post.platform].color}`}>
+            {PLATFORM_CONFIG[post.platform].label}
+          </span>
+          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${STATUS_CONFIG[post.status].classes}`}>
+            {STATUS_CONFIG[post.status].label}
+          </span>
+        </div>
+
+        {(post.date || post.time) && (
+          <div className="flex gap-6">
+            {post.date && (
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Date</p>
+                <p className="mt-0.5 text-sm font-medium text-slate-800">
+                  {new Date(`${post.date}T00:00:00`).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
+                </p>
+              </div>
+            )}
+            {post.time && (
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Time</p>
+                <p className="mt-0.5 text-sm font-medium text-slate-800">{post.time}</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Caption</p>
+          <p className="mt-1 max-h-40 overflow-y-auto text-sm leading-relaxed text-slate-800 whitespace-pre-wrap">{post.caption || "—"}</p>
+        </div>
+
+        {post.notes ? (
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Notes</p>
+            <p className="mt-1 text-sm leading-relaxed text-slate-600 whitespace-pre-wrap">{post.notes}</p>
+          </div>
+        ) : null}
+
+        {owners.length > 0 ? (
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Owners</p>
+            <div className="mt-2 flex items-center gap-2">
+              <MemberAvatarStack names={owners.map((o) => o.name)} size="sm" />
+              <p className="text-xs text-slate-500">{owners.map((o) => o.name).join(", ")}</p>
+            </div>
+          </div>
+        ) : null}
+
+        {reviewStatus?.status === "approved" ? (
+          <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+            <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+            <span className="font-semibold">Approved for publishing</span>
+            {reviewStatus.feedback ? <span className="text-emerald-600">— {reviewStatus.feedback}</span> : null}
+          </div>
+        ) : null}
+        {reviewStatus?.status === "pending" ? (
+          <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+            <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span className="font-semibold">Pending approval from HEAD</span>
+          </div>
+        ) : null}
+
+        <div className="flex gap-3 pt-1">
+          <button
+            onClick={onClose}
+            className="flex-1 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50"
+          >
+            Close
+          </button>
+          {canEdit ? (
+            <button
+              onClick={onEdit}
+              className="flex-1 rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-purple-700"
+            >
+              Edit Post
+            </button>
+          ) : null}
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 export function PostReviewModal({
   open,
   reviewTarget,
@@ -517,7 +646,7 @@ export function PostReviewModal({
         <div className="space-y-4">
           <div className="rounded-xl border border-purple-100 bg-purple-50/50 p-4">
             <p className="text-sm text-slate-500">Post Content</p>
-            <p className="line-clamp-3 text-sm font-bold text-slate-900">{reviewTarget.postCaption}</p>
+            <p className="mt-1 max-h-48 overflow-y-auto text-sm font-bold text-slate-900 leading-relaxed whitespace-pre-wrap">{reviewTarget.postCaption}</p>
           </div>
 
           <div>

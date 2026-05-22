@@ -16,6 +16,7 @@ type RouteBody = {
     events?: boolean;
     projects?: boolean;
     attendance?: boolean;
+    content?: boolean;
   };
 };
 
@@ -71,6 +72,7 @@ export async function PATCH(request: Request) {
     events: body.preferences.events ?? true,
     projects: body.preferences.projects ?? true,
     attendance: body.preferences.attendance ?? true,
+    content: body.preferences.content ?? true,
   });
 
   return NextResponse.json({ success: true, preferences });

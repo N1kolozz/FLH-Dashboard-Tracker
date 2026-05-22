@@ -51,6 +51,7 @@ function ImpactPageContent({
   );
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<ImpactRecord>(EMPTY_IMPACT_RECORD);
+  const [previewRecord, setPreviewRecord] = useState<ImpactRecord | null>(null);
   const [session] = useState<Session | null>(initialSession);
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [cachedRecordCount, setCachedRecordCount] = useState(0);
@@ -475,7 +476,11 @@ function ImpactPageContent({
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {sortedRecords.map((r) => (
-                  <tr key={r.id} className="hover:bg-slate-50 transition-colors">
+                  <tr
+                    key={r.id}
+                    onClick={() => setPreviewRecord(r)}
+                    className="hover:bg-slate-50 transition-colors cursor-pointer"
+                  >
                     <td className="px-4 py-3 text-slate-500 whitespace-nowrap">{r.date}</td>
                     <td className="px-4 py-3 font-medium text-slate-800">
                       <div className="flex flex-wrap items-center gap-2">
@@ -490,9 +495,9 @@ function ImpactPageContent({
                     <td className="px-4 py-3">
                       <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${ACTIVITY_CONFIG[r.activityType].color}`}>{ACTIVITY_CONFIG[r.activityType].label}</span>
                     </td>
-                    <td className="px-4 py-3 text-slate-600">
+                    <td className="px-4 py-3 text-slate-600 max-w-[220px]">
                       {r.resultSummary ? (
-                        <span className="line-clamp-2">{r.resultSummary}</span>
+                        <span className="block truncate" title={r.resultSummary}>{r.resultSummary}</span>
                       ) : (
                         <span className="text-slate-400">No summary</span>
                       )}
@@ -503,6 +508,7 @@ function ImpactPageContent({
                           href={getEvidenceHref(r.evidenceLink) ?? "#"}
                           target="_blank"
                           rel="noreferrer"
+                          onClick={(e) => e.stopPropagation()}
                           className="text-sm font-medium text-blue-600 hover:text-blue-700"
                         >
                           Open link
@@ -513,7 +519,14 @@ function ImpactPageContent({
                     </td>
                     <td className="px-4 py-3 text-right font-semibold text-blue-700">{r.peopleReached.toLocaleString()}</td>
                     <td className="px-4 py-3">
-                      <button onClick={() => { setEditing(r); setModalOpen(true); }} className="text-xs text-slate-500 hover:text-slate-700 hover:bg-slate-100 px-2 py-1 rounded transition-colors">{canEdit ? "Edit" : "View"}</button>
+                      {canEdit && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setEditing(r); setModalOpen(true); }}
+                          className="text-xs text-slate-500 hover:text-slate-700 hover:bg-slate-100 px-2 py-1 rounded transition-colors"
+                        >
+                          Edit
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -524,7 +537,73 @@ function ImpactPageContent({
         )}
       </div>
 
-      {/* Modal */}
+      {/* Preview Modal */}
+      <Modal open={previewRecord !== null} onClose={() => setPreviewRecord(null)} title="Outcome Record">
+        {previewRecord && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1">Date</p>
+                <p className="text-sm text-slate-800">{previewRecord.date}</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1">Activity Type</p>
+                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${ACTIVITY_CONFIG[previewRecord.activityType].color}`}>
+                  {ACTIVITY_CONFIG[previewRecord.activityType].label}
+                </span>
+              </div>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1">Project</p>
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-medium text-slate-800">{previewRecord.projectName || "—"}</p>
+                {!previewRecord.projectId && (
+                  <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">Needs relink</span>
+                )}
+              </div>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1">People Reached</p>
+              <p className="text-2xl font-bold text-blue-600">{previewRecord.peopleReached.toLocaleString()}</p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1">Result Summary</p>
+              {previewRecord.resultSummary ? (
+                <p className="text-sm text-slate-700 whitespace-pre-wrap break-words overflow-hidden">{previewRecord.resultSummary}</p>
+              ) : (
+                <p className="text-sm text-slate-400">No summary provided.</p>
+              )}
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1">Evidence</p>
+              {previewRecord.evidenceLink.trim() ? (
+                <a
+                  href={getEvidenceHref(previewRecord.evidenceLink) ?? "#"}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-sm font-medium text-blue-600 hover:text-blue-700 underline break-all"
+                >
+                  {previewRecord.evidenceLink}
+                </a>
+              ) : (
+                <p className="text-sm text-slate-400">No evidence link.</p>
+              )}
+            </div>
+            {canEdit && (
+              <div className="pt-2 flex justify-end">
+                <button
+                  onClick={() => { setEditing(previewRecord); setPreviewRecord(null); setModalOpen(true); }}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+                >
+                  Edit Record
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
+
+      {/* Edit Modal */}
       <Modal open={modalOpen} onClose={() => { setModalOpen(false); setEditing(EMPTY_IMPACT_RECORD); }} title={editing.id ? (canEdit ? "Edit Outcome Record" : "View Outcome Record") : "Add Outcome Record"}>
         <div className="space-y-4">
           <div>
