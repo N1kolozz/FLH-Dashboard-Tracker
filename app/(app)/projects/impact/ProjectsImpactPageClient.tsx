@@ -3,7 +3,7 @@
 import { Suspense, useState, useEffect, useMemo } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { ProjectRow } from "@/types";
-import { getImpactRecords, createImpactRecord, updateImpactRecord, deleteImpactRecord } from "@/app/actions/impact";
+import { createImpactRecord, updateImpactRecord, deleteImpactRecord } from "@/app/actions/impact";
 import type { ImpactRecordRow } from "@/app/actions/impact";
 import Modal from "@/components/Modal";
 import ProjectsSubnav from "@/components/ProjectsSubnav";
@@ -54,7 +54,7 @@ function ImpactPageContent({
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [previewRecord, setPreviewRecord] = useState<ImpactRecord | null>(null);
   const [session] = useState<Session | null>(initialSession);
-  const [isLoadingData, setIsLoadingData] = useState(false);
+  const [isLoadingData] = useState(false);
   const [cachedRecordCount, setCachedRecordCount] = useState(0);
   const [cachedProjectCount, setCachedProjectCount] = useState(0);
   const [filterProjectId, setFilterProjectId] = useState(projectIdFromUrl ?? "all");
@@ -86,18 +86,6 @@ function ImpactPageContent({
     session.role === "HEAD" || 
     session.department === "Projects"
   );
-
-  const refreshRecords = async (showLoading = true) => {
-    if (showLoading) setIsLoadingData(true);
-    try {
-      const res = await getImpactRecords();
-      if (res.success && res.records) {
-        setRecords(sortRecords(res.records.map(rowToRecord)));
-      }
-    } finally {
-      if (showLoading) setIsLoadingData(false);
-    }
-  };
 
   const setEditingProject = (projectIdValue: string) => {
     const nextProjectId = projectIdValue ? Number(projectIdValue) : null;
