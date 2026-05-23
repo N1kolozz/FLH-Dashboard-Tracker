@@ -32,7 +32,7 @@ export const ACTIVITY_CONFIG: Record<
 > = {
   workshop: { label: "Workshop", color: "bg-purple-100 text-purple-700" },
   training: { label: "Training", color: "bg-blue-100 text-blue-700" },
-  outreach: { label: "Outreach", color: "bg-blue-100 text-blue-700" },
+  outreach: { label: "Outreach", color: "bg-green-100 text-green-700" },
   mentoring: { label: "Mentoring", color: "bg-amber-100 text-amber-700" },
   event: { label: "Event", color: "bg-rose-100 text-rose-700" },
   other: { label: "Other", color: "bg-slate-100 text-slate-600" },

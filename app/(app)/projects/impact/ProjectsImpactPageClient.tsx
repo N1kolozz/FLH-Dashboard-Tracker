@@ -51,6 +51,7 @@ function ImpactPageContent({
   );
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<ImpactRecord>(EMPTY_IMPACT_RECORD);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [previewRecord, setPreviewRecord] = useState<ImpactRecord | null>(null);
   const [session] = useState<Session | null>(initialSession);
   const [isLoadingData, setIsLoadingData] = useState(false);
@@ -177,7 +178,6 @@ function ImpactPageContent({
 
     setModalOpen(false);
     setEditing(EMPTY_IMPACT_RECORD);
-    void refreshRecords(false);
   };
 
   const handleDeleteRecord = async (id: number) => {
@@ -191,10 +191,7 @@ function ImpactPageContent({
       if (deletedRecord) {
         setRecords((current) => sortRecords([deletedRecord, ...current]));
       }
-      return;
     }
-
-    void refreshRecords(false);
   };
 
   const filteredRecords = useMemo(
@@ -471,7 +468,7 @@ function ImpactPageContent({
                   <th className="px-4 py-3">Result</th>
                   <th className="px-4 py-3">Evidence</th>
                   <th className="px-4 py-3 text-right">People Reached</th>
-                  <th className="px-4 py-3"></th>
+                  {canEdit && <th className="px-4 py-3"></th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -518,16 +515,16 @@ function ImpactPageContent({
                       )}
                     </td>
                     <td className="px-4 py-3 text-right font-semibold text-blue-700">{r.peopleReached.toLocaleString()}</td>
-                    <td className="px-4 py-3">
-                      {canEdit && (
+                    {canEdit && (
+                      <td className="px-4 py-3">
                         <button
-                          onClick={(e) => { e.stopPropagation(); setEditing(r); setModalOpen(true); }}
+                          onClick={(e) => { e.stopPropagation(); setEditing(r); setDeleteConfirm(false); setModalOpen(true); }}
                           className="text-xs text-slate-500 hover:text-slate-700 hover:bg-slate-100 px-2 py-1 rounded transition-colors"
                         >
                           Edit
                         </button>
-                      )}
-                    </td>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -581,9 +578,12 @@ function ImpactPageContent({
                   href={getEvidenceHref(previewRecord.evidenceLink) ?? "#"}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-sm font-medium text-blue-600 hover:text-blue-700 underline break-all"
+                  className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700"
                 >
-                  {previewRecord.evidenceLink}
+                  Open link
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
                 </a>
               ) : (
                 <p className="text-sm text-slate-400">No evidence link.</p>
@@ -604,7 +604,7 @@ function ImpactPageContent({
       </Modal>
 
       {/* Edit Modal */}
-      <Modal open={modalOpen} onClose={() => { setModalOpen(false); setEditing(EMPTY_IMPACT_RECORD); }} title={editing.id ? (canEdit ? "Edit Outcome Record" : "View Outcome Record") : "Add Outcome Record"}>
+      <Modal open={modalOpen} onClose={() => { setModalOpen(false); setEditing(EMPTY_IMPACT_RECORD); setDeleteConfirm(false); }} title={editing.id ? (canEdit ? "Edit Outcome Record" : "View Outcome Record") : "Add Outcome Record"}>
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Project *</label>
@@ -687,10 +687,41 @@ function ImpactPageContent({
           </div>
           {canEdit && (
             <div className="flex items-center gap-3 pt-2">
-              <button onClick={saveRecord} disabled={!editing.projectId || !editing.date || editing.peopleReached <= 0} className="flex-1  px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white text-sm font-medium rounded-lg transition-colors">{editing.id ? "Save Changes" : "Add Outcome"}</button>
-              {editing.id ? (
-                <button onClick={() => { void handleDeleteRecord(editing.id); setModalOpen(false); setEditing(EMPTY_IMPACT_RECORD); }} className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 text-sm font-medium rounded-lg border border-rose-200 transition-colors">Delete</button>
-              ) : null}
+              {deleteConfirm ? (
+                <>
+                  <p className="flex-1 text-xs text-rose-600 font-medium">Delete this record permanently?</p>
+                  <button
+                    onClick={() => { void handleDeleteRecord(editing.id); setModalOpen(false); setEditing(EMPTY_IMPACT_RECORD); setDeleteConfirm(false); }}
+                    className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-sm font-medium rounded-lg transition-colors"
+                  >
+                    Yes, delete
+                  </button>
+                  <button
+                    onClick={() => setDeleteConfirm(false)}
+                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-medium rounded-lg transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={saveRecord}
+                    disabled={!editing.projectId || !editing.date || editing.peopleReached <= 0}
+                    className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white text-sm font-medium rounded-lg transition-colors"
+                  >
+                    {editing.id ? "Save Changes" : "Add Outcome"}
+                  </button>
+                  {editing.id && (
+                    <button
+                      onClick={() => setDeleteConfirm(true)}
+                      className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 text-sm font-medium rounded-lg border border-rose-200 transition-colors"
+                    >
+                      Delete
+                    </button>
+                  )}
+                </>
+              )}
             </div>
           )}
         </div>
