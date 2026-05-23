@@ -67,10 +67,11 @@ export default async function AdminPanelPage() {
       ORDER BY a.created_at DESC
       LIMIT 50
     `),
-    // Active sessions today
+    // Active sessions today — treat sessions with a stale ping (>2 min) as ended
     pool.query(`
       SELECT s.id, s.start_time AT TIME ZONE 'UTC' as start_time, s.last_ping AT TIME ZONE 'UTC' as last_ping,
-             s.duration_seconds, s.ip_address, s.user_agent, u.full_name, u.email, s.is_active
+             s.duration_seconds, s.ip_address, s.user_agent, u.full_name, u.email,
+             (s.is_active AND s.last_ping >= CURRENT_TIMESTAMP - INTERVAL '2 minutes') AS is_active
       FROM user_sessions s
       JOIN users u ON s.user_id = u.id
       WHERE s.start_time >= CURRENT_DATE AND u.role != 'ADMIN'
@@ -93,9 +94,10 @@ export default async function AdminPanelPage() {
         AND a.created_at >= CURRENT_DATE - INTERVAL '7 days'
         AND u.role != 'ADMIN'
         AND a.path IS NOT NULL AND a.path != ''
+        AND a.path != '/dashboard'
       GROUP BY a.path
       ORDER BY visit_count DESC
-      LIMIT 8
+      LIMIT 12
     `),
     // Most active users (last 7 days)
     pool.query(`
@@ -269,8 +271,8 @@ export default async function AdminPanelPage() {
         </div>
       </div>
 
-      {/* ── Row 2: Top Pages ─────────────────────────── */}
-      <div className="grid grid-cols-1 gap-8">
+      {/* ── Row 2: Top Pages ─────────────────────────────────────── */}
+      <div>
         {/* Most Visited Pages */}
         <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
           <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
@@ -301,6 +303,7 @@ export default async function AdminPanelPage() {
             )}
           </div>
         </div>
+
       </div>
 
       {/* ── Row 3: Most Active Users + Inactive Users ─────────────── */}

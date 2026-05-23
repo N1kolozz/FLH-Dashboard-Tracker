@@ -65,6 +65,16 @@ export async function pingSession() {
         [ipAddress, userAgent, sessionId]
       );
     } else {
+      // End any lingering active sessions before opening a new one.
+      // This handles the case where pagehide never fired (crash, killed tab, etc.)
+      await pool.query(
+        `UPDATE user_sessions
+         SET is_active = FALSE,
+             last_ping = CURRENT_TIMESTAMP,
+             duration_seconds = EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - start_time))
+         WHERE user_id = $1 AND is_active = TRUE`,
+        [session.userId]
+      );
       // Create new session
       await pool.query(
         `INSERT INTO user_sessions (user_id, ip_address, user_agent, is_active)
