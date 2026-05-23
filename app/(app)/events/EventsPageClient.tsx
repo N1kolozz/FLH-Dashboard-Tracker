@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
+import AppSelect from "@/components/ui/Select";
 import { getEvents, createEvent, updateEvent, deleteEvent } from "@/app/actions/events";
 import { generateItinerary } from "@/app/actions/ai";
 import type { EventRow } from "@/app/actions/events";
@@ -1292,9 +1293,12 @@ export default function EventsPage({
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Department</label>
-              <select disabled={!canEdit} value={editing.department} onChange={(e) => setEditing({ ...editing, department: e.target.value as Department })} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 disabled:bg-slate-50">
-                {(Object.keys(DEPT_CONFIG) as Department[]).filter((d) => d !== "logistics").map((d) => (<option key={d} value={d}>{DEPT_CONFIG[d].label}</option>))}
-              </select>
+              <AppSelect
+                disabled={!canEdit}
+                value={editing.department}
+                onValueChange={(v) => setEditing({ ...editing, department: v as Department })}
+                options={(Object.keys(DEPT_CONFIG) as Department[]).filter((d) => d !== "logistics").map((d) => ({ value: d, label: DEPT_CONFIG[d].label }))}
+              />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Location</label>

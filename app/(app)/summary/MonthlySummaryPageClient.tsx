@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import AppSelect from "@/components/ui/Select";
 import { getMonthlySummary } from "@/app/actions/monthly-summary";
 import type { MonthlySummaryData } from "@/types";
 import MonthlySummaryPresentation from "./MonthlySummaryPresentation";
@@ -127,17 +128,12 @@ export default function MonthlySummaryPageClient({
 
             <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
               {/* Month selector */}
-              <select
+              <AppSelect
                 value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-                className="h-10 w-full rounded-xl border border-purple-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-300 sm:w-48"
-              >
-                {availableMonths.map((m) => (
-                  <option key={m} value={m}>
-                    {formatMonthLabel(m)}
-                  </option>
-                ))}
-              </select>
+                onValueChange={(v) => setSelectedMonth(v)}
+                options={availableMonths.map((m) => ({ value: m, label: formatMonthLabel(m) }))}
+                className="rounded-xl border-purple-200 shadow-sm sm:w-48"
+              />
 
               {/* Start Presentation button */}
               <button

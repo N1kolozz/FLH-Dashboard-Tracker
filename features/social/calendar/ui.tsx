@@ -2,6 +2,7 @@ import FixedPortal from "@/components/FixedPortal";
 import MemberAvatarStack from "@/components/MemberAvatarStack";
 import MemberMultiSelect, { type MemberChoice } from "@/components/MemberMultiSelect";
 import Modal from "@/components/Modal";
+import AppSelect from "@/components/ui/Select";
 import { holidayLabel, type PublicHoliday } from "@/lib/public-holidays";
 import {
   PLATFORM_CONFIG,
@@ -353,20 +354,12 @@ export function PostFormModal({
       <div className="space-y-4">
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-700">Platform</label>
-          <select
+          <AppSelect
             disabled={!canEdit}
             value={post.platform}
-            onChange={(event) =>
-              onPostChange({ ...post, platform: event.target.value as Platform })
-            }
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-300 disabled:bg-slate-50"
-          >
-            {(Object.keys(PLATFORM_CONFIG) as Platform[]).map((platform) => (
-              <option key={platform} value={platform}>
-                {PLATFORM_CONFIG[platform].label}
-              </option>
-            ))}
-          </select>
+            onValueChange={(v) => onPostChange({ ...post, platform: v as Platform })}
+            options={(Object.keys(PLATFORM_CONFIG) as Platform[]).map((p) => ({ value: p, label: PLATFORM_CONFIG[p].label }))}
+          />
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-700">Caption / Content *</label>
@@ -404,20 +397,12 @@ export function PostFormModal({
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Status</label>
-            <select
+            <AppSelect
               disabled={!canEdit}
               value={post.status}
-              onChange={(event) =>
-                onPostChange({ ...post, status: event.target.value as PostStatus })
-              }
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-300 disabled:bg-slate-50"
-            >
-              {(Object.keys(STATUS_CONFIG) as PostStatus[]).map((status) => (
-                <option key={status} value={status}>
-                  {STATUS_CONFIG[status].label}
-                </option>
-              ))}
-            </select>
+              onValueChange={(v) => onPostChange({ ...post, status: v as PostStatus })}
+              options={(Object.keys(STATUS_CONFIG) as PostStatus[]).map((s) => ({ value: s, label: STATUS_CONFIG[s].label }))}
+            />
           </div>
         </div>
         <div>

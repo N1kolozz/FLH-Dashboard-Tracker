@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import AppSelect from "@/components/ui/Select";
 import type { WorkloadMember } from "@/app/actions/workload";
 import TeamSubnav from "@/components/TeamSubnav";
 import { avatarColor, getInitials } from "@/lib/member-avatar";
@@ -284,24 +285,24 @@ export default function WorkloadPageClient({
             placeholder="Search member..."
             className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-300 xl:w-48"
           />
-          <select
+          <AppSelect
             value={filterDept}
-            onChange={(e) => setFilterDept(e.target.value)}
-            className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-300 xl:w-44"
-          >
-            <option value="all">All departments</option>
-            {Object.keys(DEPT_CONFIG).map((d) => (
-              <option key={d} value={d}>{d}</option>
-            ))}
-          </select>
-          <select
+            onValueChange={(v) => setFilterDept(v)}
+            options={[
+              { value: "all", label: "All departments" },
+              ...Object.keys(DEPT_CONFIG).map((d) => ({ value: d, label: d })),
+            ]}
+            className="xl:w-44"
+          />
+          <AppSelect
             value={sortKey}
-            onChange={(e) => setSortKey(e.target.value as SortKey)}
-            className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-300 xl:w-52"
-          >
-            <option value="workload">Sort: Busiest first</option>
-            <option value="activeProjects">Sort: Most projects</option>
-          </select>
+            onValueChange={(v) => setSortKey(v as SortKey)}
+            options={[
+              { value: "workload", label: "Sort: Busiest first" },
+              { value: "activeProjects", label: "Sort: Most projects" },
+            ]}
+            className="xl:w-52"
+          />
 
           {/* Legend */}
           <div className="flex flex-wrap items-center gap-2 pt-1 md:col-span-2 xl:ml-auto xl:justify-end xl:pt-0">

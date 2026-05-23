@@ -6,6 +6,7 @@ import type { ProjectRow } from "@/types";
 import { createImpactRecord, updateImpactRecord, deleteImpactRecord } from "@/app/actions/impact";
 import type { ImpactRecordRow } from "@/app/actions/impact";
 import Modal from "@/components/Modal";
+import AppSelect from "@/components/ui/Select";
 import ProjectsSubnav from "@/components/ProjectsSubnav";
 import type { Session } from "@/lib/auth";
 import { getStoredSkeletonCount, resolveSkeletonCount, setStoredSkeletonCount } from "@/lib/loading-skeleton";
@@ -314,33 +315,23 @@ function ImpactPageContent({
             </div>
 
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
-              <select
+              <AppSelect
                 value={filterProjectId}
-                onChange={(event) => setFilterProjectId(event.target.value)}
-                title="Filter by project"
-                className="h-10 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-purple-300"
-              >
-                <option value="all">All projects</option>
-                {projects.map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.name}
-                  </option>
-                ))}
-              </select>
+                onValueChange={(v) => setFilterProjectId(v)}
+                options={[
+                  { value: "all", label: "All projects" },
+                  ...projects.map((p) => ({ value: String(p.id), label: p.name })),
+                ]}
+              />
 
-              <select
+              <AppSelect
                 value={filterActivity}
-                onChange={(event) => setFilterActivity(event.target.value as ActivityType | "all")}
-                title="Filter by activity type"
-                className="h-10 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-purple-300"
-              >
-                <option value="all">All activity types</option>
-                {(Object.keys(ACTIVITY_CONFIG) as ActivityType[]).map((activity) => (
-                  <option key={activity} value={activity}>
-                    {ACTIVITY_CONFIG[activity].label}
-                  </option>
-                ))}
-              </select>
+                onValueChange={(v) => setFilterActivity(v as ActivityType | "all")}
+                options={[
+                  { value: "all", label: "All activity types" },
+                  ...(Object.keys(ACTIVITY_CONFIG) as ActivityType[]).map((a) => ({ value: a, label: ACTIVITY_CONFIG[a].label })),
+                ]}
+              />
 
               <input
                 type="date"
@@ -596,26 +587,19 @@ function ImpactPageContent({
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Project *</label>
-            <select
+            <AppSelect
               disabled={!canEdit || projects.length === 0}
               value={editing.projectId ? String(editing.projectId) : ""}
-              onChange={(e) => setEditingProject(e.target.value)}
-              title="Project"
-              className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 disabled:bg-slate-50"
-            >
-              <option value="">
-                {projects.length === 0
+              onValueChange={(v) => setEditingProject(v)}
+              placeholder={
+                projects.length === 0
                   ? "Create a project first"
                   : editing.id && editing.projectName && !editing.projectId
                     ? "Legacy record not linked yet"
-                    : "Select a project"}
-              </option>
-              {projects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name}
-                </option>
-              ))}
-            </select>
+                    : "Select a project"
+              }
+              options={projects.map((p) => ({ value: String(p.id), label: p.name }))}
+            />
             {editing.projectId === null && editing.projectName ? (
               <p className="mt-2 text-xs text-amber-700">
                 This record still uses the old project name{" "}
@@ -641,14 +625,12 @@ function ImpactPageContent({
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Activity Type</label>
-              <select disabled={!canEdit}
+              <AppSelect
+                disabled={!canEdit}
                 value={editing.activityType}
-                onChange={(e) => setEditing({ ...editing, activityType: e.target.value as ActivityType })}
-                title="Activity Type"
-                className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 disabled:bg-slate-50"
-              >
-                {(Object.keys(ACTIVITY_CONFIG) as ActivityType[]).map((a) => (<option key={a} value={a}>{ACTIVITY_CONFIG[a].label}</option>))}
-              </select>
+                onValueChange={(v) => setEditing({ ...editing, activityType: v as ActivityType })}
+                options={(Object.keys(ACTIVITY_CONFIG) as ActivityType[]).map((a) => ({ value: a, label: ACTIVITY_CONFIG[a].label }))}
+              />
             </div>
           </div>
           <div>

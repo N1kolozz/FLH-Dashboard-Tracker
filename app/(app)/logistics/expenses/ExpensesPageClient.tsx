@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { getExpenses, createExpense, updateExpense, deleteExpense } from "@/app/actions/expenses";
 import type { ExpenseRow } from "@/app/actions/expenses";
 import Modal from "@/components/Modal";
+import AppSelect from "@/components/ui/Select";
 import EmptyState from "@/components/EmptyState";
 import type { Session } from "@/lib/auth";
 import { getStoredSkeletonCount, resolveSkeletonCount, setStoredSkeletonCount } from "@/lib/loading-skeleton";
@@ -385,17 +386,15 @@ export default function ExpensesPage({
 
         {/* Filter + List */}
         <div className="flex items-center gap-2 flex-wrap">
-          <select
+          <AppSelect
             value={filterCategory}
-            onChange={(e) => setFilterCategory(e.target.value as ExpenseCategory | "all")}
-            title="Filter category"
-            className="px-3 text-slate-500 py-1.5 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-300"
-          >
-            <option value="all">All categories</option>
-            {(Object.keys(CATEGORY_CONFIG) as ExpenseCategory[]).map((c) => (
-              <option key={c} value={c}>{CATEGORY_CONFIG[c].label}</option>
-            ))}
-          </select>
+            onValueChange={(v) => setFilterCategory(v as ExpenseCategory | "all")}
+            options={[
+              { value: "all", label: "All categories" },
+              ...(Object.keys(CATEGORY_CONFIG) as ExpenseCategory[]).map((c) => ({ value: c, label: CATEGORY_CONFIG[c].label })),
+            ]}
+            className="w-auto"
+          />
         </div>
 
         {isLoadingData ? (
@@ -467,18 +466,16 @@ export default function ExpensesPage({
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Category</label>
-              <select disabled={!canEdit}
+              <AppSelect
                 value={editing.category}
-                onChange={(e) => setEditing({ ...editing, category: e.target.value as ExpenseCategory })}
-                title="Category"
-                className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 disabled:bg-slate-50"
-              >
-                {(Object.keys(CATEGORY_CONFIG) as ExpenseCategory[]).map((c) => (<option key={c} value={c}>{CATEGORY_CONFIG[c].label}</option>))}
-              </select>
+                onValueChange={(v) => setEditing({ ...editing, category: v as ExpenseCategory })}
+                disabled={!canEdit}
+                options={(Object.keys(CATEGORY_CONFIG) as ExpenseCategory[]).map((c) => ({ value: c, label: CATEGORY_CONFIG[c].label }))}
+              />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Paid By</label>
-              <input disabled={!canEdit} type="text" value={editing.paidBy} onChange={(e) => setEditing({ ...editing, paidBy: e.target.value })} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 disabled:bg-slate-50" placeholder="e.g., Ahmed" />
+              <input disabled={!canEdit} type="text" value={editing.paidBy} onChange={(e) => setEditing({ ...editing, paidBy: e.target.value })} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 disabled:bg-slate-50" placeholder="e.g., Ahmed" />
             </div>
           </div>
           <div>

@@ -11,6 +11,7 @@ import {
 } from "@/app/actions/inventory";
 import type { InventoryItemRow, CheckoutRow } from "@/app/actions/inventory";
 import Modal from "@/components/Modal";
+import AppSelect from "@/components/ui/Select";
 import EmptyState from "@/components/EmptyState";
 import type { Session } from "@/lib/auth";
 import { getStoredSkeletonCount, resolveSkeletonCount, setStoredSkeletonCount } from "@/lib/loading-skeleton";
@@ -388,28 +389,18 @@ export default function InventoryPage({
               placeholder="Search items..."
               className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-300 sm:w-44"
             />
-            <select
+            <AppSelect
               value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value as ItemStatus | "all")}
-              title="Filter status"
-              className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-300 sm:w-40"
-            >
-              <option value="all">All statuses</option>
-              {(Object.keys(STATUS_CONFIG) as ItemStatus[]).map((s) => (
-                <option key={s} value={s}>{STATUS_CONFIG[s].label}</option>
-              ))}
-            </select>
-            <select
+              onValueChange={(v) => setFilterStatus(v as ItemStatus | "all")}
+              options={[{ value: "all", label: "All statuses" }, ...(Object.keys(STATUS_CONFIG) as ItemStatus[]).map((s) => ({ value: s, label: STATUS_CONFIG[s].label }))]}
+              className="sm:w-40"
+            />
+            <AppSelect
               value={filterCategory}
-              onChange={(e) => setFilterCategory(e.target.value as Category | "all")}
-              title="Filter category"
-              className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-300 sm:w-44"
-            >
-              <option value="all">All categories</option>
-              {(Object.keys(CATEGORY_LABELS) as Category[]).map((c) => (
-                <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>
-              ))}
-            </select>
+              onValueChange={(v) => setFilterCategory(v as Category | "all")}
+              options={[{ value: "all", label: "All categories" }, ...(Object.keys(CATEGORY_LABELS) as Category[]).map((c) => ({ value: c, label: CATEGORY_LABELS[c] }))]}
+              className="sm:w-44"
+            />
             <div className="flex h-10 rounded-lg bg-slate-100 p-0.5">
               <button
                 onClick={() => setViewMode("grid")}
@@ -590,16 +581,11 @@ export default function InventoryPage({
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Category</label>
-              <select
+              <AppSelect
                 value={editing.category}
-                onChange={(e) => setEditing({ ...editing, category: e.target.value as Category })}
-                title="Category"
-                className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400"
-              >
-                {(Object.keys(CATEGORY_LABELS) as Category[]).map((c) => (
-                  <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>
-                ))}
-              </select>
+                onValueChange={(v) => setEditing({ ...editing, category: v as Category })}
+                options={(Object.keys(CATEGORY_LABELS) as Category[]).map((c) => ({ value: c, label: CATEGORY_LABELS[c] }))}
+              />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Quantity</label>
@@ -616,16 +602,11 @@ export default function InventoryPage({
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
-              <select
+              <AppSelect
                 value={editing.status}
-                onChange={(e) => setEditing({ ...editing, status: e.target.value as ItemStatus })}
-                title="Status"
-                className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400"
-              >
-                {(Object.keys(STATUS_CONFIG) as ItemStatus[]).map((s) => (
-                  <option key={s} value={s}>{STATUS_CONFIG[s].label}</option>
-                ))}
-              </select>
+                onValueChange={(v) => setEditing({ ...editing, status: v as ItemStatus })}
+                options={(Object.keys(STATUS_CONFIG) as ItemStatus[]).map((s) => ({ value: s, label: STATUS_CONFIG[s].label }))}
+              />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Location</label>

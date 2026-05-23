@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import * as Popover from "@radix-ui/react-popover";
 
 type PushTopic = "news" | "events" | "projects" | "attendance";
 
@@ -66,7 +67,6 @@ export default function PushNotificationManager({
   collapsed?: boolean;
   variant?: "card" | "dashboard" | "sidebar";
 }) {
-  const rootRef = useRef<HTMLDivElement | null>(null);
   const [hasCheckedStatus, setHasCheckedStatus] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
   const [isConfigured, setIsConfigured] = useState(false);
@@ -176,24 +176,6 @@ export default function PushNotificationManager({
       window.removeEventListener(PUSH_STATUS_CHANGED_EVENT, handlePushStatusChanged);
     };
   }, [refreshStatus]);
-
-  useEffect(() => {
-    if (!panelOpen) {
-      return;
-    }
-
-    const handlePointerDown = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        setPanelOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handlePointerDown);
-
-    return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
-    };
-  }, [panelOpen]);
 
   const canEnableNotifications = useMemo(() => {
     if (!isSupported || !isConfigured || !publicKey) {
@@ -551,34 +533,34 @@ export default function PushNotificationManager({
 
   if (variant === "sidebar") {
     return (
-      <div ref={rootRef} className="relative mb-2">
-        <button
-          type="button"
-          onClick={() => setPanelOpen((current) => !current)}
-          title={collapsed ? alertLabel : undefined}
-          className={`flex w-full items-center gap-2.5 rounded-lg border px-2.5 py-2 text-xs font-semibold transition ${alertButtonClass} ${
-            collapsed ? "justify-center" : ""
-          }`}
-          aria-expanded={panelOpen}
-        >
-          <span className="relative shrink-0">
-            <svg className="h-[18px] w-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2a2 2 0 01-.6 1.4L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-            </svg>
-            <span
-              className={`absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full ${
-                isSubscribed ? "bg-purple-500" : "bg-slate-300"
-              }`}
-            />
-          </span>
-          {!collapsed && <span className="truncate">{alertLabel}</span>}
-        </button>
-
-        {panelOpen && (
-          <div
-            className={`absolute bottom-full z-[80] mb-2 w-[min(17rem,calc(100vw-2rem))] rounded-lg border border-purple-200 bg-white p-3 shadow-xl shadow-purple-950/15 ${
-              collapsed ? "left-0 md:bottom-0 md:left-full md:mb-0 md:ml-2" : "left-0"
+      <Popover.Root open={panelOpen} onOpenChange={setPanelOpen}>
+        <Popover.Trigger asChild>
+          <button
+            type="button"
+            title={collapsed ? alertLabel : undefined}
+            className={`flex w-full items-center gap-2.5 rounded-lg border px-2.5 py-2 text-xs font-semibold transition ${alertButtonClass} ${
+              collapsed ? "justify-center" : ""
             }`}
+          >
+            <span className="relative shrink-0">
+              <svg className="h-[18px] w-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2a2 2 0 01-.6 1.4L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+              </svg>
+              <span
+                className={`absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full ${
+                  isSubscribed ? "bg-purple-500" : "bg-slate-300"
+                }`}
+              />
+            </span>
+            {!collapsed && <span className="truncate">{alertLabel}</span>}
+          </button>
+        </Popover.Trigger>
+        <Popover.Portal>
+          <Popover.Content
+            side={collapsed ? "right" : "top"}
+            align="start"
+            sideOffset={8}
+            className="z-[80] w-[min(17rem,calc(100vw-2rem))] rounded-lg border border-purple-200 bg-white p-3 shadow-xl shadow-purple-950/15 focus:outline-none"
           >
             <p className="text-[10px] font-semibold uppercase tracking-wide text-purple-700">
               App and alerts
@@ -598,9 +580,9 @@ export default function PushNotificationManager({
               {actions}
               {topicButtons}
             </div>
-          </div>
-        )}
-      </div>
+          </Popover.Content>
+        </Popover.Portal>
+      </Popover.Root>
     );
   }
 

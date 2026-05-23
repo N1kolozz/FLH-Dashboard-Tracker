@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Modal from "@/components/Modal";
+import AppSelect from "@/components/ui/Select";
 import EmptyState from "@/components/EmptyState";
 import { getMembers, addMember, deleteMember, updateMember } from "@/app/actions/members";
 import { avatarColor, getInitials } from "@/lib/member-avatar";
@@ -275,14 +276,15 @@ export default function TeamPage({
               placeholder="Search name or role..."
               className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-300 2xl:w-56"
             />
-            <select
+            <AppSelect
               value={filterDept}
-              onChange={(e) => setFilterDept(e.target.value)}
-              className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-300 2xl:w-44"
-            >
-              <option value="all">All departments</option>
-              {Object.keys(DEPT_CONFIG).map((d) => (<option key={d} value={d}>{DEPT_CONFIG[d].label}</option>))}
-            </select>
+              onValueChange={setFilterDept}
+              options={[
+                { value: "all", label: "All departments" },
+                ...Object.keys(DEPT_CONFIG).map((d) => ({ value: d, label: DEPT_CONFIG[d].label })),
+              ]}
+              className="2xl:w-44"
+            />
             {canEdit && (
               <button
                 onClick={() => setModalOpen(true)}
@@ -382,9 +384,11 @@ export default function TeamPage({
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Department *</label>
-                <select required value={formData.department} onChange={(e) => setFormData({ ...formData, department: e.target.value })} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400">
-                  {Object.keys(DEPT_CONFIG).map((d) => (<option key={d} value={d}>{DEPT_CONFIG[d].label}</option>))}
-                </select>
+                <AppSelect
+                  value={formData.department}
+                  onValueChange={(v) => setFormData({ ...formData, department: v })}
+                  options={Object.keys(DEPT_CONFIG).map((d) => ({ value: d, label: DEPT_CONFIG[d].label }))}
+                />
               </div>
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -394,11 +398,15 @@ export default function TeamPage({
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Access Level *</label>
-                <select required value={formData.systemRole} onChange={(e) => setFormData({ ...formData, systemRole: e.target.value })} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400">
-                  <option value="MEMBER">Member</option>
-                  <option value="HEAD">Head</option>
-                  {session?.role === "ADMIN" && <option value="ADMIN">Admin</option>}
-                </select>
+                <AppSelect
+                  value={formData.systemRole}
+                  onValueChange={(v) => setFormData({ ...formData, systemRole: v })}
+                  options={[
+                    { value: "MEMBER", label: "Member" },
+                    { value: "HEAD", label: "Head" },
+                    ...(session?.role === "ADMIN" ? [{ value: "ADMIN", label: "Admin" }] : []),
+                  ]}
+                />
                 <p className="text-[10px] text-slate-400 mt-1">Head = full access like Admin</p>
               </div>
             </div>
@@ -430,9 +438,11 @@ export default function TeamPage({
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Department *</label>
-                    <select required value={editData.department} onChange={(e) => setEditData({ ...editData, department: e.target.value })} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400">
-                      {Object.keys(DEPT_CONFIG).map((d) => (<option key={d} value={d}>{DEPT_CONFIG[d].label}</option>))}
-                    </select>
+                    <AppSelect
+                      value={editData.department}
+                      onValueChange={(v) => setEditData({ ...editData, department: v })}
+                      options={Object.keys(DEPT_CONFIG).map((d) => ({ value: d, label: DEPT_CONFIG[d].label }))}
+                    />
                   </div>
                 </div>
                 {!isSelfEdit && (
@@ -440,11 +450,15 @@ export default function TeamPage({
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Access Level *</label>
-                        <select required value={editData.systemRole} onChange={(e) => setEditData({ ...editData, systemRole: e.target.value })} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400">
-                          <option value="MEMBER">Member</option>
-                          <option value="HEAD">Head</option>
-                          {session?.role === "ADMIN" && <option value="ADMIN">Admin</option>}
-                        </select>
+                        <AppSelect
+                          value={editData.systemRole}
+                          onValueChange={(v) => setEditData({ ...editData, systemRole: v })}
+                          options={[
+                            { value: "MEMBER", label: "Member" },
+                            { value: "HEAD", label: "Head" },
+                            ...(session?.role === "ADMIN" ? [{ value: "ADMIN", label: "Admin" }] : []),
+                          ]}
+                        />
                         <p className="text-[10px] text-slate-400 mt-1">Head = full access like Admin</p>
                       </div>
                       <div>

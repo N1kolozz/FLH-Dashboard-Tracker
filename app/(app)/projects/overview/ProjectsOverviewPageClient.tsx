@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import AppSelect from "@/components/ui/Select";
 import type { ProjectRow } from "@/types";
 import type { ImpactRecordRow } from "@/app/actions/impact";
 import EmptyState from "@/components/EmptyState";
@@ -268,32 +269,24 @@ export default function ProjectsOverviewPage({
                   placeholder="Search projects, owners, or teams..."
                   className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-300 sm:w-64"
                 />
-                <select
+                <AppSelect
                   value={statusFilter}
-                  onChange={(event) => setStatusFilter(event.target.value as Status | "all")}
-                  title="Filter by status"
-                  className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-purple-300 sm:w-40"
-                >
-                  <option value="all">All statuses</option>
-                  {(Object.keys(STATUS_CONFIG) as Status[]).map((status) => (
-                    <option key={status} value={status}>
-                      {STATUS_CONFIG[status].label}
-                    </option>
-                  ))}
-                </select>
-                <select
+                  onValueChange={(v) => setStatusFilter(v as Status | "all")}
+                  options={[
+                    { value: "all", label: "All statuses" },
+                    ...(Object.keys(STATUS_CONFIG) as Status[]).map((s) => ({ value: s, label: STATUS_CONFIG[s].label })),
+                  ]}
+                  className="sm:w-40"
+                />
+                <AppSelect
                   value={priorityFilter}
-                  onChange={(event) => setPriorityFilter(event.target.value as Priority | "all")}
-                  title="Filter by priority"
-                  className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-purple-300 sm:w-40"
-                >
-                  <option value="all">All priorities</option>
-                  {(Object.keys(PRIORITY_CONFIG) as Priority[]).map((priority) => (
-                    <option key={priority} value={priority}>
-                      {PRIORITY_CONFIG[priority].label}
-                    </option>
-                  ))}
-                </select>
+                  onValueChange={(v) => setPriorityFilter(v as Priority | "all")}
+                  options={[
+                    { value: "all", label: "All priorities" },
+                    ...(Object.keys(PRIORITY_CONFIG) as Priority[]).map((p) => ({ value: p, label: PRIORITY_CONFIG[p].label })),
+                  ]}
+                  className="sm:w-40"
+                />
               </div>
             </div>
           </div>

@@ -3,6 +3,7 @@ import { useDraggable, useDroppable } from "@dnd-kit/core";
 import MemberAvatarStack from "@/components/MemberAvatarStack";
 import MemberMultiSelect, { type MemberChoice } from "@/components/MemberMultiSelect";
 import Modal from "@/components/Modal";
+import AppSelect from "@/components/ui/Select";
 import ProjectsSubnav from "@/components/ProjectsSubnav";
 import {
   COLUMNS,
@@ -385,19 +386,17 @@ export function ProjectBoardHeader({
               placeholder="Search projects..."
               className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-300 sm:w-56"
             />
-            <select
+            <AppSelect
               value={filterPriority}
-              onChange={(event) =>
-                onFilterPriorityChange(event.target.value as ProjectPriorityFilter)
-              }
-              title="Filter priority"
-              className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-300 sm:w-44"
-            >
-              <option value="all">All priorities</option>
-              <option value="high">High</option>
-              <option value="medium">Medium</option>
-              <option value="low">Low</option>
-            </select>
+              onValueChange={(v) => onFilterPriorityChange(v as ProjectPriorityFilter)}
+              options={[
+                { value: "all", label: "All priorities" },
+                { value: "high", label: "High" },
+                { value: "medium", label: "Medium" },
+                { value: "low", label: "Low" },
+              ]}
+              className="sm:w-44"
+            />
             {canEdit && (
               <button
                 onClick={onCreateProject}
@@ -479,37 +478,25 @@ export function ProjectFormModal({
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Status</label>
-            <select
+            <AppSelect
               disabled={!canEdit}
               value={project.status}
-              onChange={(event) =>
-                onProjectChange({ ...project, status: event.target.value as Status })
-              }
-              title="Status"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-300 disabled:bg-slate-50"
-            >
-              {COLUMNS.map((column) => (
-                <option key={column.id} value={column.id}>
-                  {column.label}
-                </option>
-              ))}
-            </select>
+              onValueChange={(v) => onProjectChange({ ...project, status: v as Status })}
+              options={COLUMNS.map((col) => ({ value: col.id, label: col.label }))}
+            />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Priority</label>
-            <select
+            <AppSelect
               disabled={!canEdit}
               value={project.priority}
-              onChange={(event) =>
-                onProjectChange({ ...project, priority: event.target.value as Priority })
-              }
-              title="Priority"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-300 disabled:bg-slate-50"
-            >
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-            </select>
+              onValueChange={(v) => onProjectChange({ ...project, priority: v as Priority })}
+              options={[
+                { value: "low", label: "Low" },
+                { value: "medium", label: "Medium" },
+                { value: "high", label: "High" },
+              ]}
+            />
           </div>
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

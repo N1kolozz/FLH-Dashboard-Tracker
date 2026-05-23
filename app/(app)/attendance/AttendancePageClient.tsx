@@ -3,6 +3,7 @@
 import { useCallback, useState } from "react";
 import EmptyState from "@/components/EmptyState";
 import Modal from "@/components/Modal";
+import AppSelect from "@/components/ui/Select";
 import type { EventRow } from "@/app/actions/events";
 import {
   createAttendanceSession,
@@ -768,18 +769,14 @@ export default function AttendancePage({
             <label className="mb-1 block text-sm font-medium text-slate-700">
               Link Event
             </label>
-            <select
-              value={form.eventId}
-              onChange={(event) => selectEvent(event.target.value)}
-              className="w-full rounded-lg border border-purple-100 px-3 py-2 text-sm text-slate-600 outline-none transition focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
-            >
-              <option value="">No linked event</option>
-              {events.map((event) => (
-                <option key={event.id} value={event.id}>
-                  {event.title} - {formatDate(event.date)}
-                </option>
-              ))}
-            </select>
+            <AppSelect
+              value={form.eventId || "none"}
+              onValueChange={(v) => selectEvent(v === "none" ? "" : v)}
+              options={[
+                { value: "none", label: "No linked event" },
+                ...events.map((event) => ({ value: String(event.id), label: `${event.title} - ${formatDate(event.date)}` })),
+              ]}
+            />
           </div>
 
           <div>
