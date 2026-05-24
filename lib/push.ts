@@ -57,14 +57,6 @@ const DEFAULT_PUSH_PREFERENCES: PushPreferences = {
   content: true,
 };
 
-const TOPIC_COLUMN_MAP: Record<PushTopic, string> = {
-  news: "topic_news",
-  events: "topic_events",
-  projects: "topic_projects",
-  attendance: "topic_attendance",
-  content: "topic_content",
-};
-
 function toPreferences(row?: Partial<PreferenceRow> | null): PushPreferences {
   return {
     news: row?.topic_news ?? DEFAULT_PUSH_PREFERENCES.news,
@@ -497,7 +489,7 @@ export async function notifySubscribers(options: {
   }
 
   const params: unknown[] = [];
-  const filters = [`${TOPIC_COLUMN_MAP[options.topic]} = TRUE`];
+  const filters: string[] = [];
 
   if (options.userIds) {
     const userIds = Array.from(new Set(options.userIds)).filter((userId) =>
@@ -517,10 +509,11 @@ export async function notifySubscribers(options: {
     filters.push(`(user_id IS NULL OR user_id <> $${params.length})`);
   }
 
+  const whereClause = filters.length > 0 ? `WHERE ${filters.join(" AND ")}` : "";
   const result = await pool.query<StoredSubscriptionRow>(
     `SELECT endpoint, p256dh, auth
      FROM push_subscriptions
-     WHERE ${filters.join(" AND ")}`,
+     ${whereClause}`,
     params
   );
 

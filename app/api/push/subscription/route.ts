@@ -4,20 +4,12 @@ import {
   type BrowserPushSubscription,
   deletePushSubscription,
   syncPushSubscription,
-  updatePushPreferences,
 } from "@/lib/push";
 import { getSessionUserId } from "@/lib/permissions";
 
 type RouteBody = {
   endpoint?: string;
   subscription?: BrowserPushSubscription;
-  preferences?: {
-    news?: boolean;
-    events?: boolean;
-    projects?: boolean;
-    attendance?: boolean;
-    content?: boolean;
-  };
 };
 
 export const dynamic = "force-dynamic";
@@ -54,26 +46,6 @@ export async function POST(request: Request) {
     body.subscription,
     request.headers.get("user-agent") ?? "unknown"
   );
-
-  return NextResponse.json({ success: true, preferences });
-}
-
-export async function PATCH(request: Request) {
-  const auth = await requirePushUserId();
-  if ("response" in auth) return auth.response;
-
-  const body = (await request.json()) as RouteBody;
-  if (!body.endpoint || !body.preferences) {
-    return NextResponse.json({ error: "Missing endpoint or preferences" }, { status: 400 });
-  }
-
-  const preferences = await updatePushPreferences(auth.userId, body.endpoint, {
-    news: body.preferences.news ?? true,
-    events: body.preferences.events ?? true,
-    projects: body.preferences.projects ?? true,
-    attendance: body.preferences.attendance ?? true,
-    content: body.preferences.content ?? true,
-  });
 
   return NextResponse.json({ success: true, preferences });
 }

@@ -3,38 +3,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import * as Popover from "@radix-ui/react-popover";
 
-type PushTopic = "news" | "events" | "projects" | "attendance";
-
-type PushPreferences = Record<PushTopic, boolean>;
-
 type PushKeyResponse = {
   configured: boolean;
   publicKey: string | null;
-};
-
-type SubscriptionRouteResponse = {
-  success: boolean;
-  preferences: PushPreferences;
 };
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
 }
-
-const DEFAULT_PREFERENCES: PushPreferences = {
-  news: true,
-  events: true,
-  projects: true,
-  attendance: true,
-};
-
-const TOPIC_LABELS: Record<PushTopic, string> = {
-  news: "News posts",
-  events: "Events",
-  projects: "Projects",
-  attendance: "Attendance",
-};
 
 const PUSH_STATUS_CHANGED_EVENT = "flh:push-status-changed";
 
@@ -75,7 +52,6 @@ export default function PushNotificationManager({
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [isStandalone, setIsStandalone] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
-  const [preferences, setPreferences] = useState<PushPreferences>(DEFAULT_PREFERENCES);
   const [isBusy, setIsBusy] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
@@ -96,8 +72,6 @@ export default function PushNotificationManager({
       throw new Error("Failed to sync notification subscription");
     }
 
-    const data = (await response.json()) as SubscriptionRouteResponse;
-    setPreferences(data.preferences ?? DEFAULT_PREFERENCES);
     setIsSubscribed(true);
   }, []);
 
@@ -132,7 +106,6 @@ export default function PushNotificationManager({
         await syncExistingSubscription(existingSubscription);
       } else {
         setIsSubscribed(false);
-        setPreferences(DEFAULT_PREFERENCES);
       }
     } catch (error) {
       console.error("Failed to load push status:", error);
@@ -275,7 +248,6 @@ export default function PushNotificationManager({
       });
 
       setIsSubscribed(false);
-      setPreferences(DEFAULT_PREFERENCES);
       setStatusMessage("Alerts are off for this device.");
       notifyPushStatusChanged();
     } catch (error) {
@@ -371,60 +343,6 @@ export default function PushNotificationManager({
     }
   };
 
-  const toggleTopic = async (topic: PushTopic) => {
-    if (!isSupported || !isSubscribed) {
-      return;
-    }
-
-    setIsBusy(true);
-    setStatusMessage("");
-
-    try {
-      const registration = await navigator.serviceWorker.ready;
-      const subscription = await registration.pushManager.getSubscription();
-
-      if (!subscription) {
-        setIsSubscribed(false);
-        setStatusMessage("This device no longer has an active subscription.");
-        return;
-      }
-
-      const nextPreferences = {
-        ...preferences,
-        [topic]: !preferences[topic],
-      };
-
-      setPreferences(nextPreferences);
-
-      const response = await fetch("/api/push/subscription", {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          endpoint: subscription.endpoint,
-          preferences: nextPreferences,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to update notification preferences");
-      }
-
-      const data = (await response.json()) as SubscriptionRouteResponse;
-      setPreferences(data.preferences ?? nextPreferences);
-    } catch (error) {
-      console.error("Failed to update notification preferences:", error);
-      setStatusMessage("Could not update alert preferences.");
-      setPreferences((current) => ({
-        ...current,
-        [topic]: !current[topic],
-      }));
-    } finally {
-      setIsBusy(false);
-    }
-  };
-
   const helperText = useMemo(() => {
     if (!isSupported) {
       return "This browser does not support service-worker push notifications.";
@@ -441,7 +359,7 @@ export default function PushNotificationManager({
     if (isSubscribed) {
       return "This device is ready for dashboard alerts.";
     }
-    return "Install the app, then turn on alerts for news, events, projects, and attendance.";
+    return "Install the app, then turn on alerts to receive dashboard updates.";
   }, [isConfigured, isIOS, isStandalone, isSubscribed, isSupported, permission]);
 
   const alertLabel = useMemo(() => {
@@ -511,26 +429,6 @@ export default function PushNotificationManager({
     </div>
   );
 
-  const topicButtons = isSubscribed ? (
-    <div className="flex flex-wrap gap-2">
-      {(Object.keys(TOPIC_LABELS) as PushTopic[]).map((topic) => (
-        <button
-          key={topic}
-          type="button"
-          onClick={() => toggleTopic(topic)}
-          disabled={isBusy}
-          className={`rounded-md border px-2.5 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
-            preferences[topic]
-              ? "border-purple-200 bg-purple-50 text-purple-700"
-              : "border-slate-200 bg-white text-slate-600 hover:bg-purple-50 hover:text-purple-700"
-          }`}
-        >
-          {TOPIC_LABELS[topic]}
-        </button>
-      ))}
-    </div>
-  ) : null;
-
   if (variant === "sidebar") {
     return (
       <Popover.Root open={panelOpen} onOpenChange={setPanelOpen}>
@@ -576,9 +474,8 @@ export default function PushNotificationManager({
               </div>
             )}
 
-            <div className="mt-3 space-y-2.5">
+            <div className="mt-3">
               {actions}
-              {topicButtons}
             </div>
           </Popover.Content>
         </Popover.Portal>
@@ -612,10 +509,10 @@ export default function PushNotificationManager({
               {isInstallMode
                 ? isIOS
                   ? "On iPhone or iPad, install from the Share menu with Add to Home Screen, then open the app to turn on alerts."
-                  : "Install the app first, then turn on alerts for news, events, projects, and attendance."
+                  : "Install the app first, then turn on alerts to receive dashboard updates."
                 : isBlocked
                   ? "Notifications are blocked in this app. Allow them from browser settings to receive dashboard updates."
-                  : "Turn on alerts so this device receives news, events, projects, and attendance updates."}
+                  : "Turn on alerts so this device receives dashboard updates."}
             </p>
           </div>
 
@@ -675,7 +572,6 @@ export default function PushNotificationManager({
         </div>
       )}
 
-      {topicButtons && <div className="mt-4">{topicButtons}</div>}
     </div>
   );
 }
