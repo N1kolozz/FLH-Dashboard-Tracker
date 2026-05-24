@@ -100,6 +100,54 @@ export async function createProject(data: {
   }
 }
 
+const STATUS_LABELS: Record<string, string> = {
+  planning: "დაგეგმვა",
+  in_progress: "მიმდინარეობს",
+  review: "განხილვა",
+  completed: "დასრულდა",
+  rejected: "უარყოფილია",
+};
+
+const PRIORITY_LABELS: Record<string, string> = {
+  high: "მაღალი",
+  medium: "საშუალო",
+  low: "დაბალი",
+};
+
+function translateStatus(s: string) {
+  return STATUS_LABELS[s] ?? s.replace(/_/g, " ");
+}
+
+function translatePriority(p: string) {
+  return PRIORITY_LABELS[p] ?? p;
+}
+
+function buildUpdateNotificationBody(
+  updateType: string,
+  oldRow: { name: string; status: string; priority: string; deadline: string | null } | null | undefined,
+  data: { name: string; status: string; priority: string; deadline: string }
+): string {
+  if (!oldRow) return "პროექტის დეტალები განახლდა.";
+
+  switch (updateType) {
+    case "status":
+      return `სტატუსი: ${translateStatus(oldRow.status)} → ${translateStatus(data.status)}`;
+    case "priority":
+      return `პრიორიტეტი: ${translatePriority(oldRow.priority)} → ${translatePriority(data.priority)}`;
+    case "name":
+      return `სახელი: "${oldRow.name}" → "${data.name}"`;
+    case "deadline": {
+      const oldD = oldRow.deadline ? String(oldRow.deadline).split("T")[0] : "—";
+      const newD = data.deadline ? data.deadline.split("T")[0] : "—";
+      return `დედლაინი: ${oldD} → ${newD}`;
+    }
+    case "description":
+      return "აღწერა განახლდა.";
+    default:
+      return "პროექტის დეტალები განახლდა.";
+  }
+}
+
 export async function updateProject(
   id: number,
   data: {
@@ -121,15 +169,17 @@ export async function updateProject(
     const updatedAt = row?.updated_at;
 
     try {
+      const updateType = row?.last_update_type ?? "details";
+      const oldRow = row?.oldRow;
+      const notifBody = buildUpdateNotificationBody(updateType, oldRow, data);
+
       await notifySubscribers({
         topic: "projects",
         excludeUserId: actorUserId,
         payload: createPushNotification({
           topic: "projects",
           title: `პროექტი განახლდა: ${data.name}`,
-          body: data.status
-            ? `სტატუსი: ${data.status.replace(/_/g, " ")}.`
-            : "dashboard-ში პროექტი განახლდა.",
+          body: notifBody,
           url: "/projects/overview",
           tag: `project-${id}`,
         }),

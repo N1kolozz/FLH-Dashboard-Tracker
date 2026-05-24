@@ -20,8 +20,6 @@ const CombinedGrowthChart = dynamic(
 );
 
 const PLATFORMS: SocialPlatform[] = ["instagram", "tiktok", "facebook"];
-const MIN_PERCENT_BASELINE = 100;
-const MAX_PERCENT_BADGE = 300;
 type Platform = (typeof PLATFORMS)[number];
 type ChartTab = Platform | "all";
 type TimeRange = SocialHistoryRange;
@@ -32,124 +30,12 @@ interface GrowthHighlight {
   value: number;
 }
 
-interface CompareRow {
-  platform: Platform;
-  currentGrowth: number | null;
-  previousGrowth: number | null;
-  deltaLabel: string;
-  deltaTone: CompareTone;
-}
-
-type CompareTone = "positive" | "negative" | "neutral";
-
-interface CompareDelta {
-  label: string;
-  tone: CompareTone;
-}
-
-interface ComparePeriod {
-  start: string;
-  end: string;
-}
-
-function rangeToDays(range: TimeRange): number {
-  if (range === "30") return 30;
-  if (range === "90") return 90;
-  return 0;
-}
-
-function ymd(date: Date): string {
-  return date.toISOString().slice(0, 10);
-}
-
-function parseYmd(date: string): Date {
-  return new Date(`${date}T00:00:00.000Z`);
-}
-
-function addDays(date: Date, days: number): Date {
-  const next = new Date(date);
-  next.setUTCDate(next.getUTCDate() + days);
-  return next;
-}
-
-function previousPeriodFromHistory(
-  points: HistoryPoint[],
-  days: number
-): ComparePeriod | null {
-  if (points.length === 0) return null;
-
-  const currentEnd = parseYmd(points[points.length - 1].date);
-  const currentStart = addDays(currentEnd, -(days - 1));
-  const previousEnd = addDays(currentStart, -1);
-  const previousStart = addDays(previousEnd, -(days - 1));
-
-  return {
-    start: ymd(previousStart),
-    end: ymd(previousEnd),
-  };
-}
-
-function growthFromHistory(points: HistoryPoint[]): number | null {
-  if (points.length < 2) return null;
-  return points[points.length - 1].followers - points[0].followers;
-}
-
 function formatSignedInteger(value: number): string {
   if (value === 0) return "0";
   const formatted = Math.abs(value).toLocaleString();
   return `${value > 0 ? "+" : "-"}${formatted}`;
 }
 
-function formatSignedPercent(value: number): string {
-  const rounded = Number(value.toFixed(1));
-  if (rounded === 0) return "0%";
-  return `${rounded > 0 ? "+" : ""}${rounded}%`;
-}
-
-function formatFollowerDelta(value: number): string {
-  if (value === 0) return "No change";
-  const unit = Math.abs(value) === 1 ? "follower" : "followers";
-  return `${formatSignedInteger(value)} ${unit}`;
-}
-
-function formatNullableGrowth(value: number | null): string {
-  return value === null ? "N/A" : formatSignedInteger(value);
-}
-
-function compareDelta(
-  currentGrowth: number | null,
-  previousGrowth: number | null
-): CompareDelta {
-  if (currentGrowth === null || previousGrowth === null) {
-    return { label: "N/A", tone: "neutral" };
-  }
-
-  const deltaGrowth = currentGrowth - previousGrowth;
-  const tone: CompareTone =
-    deltaGrowth > 0 ? "positive" : deltaGrowth < 0 ? "negative" : "neutral";
-
-  if (deltaGrowth === 0) return { label: "No change", tone };
-
-  if (previousGrowth >= MIN_PERCENT_BASELINE) {
-    const deltaPercent = (deltaGrowth / previousGrowth) * 100;
-    if (Math.abs(deltaPercent) > MAX_PERCENT_BADGE) {
-      return {
-        label: formatFollowerDelta(deltaGrowth),
-        tone,
-      };
-    }
-
-    return {
-      label: formatSignedPercent(deltaPercent),
-      tone,
-    };
-  }
-
-  return {
-    label: formatFollowerDelta(deltaGrowth),
-    tone,
-  };
-}
 
 export default function DashboardPage({
   initialStats,
@@ -167,14 +53,12 @@ export default function DashboardPage({
   const [insightsLoading, setInsightsLoading] = useState(false);
   const [activeChart, setActiveChart] = useState<ChartTab>("all");
   const [insightsRange, setInsightsRange] = useState<TimeRange>("30");
-  const [compareMode, setCompareMode] = useState(false);
   const [insightsLastUpdated, setInsightsLastUpdated] = useState<Date | null>(
     new Date(initialGeneratedAt)
   );
   const [historyByPlatform, setHistoryByPlatform] = useState<Record<Platform, HistoryPoint[]>>(
     initialHistoryByPlatform
   );
-  const [compareRows, setCompareRows] = useState<CompareRow[]>([]);
   const didHydrateRangeRef = useRef(false);
 
   useEffect(() => {
@@ -228,66 +112,6 @@ export default function DashboardPage({
     };
   }, [insightsRange]);
 
-  useEffect(() => {
-    if (!compareMode || insightsRange === "all") {
-      setCompareRows([]);
-      return;
-    }
-
-    let cancelled = false;
-
-    const loadComparisons = async () => {
-      try {
-        const days = rangeToDays(insightsRange);
-        const previousResults = await Promise.all(
-          PLATFORMS.map(async (platform) => {
-            const period = previousPeriodFromHistory(historyByPlatform[platform], days);
-            if (!period) {
-              return { platform, data: [] as HistoryPoint[] };
-            }
-
-            const res = await fetch(
-              `/api/history?platform=${platform}&start=${period.start}&end=${period.end}`,
-              { cache: "default" }
-            );
-            if (!res.ok) throw new Error(`Compare ${platform}: HTTP ${res.status}`);
-            const data: HistoryPoint[] = await res.json();
-            return { platform, data };
-          })
-        );
-
-        const rows: CompareRow[] = PLATFORMS.map((platform) => {
-          const current = growthFromHistory(historyByPlatform[platform]);
-          const previous = growthFromHistory(
-            previousResults.find((result) => result.platform === platform)?.data ?? []
-          );
-          const delta = compareDelta(current, previous);
-          return {
-            platform,
-            currentGrowth: current,
-            previousGrowth: previous,
-            deltaLabel: delta.label,
-            deltaTone: delta.tone,
-          };
-        });
-
-        if (!cancelled) {
-          setCompareRows(rows);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setInsightsError(String(err));
-        }
-      }
-    };
-
-    void loadComparisons();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [compareMode, historyByPlatform, insightsRange]);
-
   async function exportCsv() {
     try {
       const res = await fetch(`/api/report?range=${insightsRange}`);
@@ -340,12 +164,6 @@ export default function DashboardPage({
     }
     return best;
   })();
-
-  function deltaClass(tone: CompareTone): string {
-    if (tone === "positive") return "bg-purple-100 text-purple-700";
-    if (tone === "negative") return "bg-rose-100 text-rose-700";
-    return "bg-slate-100 text-slate-600";
-  }
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -439,15 +257,6 @@ export default function DashboardPage({
                   </button>
                 ))}
               </div>
-              <button
-                onClick={() => setCompareMode((v) => !v)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${compareMode
-                    ? "bg-purple-50 border-purple-200 text-purple-700"
-                    : "bg-white border-slate-200 text-slate-600"
-                  }`}
-              >
-                Compare mode {compareMode ? "ON" : "OFF"}
-              </button>
             </div>
           </div>
 
@@ -500,40 +309,6 @@ export default function DashboardPage({
 
           </div>
 
-          {compareMode && insightsRange !== "all" && (
-            <div className="mt-4 rounded-xl border border-purple-100 overflow-hidden">
-              <div className="px-4 py-2 bg-purple-50/50 text-xs text-slate-500 uppercase tracking-wide">
-                <p>Compare current range vs previous period</p>
-                <p className="mt-0.5 text-[11px] normal-case tracking-normal text-slate-400">
-                  Small baselines use follower difference.
-                </p>
-              </div>
-              <div className="divide-y divide-purple-100">
-                {compareRows.map((row) => (
-                  <div
-                    key={row.platform}
-                    className="px-4 py-2 text-sm flex items-center justify-between gap-3"
-                  >
-                    <span className="capitalize text-slate-600 shrink-0">{row.platform}</span>
-                    <span className="text-slate-800 flex flex-wrap items-center justify-end gap-2 text-right">
-                      <span>
-                        {formatNullableGrowth(row.currentGrowth)}
-                        {" vs "}
-                        {formatNullableGrowth(row.previousGrowth)}
-                      </span>
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-xs font-semibold ${deltaClass(
-                          row.deltaTone
-                        )}`}
-                      >
-                        {row.deltaLabel}
-                      </span>
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </section>
 
         {/* Summary Stats Row */}

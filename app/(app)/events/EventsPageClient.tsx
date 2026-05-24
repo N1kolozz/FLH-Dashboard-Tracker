@@ -9,6 +9,7 @@ import FixedPortal from "@/components/FixedPortal";
 import MemberAvatarStack from "@/components/MemberAvatarStack";
 import MemberMultiSelect, { type MemberChoice } from "@/components/MemberMultiSelect";
 import Modal from "@/components/Modal";
+import { useConfirmDialog } from "@/components/ConfirmDialog";
 import EmptyState from "@/components/EmptyState";
 import type { Session } from "@/lib/auth";
 import {
@@ -218,6 +219,7 @@ export default function EventsPage({
         .sort((a, b) => a.name.localeCompare(b.name)),
     [initialMembers]
   );
+  const { confirm: confirmDelete, dialog: confirmDialog } = useConfirmDialog();
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<CalEvent>(EMPTY);
   const [detailEvent, setDetailEvent] = useState<CalEvent | null>(null);
@@ -372,6 +374,15 @@ export default function EventsPage({
 
   const handleDelete = async (id: number) => {
     const deletedEvent = events.find((event) => event.id === id);
+    const ok = await confirmDelete({
+      title: "Delete event?",
+      message: deletedEvent
+        ? `Are you sure you want to delete "${deletedEvent.title}"? This cannot be undone.`
+        : "Are you sure you want to delete this event? This cannot be undone.",
+      confirmText: "Delete",
+      variant: "danger",
+    });
+    if (!ok) return;
 
     setEvents((current) => current.filter((event) => event.id !== id));
 
@@ -493,6 +504,8 @@ export default function EventsPage({
   );
 
   return (
+    <>
+    {confirmDialog}
     <div className="min-h-screen bg-slate-50">
       <header className="border-b border-purple-200/70 bg-gradient-to-r from-amber-50/70 via-orange-50/65 to-yellow-50/70 backdrop-blur-md">
         <div className="mx-auto flex max-w-[1400px] flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
@@ -576,11 +589,11 @@ export default function EventsPage({
                     Switch between month and week, then choose either a roomy slide layout or a zoomed-out fit layout.
                   </p>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="flex rounded-2xl bg-slate-100 p-1 text-sm">
+                <div className="flex w-full flex-col gap-2 xl:w-auto xl:flex-row xl:flex-wrap xl:items-center xl:justify-start">
+                  <div className="flex w-full rounded-2xl bg-slate-100 p-1 text-sm xl:w-auto">
                     <button
                       onClick={() => setCalendarView("month")}
-                      className={`rounded-xl px-4 py-2 font-medium transition-colors ${calendarView === "month" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
+                      className={`flex-1 rounded-xl px-4 py-2 text-center font-medium transition-colors ${calendarView === "month" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
                         }`}
                     >
                       Month
@@ -590,43 +603,43 @@ export default function EventsPage({
                         setCalendarCursor(selectedDate ?? fallbackWeekAnchor);
                         setCalendarView("week");
                       }}
-                      className={`rounded-xl px-4 py-2 font-medium transition-colors ${calendarView === "week" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
+                      className={`flex-1 rounded-xl px-4 py-2 text-center font-medium transition-colors ${calendarView === "week" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
                         }`}
                     >
                       Week
                     </button>
                   </div>
-                  <div className="flex rounded-2xl bg-slate-100 p-1 text-sm">
+                  <div className="flex w-full rounded-2xl bg-slate-100 p-1 text-sm xl:w-auto">
                     <button
                       onClick={() => setCalendarLayout("slide")}
-                      className={`rounded-xl px-4 py-2 font-medium transition-colors ${calendarLayout === "slide" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
+                      className={`flex-1 rounded-xl px-4 py-2 text-center font-medium transition-colors ${calendarLayout === "slide" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
                         }`}
                     >
                       Slide
                     </button>
                     <button
                       onClick={() => setCalendarLayout("fit")}
-                      className={`rounded-xl px-4 py-2 font-medium transition-colors ${calendarLayout === "fit" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
+                      className={`flex-1 rounded-xl px-4 py-2 text-center font-medium transition-colors ${calendarLayout === "fit" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
                         }`}
                     >
                       Fit
                     </button>
                   </div>
-                  <div className="flex flex-nowrap items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50/80 p-1">
-                    <button onClick={() => navigateCalendar("prev")} className="whitespace-nowrap rounded-xl border border-transparent bg-white px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100">
+                  <div className="flex w-full items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50/80 p-1 xl:w-auto">
+                    <button onClick={() => navigateCalendar("prev")} className="flex-1 rounded-xl border border-transparent bg-white px-4 py-2 text-center text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100">
                       ← Prev
                     </button>
-                    <button onClick={goToToday} className="whitespace-nowrap rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-700 transition-colors hover:bg-amber-100">
+                    <button onClick={goToToday} className="flex-1 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-center text-sm font-medium text-amber-700 transition-colors hover:bg-amber-100">
                       Today
                     </button>
-                    <button onClick={() => navigateCalendar("next")} className="whitespace-nowrap rounded-xl border border-transparent bg-white px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100">
+                    <button onClick={() => navigateCalendar("next")} className="flex-1 rounded-xl border border-transparent bg-white px-4 py-2 text-center text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100">
                       Next →
                     </button>
                   </div>
                 </div>
               </div>
 
-              <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-xs xl:justify-start">
                 {(Object.keys(DEPT_CONFIG) as Department[]).map((dept) => (
                   <span
                     key={dept}
@@ -1328,12 +1341,23 @@ export default function EventsPage({
                 {editing.id ? "Save Changes" : "Create Event"}
               </button>
               {editing.id ? (
-                <button onClick={() => { void handleDelete(editing.id); setModalOpen(false); setEditing(EMPTY); }} className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 text-sm font-medium rounded-lg border border-rose-200 transition-colors">Delete</button>
+                <button
+                  onClick={async () => {
+                    const targetId = editing.id;
+                    await handleDelete(targetId);
+                    setModalOpen(false);
+                    setEditing(EMPTY);
+                  }}
+                  className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 text-sm font-medium rounded-lg border border-rose-200 transition-colors"
+                >
+                  Delete
+                </button>
               ) : null}
             </div>
           )}
         </div>
       </Modal>
     </div>
+    </>
   );
 }

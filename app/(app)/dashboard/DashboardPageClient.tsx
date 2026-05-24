@@ -5,11 +5,13 @@ import { useState } from "react";
 import { generateDailyBriefing } from "@/app/actions/ai";
 import {
   createNewsPost,
+  deleteNewsPost,
   getDashboardNews,
   type DashboardNewsItem,
   type DashboardNewsType,
 } from "@/app/actions/news";
 import Modal from "@/components/Modal";
+import { useConfirmDialog } from "@/components/ConfirmDialog";
 import PushNotificationManager from "@/components/PushNotificationManager";
 import { canPublishNews } from "@/lib/permissions";
 import type { Session } from "@/lib/auth";
@@ -58,6 +60,20 @@ function QuickStat({
     </Link>
   );
 }
+
+const UPDATE_TYPE_LABELS: Record<string, string> = {
+  status: "Status updated",
+  deadline: "Deadline updated",
+  name: "Name updated",
+  description: "Description updated",
+  priority: "Priority updated",
+  title: "Title updated",
+  date: "Date updated",
+  time: "Time updated",
+  location: "Location updated",
+  department: "Department updated",
+  details: "Updated",
+};
 
 const NEWS_CONFIG: Record<
   DashboardNewsType,
@@ -115,9 +131,19 @@ function formatDashboardNumber(value: number) {
   return dashboardNumberFormatter.format(value);
 }
 
-function NewsItem({ item }: { item: DashboardNewsItem }) {
+function NewsItem({
+  item,
+  canDelete = false,
+  onDelete,
+  deleting = false,
+}: {
+  item: DashboardNewsItem;
+  canDelete?: boolean;
+  onDelete?: (item: DashboardNewsItem) => void;
+  deleting?: boolean;
+}) {
   const config = { ...NEWS_CONFIG[item.type] };
-  let className = "dash-news-card block h-full rounded-lg border bg-white/95 p-4 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:bg-purple-50/60 hover:shadow-lg hover:shadow-purple-100/60 ";
+  let className = "dash-news-card flex flex-col h-full overflow-hidden rounded-lg border bg-white/95 p-4 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:bg-purple-50/60 hover:shadow-lg hover:shadow-purple-100/60 ";
   
   if (item.type === "review") {
     if (item.review_status === "approved") {
@@ -139,32 +165,64 @@ function NewsItem({ item }: { item: DashboardNewsItem }) {
   const content = (
     <>
       <div className="flex items-start justify-between gap-3">
-        <div
-          className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-semibold ${config.badge}`}
-        >
-          {config.icon}
-          {config.label}
+        <div className="flex flex-wrap items-center gap-1.5">
+          <div
+            className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-semibold ${config.badge}`}
+          >
+            {config.icon}
+            {config.label}
+          </div>
+          {item.update_type && (
+            <span className="inline-flex items-center gap-1 rounded-md border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-600">
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              {UPDATE_TYPE_LABELS[item.update_type] ?? "Updated"}
+            </span>
+          )}
         </div>
         <span className="shrink-0 text-xs font-medium text-slate-400">
           {formatNewsDate(item.created_at)}
         </span>
       </div>
-      <h3 className="mt-3 text-base font-bold text-slate-900">{item.title}</h3>
+      <h3 className="mt-3 truncate text-base font-bold text-slate-900">{item.title}</h3>
       {item.body && (
-        <p className="mt-2 text-sm leading-6 text-slate-600">{item.body}</p>
+        <div className="mt-2 mb-3 flex-1">
+          <p className="text-sm leading-6 text-slate-600 line-clamp-2">{item.body}</p>
+        </div>
       )}
-      <div className="mt-4 flex items-center justify-between gap-3 border-t border-purple-50 pt-3">
+      <div className="mt-auto flex items-center justify-between gap-3 border-t border-purple-50 pt-3">
         <p className="min-w-0 truncate text-xs font-medium text-purple-700">
           {item.meta || "FLH update"}
         </p>
-        {(item.href && item.review_status === "pending") && (
-          <span className="inline-flex items-center gap-1 text-xs font-semibold text-purple-600">
-            Open
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </span>
-        )}
+        <div className="flex shrink-0 items-center gap-2">
+          {(item.href && item.review_status === "pending") && (
+            <span className="inline-flex items-center gap-1 text-xs font-semibold text-purple-600">
+              Open
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </span>
+          )}
+          {canDelete && (
+            <button
+              type="button"
+              disabled={deleting}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onDelete?.(item);
+              }}
+              className="inline-flex items-center justify-center rounded-md p-1 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600 disabled:opacity-40"
+              title="Delete post"
+              aria-label="Delete post"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" />
+              </svg>
+            </button>
+          )}
+        </div>
       </div>
     </>
   );
@@ -262,6 +320,53 @@ export default function DashboardPage({
     setNewsLoading(false);
   };
 
+  const [deletingNewsId, setDeletingNewsId] = useState<string | null>(null);
+  const { confirm: confirmDelete, dialog: confirmDialog } = useConfirmDialog();
+
+  const sessionUserId =
+    session && typeof session.userId === "number"
+      ? session.userId
+      : session && session.userId
+        ? Number(session.userId)
+        : null;
+  const sessionRole = session?.role?.toUpperCase() ?? "";
+
+  const canDeleteNewsItem = (item: DashboardNewsItem): boolean => {
+    if (item.type !== "announcement") return false;
+    if (sessionRole === "ADMIN") return true;
+    if (
+      sessionRole === "HEAD" &&
+      item.author_user_id !== null &&
+      sessionUserId !== null &&
+      item.author_user_id === sessionUserId
+    ) {
+      return true;
+    }
+    return false;
+  };
+
+  const handleDeleteNews = async (item: DashboardNewsItem) => {
+    if (item.type !== "announcement") return;
+    if (!canDeleteNewsItem(item)) return;
+    if (deletingNewsId) return;
+    const confirmed = await confirmDelete({
+      title: "Delete post?",
+      message: `Are you sure you want to delete "${item.title}"? This cannot be undone.`,
+      confirmText: "Delete",
+      variant: "danger",
+    });
+    if (!confirmed) return;
+
+    setDeletingNewsId(item.id);
+    const result = await deleteNewsPost(item.source_id);
+    if ("success" in result && result.success) {
+      setNewsItems((current) => current.filter((n) => n.id !== item.id));
+    } else if ("error" in result) {
+      setNewsError(result.error ?? "Failed to delete news post");
+    }
+    setDeletingNewsId(null);
+  };
+
   const submitNews = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!newsForm.title.trim() || newsSaving) return;
@@ -287,6 +392,8 @@ export default function DashboardPage({
   };
 
   return (
+    <>
+    {confirmDialog}
     <div className="relative min-h-screen overflow-hidden bg-slate-50">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(216,180,254,0.18),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(244,114,182,0.14),transparent_28%)]" />
       <div className="pointer-events-none absolute -top-16 left-[7%] h-56 w-56 rounded-full bg-purple-300/18 blur-3xl" />
@@ -478,8 +585,13 @@ export default function DashboardPage({
                 </p>
                 <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                   {reviewItems.map((item) => (
-                    <div key={item.id}>
-                      <NewsItem item={item} />
+                    <div key={item.id} className="h-44">
+                      <NewsItem
+                        item={item}
+                        canDelete={canDeleteNewsItem(item)}
+                        onDelete={handleDeleteNews}
+                        deleting={deletingNewsId === item.id}
+                      />
                     </div>
                   ))}
                 </div>
@@ -499,8 +611,13 @@ export default function DashboardPage({
             ) : newsItems.length > 0 ? (
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 {newsItems.map((item) => (
-                  <div key={item.id}>
-                    <NewsItem item={item} />
+                  <div key={item.id} className="h-44">
+                    <NewsItem
+                      item={item}
+                      canDelete={canDeleteNewsItem(item)}
+                      onDelete={handleDeleteNews}
+                      deleting={deletingNewsId === item.id}
+                    />
                   </div>
                 ))}
               </div>
@@ -570,5 +687,6 @@ export default function DashboardPage({
         </form>
       </Modal>
     </div>
+    </>
   );
 }

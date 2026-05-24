@@ -195,7 +195,6 @@ function MemberWorkloadCard({
 
 /* ─── Page ─── */
 
-type SortKey = "workload" | "activeProjects";
 type FilterDept = "all" | string;
 
 export default function WorkloadPageClient({
@@ -209,7 +208,6 @@ export default function WorkloadPageClient({
   const [loading] = useState(false);
   const [error] = useState(initialError);
   const [expandedId, setExpandedId] = useState<number | null>(null);
-  const [sortKey, setSortKey] = useState<SortKey>("workload");
   const [filterDept, setFilterDept] = useState<FilterDept>("all");
   const [search, setSearch] = useState("");
 
@@ -219,11 +217,7 @@ export default function WorkloadPageClient({
       if (search && !m.name.toLowerCase().includes(search.toLowerCase())) return false;
       return true;
     })
-    .sort((a, b) => {
-      if (sortKey === "workload") return workloadScore(b) - workloadScore(a);
-      if (sortKey === "activeProjects") return b.activeProjects - a.activeProjects;
-      return 0;
-    });
+    .sort((a, b) => workloadScore(b) - workloadScore(a));
 
   const maxScore = Math.max(...sorted.map(workloadScore), 1);
 
@@ -277,13 +271,13 @@ export default function WorkloadPageClient({
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
         {/* Controls */}
-        <div className="mb-5 grid grid-cols-1 gap-2 md:grid-cols-2 xl:flex xl:flex-wrap xl:items-center">
+        <div className="mb-5 flex flex-wrap items-center gap-2">
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search member..."
-            className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-300 xl:w-48"
+            className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-300 sm:w-48"
           />
           <AppSelect
             value={filterDept}
@@ -292,20 +286,11 @@ export default function WorkloadPageClient({
               { value: "all", label: "All departments" },
               ...Object.keys(DEPT_CONFIG).map((d) => ({ value: d, label: d })),
             ]}
-            className="xl:w-44"
-          />
-          <AppSelect
-            value={sortKey}
-            onValueChange={(v) => setSortKey(v as SortKey)}
-            options={[
-              { value: "workload", label: "Sort: Busiest first" },
-              { value: "activeProjects", label: "Sort: Most projects" },
-            ]}
-            className="xl:w-52"
+            className="sm:w-44"
           />
 
           {/* Legend */}
-          <div className="flex flex-wrap items-center gap-2 pt-1 md:col-span-2 xl:ml-auto xl:justify-end xl:pt-0">
+          <div className="flex flex-wrap items-center gap-2 ml-auto">
             {[
               { label: "Free", bar: "bg-slate-300" },
               { label: "Light", bar: "bg-emerald-400" },

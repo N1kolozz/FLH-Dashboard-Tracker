@@ -114,6 +114,38 @@ export async function insertProject(data: {
   return res.rows[0];
 }
 
+function normalizeDeadline(value: string | null | undefined): string {
+  if (!value) return "";
+  const trimmed = String(value).trim();
+  if (!trimmed) return "";
+  // Strip time component if present (e.g. "2026-05-28T00:00:00.000Z" -> "2026-05-28")
+  return trimmed.split("T")[0].split(" ")[0];
+}
+
+function detectProjectUpdateType(
+  oldRow: {
+    name: string;
+    description: string | null;
+    status: string;
+    priority: string;
+    deadline: string | null;
+  },
+  next: {
+    name: string;
+    description: string;
+    status: string;
+    priority: string;
+    deadline: string;
+  }
+): string {
+  if ((oldRow.status ?? "") !== (next.status ?? "")) return "status";
+  if (normalizeDeadline(oldRow.deadline) !== normalizeDeadline(next.deadline)) return "deadline";
+  if ((oldRow.priority ?? "") !== (next.priority ?? "")) return "priority";
+  if ((oldRow.name ?? "") !== (next.name ?? "")) return "name";
+  if ((oldRow.description ?? "") !== (next.description ?? "")) return "description";
+  return "details";
+}
+
 export async function updateProjectInDB(
   id: number,
   data: {
@@ -127,19 +159,32 @@ export async function updateProjectInDB(
     ownerUserIds: number[];
   }
 ) {
+  const oldRes = await pool.query(
+    `SELECT name, description, status, priority, deadline::text AS deadline
+     FROM projects WHERE id = $1`,
+    [id]
+  );
+  const oldRow = oldRes.rows[0];
+  const lastUpdateType = oldRow
+    ? detectProjectUpdateType(oldRow, data)
+    : "details";
+
   const res = await pool.query(
     `UPDATE projects
-     SET name=$1,
-         description=$2,
-         status=$3,
-         priority=$4,
-         deadline=$5,
-         team=$6,
-         tags=$7,
-         owner_user_ids=$8,
-         updated_at=(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
-     WHERE id=$9
-     RETURNING (updated_at AT TIME ZONE 'UTC')::text || 'Z' as updated_at`,
+     SET name = $1,
+         description = $2,
+         status = $3,
+         priority = $4,
+         deadline = $5,
+         team = $6,
+         tags = $7,
+         owner_user_ids = $8,
+         updated_at = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'),
+         last_update_type = $10
+     WHERE id = $9
+     RETURNING
+         (updated_at AT TIME ZONE 'UTC')::text || 'Z' AS updated_at,
+         last_update_type`,
     [
       data.name,
       data.description,
@@ -150,9 +195,10 @@ export async function updateProjectInDB(
       data.tags,
       normalizeOwnerUserIds(data.ownerUserIds),
       id,
+      lastUpdateType,
     ]
   );
-  return res.rows[0];
+  return { ...res.rows[0], oldRow };
 }
 
 export async function deleteProjectFromDB(id: number) {

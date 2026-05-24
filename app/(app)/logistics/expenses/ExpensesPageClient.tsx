@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { getExpenses, createExpense, updateExpense, deleteExpense } from "@/app/actions/expenses";
 import type { ExpenseRow } from "@/app/actions/expenses";
 import Modal from "@/components/Modal";
+import { useConfirmDialog } from "@/components/ConfirmDialog";
 import AppSelect from "@/components/ui/Select";
 import EmptyState from "@/components/EmptyState";
 import type { Session } from "@/lib/auth";
@@ -147,6 +148,7 @@ export default function ExpensesPage({
 }) {
   const [expenses, setExpenses] = useState<Expense[]>(sortExpenses(initialExpenses.map(rowToExpense)));
   const [modalOpen, setModalOpen] = useState(false);
+  const { confirm: confirmDelete, dialog: confirmDialog } = useConfirmDialog();
   const [editing, setEditing] = useState<Expense>(EMPTY);
   const [filterCategory, setFilterCategory] = useState<ExpenseCategory | "all">("all");
   const [filterMonth, setFilterMonth] = useState(() => new Date().toISOString().slice(0, 7));
@@ -245,6 +247,15 @@ export default function ExpensesPage({
 
   const handleDeleteExpense = async (id: number) => {
     const deletedExpense = expenses.find((expense) => expense.id === id);
+    const ok = await confirmDelete({
+      title: "Delete expense?",
+      message: deletedExpense
+        ? `Are you sure you want to delete "${deletedExpense.description}"? This cannot be undone.`
+        : "Are you sure you want to delete this expense? This cannot be undone.",
+      confirmText: "Delete",
+      variant: "danger",
+    });
+    if (!ok) return;
 
     setExpenses((current) => current.filter((expense) => expense.id !== id));
 
@@ -309,6 +320,8 @@ export default function ExpensesPage({
   }, [categoryBreakdown.length, filtered.length, isLoadingData]);
 
   return (
+    <>
+    {confirmDialog}
     <div className="min-h-screen bg-slate-50">
       <header className="border-b border-purple-200/70 bg-emerald-100/80 backdrop-blur-md">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -486,12 +499,23 @@ export default function ExpensesPage({
             <div className="flex items-center gap-3 pt-2">
               <button onClick={saveExpenseHandler} disabled={!editing.description.trim() || !editing.date || editing.amount <= 0} className="flex-1  px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white text-sm font-medium rounded-lg transition-colors">{editing.id ? "Save Changes" : "Add Expense"}</button>
               {editing.id ? (
-                <button onClick={() => { void handleDeleteExpense(editing.id); setModalOpen(false); setEditing(EMPTY); }} className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 text-sm font-medium rounded-lg border border-rose-200 transition-colors">Delete</button>
+                <button
+                  onClick={async () => {
+                    const targetId = editing.id;
+                    await handleDeleteExpense(targetId);
+                    setModalOpen(false);
+                    setEditing(EMPTY);
+                  }}
+                  className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 text-sm font-medium rounded-lg border border-rose-200 transition-colors"
+                >
+                  Delete
+                </button>
               ) : null}
             </div>
           )}
         </div>
       </Modal>
     </div>
+    </>
   );
 }

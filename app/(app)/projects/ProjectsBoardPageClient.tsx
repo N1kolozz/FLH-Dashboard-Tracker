@@ -16,6 +16,7 @@ import { getProjects, createProject, updateProject, deleteProject } from "@/app/
 import type { ProjectRow } from "@/types";
 import { type MemberChoice } from "@/components/MemberMultiSelect";
 import EmptyState from "@/components/EmptyState";
+import { useConfirmDialog } from "@/components/ConfirmDialog";
 import type { Session } from "@/lib/auth";
 import { getStoredSkeletonMap, setStoredSkeletonMap } from "@/lib/loading-skeleton";
 import { normalizeOwnerUserIds } from "@/lib/owner-users";
@@ -72,6 +73,7 @@ export default function ProjectsBoardPageClient({
       .map((member) => ({ id: member.id, name: member.name }))
       .sort((a, b) => a.name.localeCompare(b.name))
   );
+  const { confirm: confirmDelete, dialog: confirmDialog } = useConfirmDialog();
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Project>(EMPTY_PROJECT);
   const [search, setSearch] = useState("");
@@ -267,7 +269,7 @@ export default function ProjectsBoardPageClient({
     const board = boardRef.current;
     if (!board) return;
 
-    const isMobileBoard = () => window.matchMedia("(max-width: 1023px)").matches;
+    const isMobileBoard = () => window.matchMedia("(max-width: 1279px)").matches;
     const resetSnapStyles = () => {
       board.style.scrollBehavior = "";
       board.style.scrollSnapType = "";
@@ -539,6 +541,15 @@ export default function ProjectsBoardPageClient({
 
   const handleDelete = async (id: number) => {
     const deletedProject = projects.find((project) => project.id === id);
+    const ok = await confirmDelete({
+      title: "Delete project?",
+      message: deletedProject
+        ? `Are you sure you want to delete "${deletedProject.name}"? This cannot be undone.`
+        : "Are you sure you want to delete this project? This cannot be undone.",
+      confirmText: "Delete",
+      variant: "danger",
+    });
+    if (!ok) return;
 
     setProjects((current) => current.filter((project) => project.id !== id));
 
@@ -791,6 +802,8 @@ export default function ProjectsBoardPageClient({
   const showMobileColumnDots = isLoadingData || projects.length > 0;
 
   return (
+    <>
+    {confirmDialog}
     <div className="flex h-[calc(100dvh-4rem)] min-h-0 flex-col overflow-hidden bg-slate-50 md:h-screen">
       <ProjectBoardHeader
         isLoadingData={isLoadingData}
@@ -806,7 +819,7 @@ export default function ProjectsBoardPageClient({
       {/* Kanban Board */}
       <div className="max-w-[1400px] mx-auto flex w-full flex-1 min-h-0 flex-col py-6 sm:px-6">
         {showMobileColumnDots && (
-          <div className="mb-3 flex items-center justify-center gap-2 px-4 lg:hidden">
+          <div className="mb-3 flex items-center justify-center gap-2 px-4 xl:hidden">
             {COLUMNS.map((column, index) => {
               const isActive = activeMobileColumn === index;
 
@@ -829,7 +842,7 @@ export default function ProjectsBoardPageClient({
         )}
 
         {isLoadingData ? (
-          <div className="px-4 lg:px-0 flex-1 min-h-0">
+          <div className="px-4 xl:px-0 flex-1 min-h-0">
             <ProjectBoardSkeleton
               counts={skeletonColumnCounts}
               boardRef={boardRef}
@@ -837,7 +850,7 @@ export default function ProjectsBoardPageClient({
             />
           </div>
         ) : projects.length === 0 ? (
-          <div className="px-4 lg:px-0">
+          <div className="px-4 xl:px-0">
             <EmptyState
               title="No projects yet"
               description="Create your first project to start tracking work on the kanban board."
@@ -860,7 +873,7 @@ export default function ProjectsBoardPageClient({
           >
             <div
               ref={boardRef}
-              className={`hide-scrollbar flex flex-1 min-h-0 touch-pan-y gap-4 overflow-x-auto overflow-y-hidden px-4 pb-2 lg:grid lg:grid-cols-4 lg:overflow-visible lg:px-0 lg:pb-0 overscroll-x-contain scroll-px-4 ${
+              className={`hide-scrollbar flex flex-1 min-h-0 touch-pan-y gap-4 overflow-x-auto overflow-y-hidden px-4 pb-2 xl:grid xl:grid-cols-4 xl:overflow-visible xl:px-0 xl:pb-0 overscroll-x-contain scroll-px-4 ${
                 isDragging ? "" : "snap-x snap-mandatory"
               }`}
             >
@@ -967,8 +980,9 @@ export default function ProjectsBoardPageClient({
         }}
         onProjectChange={setEditing}
         onSave={saveProject}
-        onDelete={() => {
-          void handleDelete(editing.id);
+        onDelete={async () => {
+          const targetId = editing.id;
+          await handleDelete(targetId);
           setModalOpen(false);
           setEditing(EMPTY_PROJECT);
         }}
@@ -1011,5 +1025,6 @@ export default function ProjectsBoardPageClient({
         onEdit={canEdit ? handleEditProject : undefined}
       />
     </div>
+    </>
   );
 }

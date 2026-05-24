@@ -43,7 +43,7 @@ export function ProjectBoardSkeleton({
   return (
     <div
       ref={boardRef}
-      className="hide-scrollbar flex min-h-0 flex-1 gap-4 overflow-x-auto overflow-y-hidden pb-2 scroll-smooth snap-x snap-mandatory lg:grid lg:grid-cols-4 lg:overflow-visible lg:pb-0"
+      className="hide-scrollbar flex min-h-0 flex-1 gap-4 overflow-x-auto overflow-y-hidden pb-2 scroll-smooth snap-x snap-mandatory xl:grid xl:grid-cols-4 xl:overflow-visible xl:pb-0"
     >
       {COLUMNS.map((column, index) => (
         <div
@@ -51,7 +51,7 @@ export function ProjectBoardSkeleton({
           ref={(node) => {
             columnRefs.current[index] = node;
           }}
-          className={`flex min-h-0 w-full min-w-full shrink-0 snap-start snap-always flex-col overflow-hidden rounded-xl border border-slate-200 bg-white/70 ${column.color} border-t-2 lg:min-w-0 lg:w-full lg:snap-none`}
+          className={`flex min-h-0 w-full min-w-full shrink-0 snap-start snap-always flex-col overflow-hidden rounded-xl border border-slate-200 bg-white/70 ${column.color} border-t-2 xl:min-w-0 xl:w-full xl:snap-none`}
         >
           <div className="flex shrink-0 items-center justify-between px-4 py-3">
             <div className="flex items-center gap-2">
@@ -311,7 +311,7 @@ export function ProjectColumn({
   return (
     <div
       ref={setCombinedRef}
-      className={`relative flex min-h-0 w-full min-w-full shrink-0 snap-start snap-always flex-col overflow-hidden rounded-xl border border-slate-200 bg-white/70 ${column.color} border-t-2 transition-colors lg:min-w-0 lg:w-full lg:snap-none ${
+      className={`relative flex min-h-0 w-full min-w-full shrink-0 snap-start snap-always flex-col overflow-hidden rounded-xl border border-slate-200 bg-white/70 ${column.color} border-t-2 transition-colors xl:min-w-0 xl:w-full xl:snap-none ${
         isHighlighted ? "bg-blue-50/60 border-blue-200" : ""
       }`}
     >

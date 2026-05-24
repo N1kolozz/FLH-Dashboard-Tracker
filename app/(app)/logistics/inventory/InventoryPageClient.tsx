@@ -11,6 +11,7 @@ import {
 } from "@/app/actions/inventory";
 import type { InventoryItemRow, CheckoutRow } from "@/app/actions/inventory";
 import Modal from "@/components/Modal";
+import { useConfirmDialog } from "@/components/ConfirmDialog";
 import AppSelect from "@/components/ui/Select";
 import EmptyState from "@/components/EmptyState";
 import type { Session } from "@/lib/auth";
@@ -162,6 +163,7 @@ export default function InventoryPage({
   initialSession: Session | null;
   initialItems: InventoryItemRow[];
 }) {
+  const { confirm: confirmDelete, dialog: confirmDialog } = useConfirmDialog();
   const [items, setItems] = useState<InventoryItem[]>(sortItems(initialItems.map(rowToItem)));
   const [modalOpen, setModalOpen] = useState(false);
   const [checkoutModalOpen, setCheckoutModalOpen] = useState(false);
@@ -275,6 +277,15 @@ export default function InventoryPage({
 
   const handleDeleteItem = async (id: number) => {
     const deletedItem = items.find((item) => item.id === id);
+    const ok = await confirmDelete({
+      title: "Delete item?",
+      message: deletedItem
+        ? `Are you sure you want to delete "${deletedItem.name}"? This cannot be undone.`
+        : "Are you sure you want to delete this item? This cannot be undone.",
+      confirmText: "Delete",
+      variant: "danger",
+    });
+    if (!ok) return;
 
     setItems((current) => current.filter((item) => item.id !== id));
 
@@ -366,6 +377,8 @@ export default function InventoryPage({
   const inventorySkeletonCount = resolveSkeletonCount(items.length, cachedItemCount);
 
   return (
+    <>
+    {confirmDialog}
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
       <header className="border-b border-purple-200/70 bg-emerald-100/80 backdrop-blur-md">
@@ -641,7 +654,12 @@ export default function InventoryPage({
               </button>
               {editing.id ? (
                 <button
-                  onClick={() => { void handleDeleteItem(editing.id); setModalOpen(false); setEditing(EMPTY); }}
+                  onClick={async () => {
+                    const targetId = editing.id;
+                    await handleDeleteItem(targetId);
+                    setModalOpen(false);
+                    setEditing(EMPTY);
+                  }}
                   className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 text-sm font-medium rounded-lg border border-rose-200 transition-colors"
                 >
                   Delete
@@ -680,5 +698,6 @@ export default function InventoryPage({
         </div>
       </Modal>
     </div>
+    </>
   );
 }

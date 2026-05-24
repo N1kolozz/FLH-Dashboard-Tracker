@@ -130,6 +130,12 @@ async function migrate() {
     console.log("✓ projects updated_at column ready");
 
     await client.query(`
+      ALTER TABLE projects
+      ADD COLUMN IF NOT EXISTS last_update_type TEXT
+    `);
+    console.log("✓ projects last_update_type column ready");
+
+    await client.query(`
       CREATE TABLE IF NOT EXISTS events (
         id SERIAL PRIMARY KEY,
         title VARCHAR(255) NOT NULL,
@@ -164,6 +170,21 @@ async function migrate() {
       ON events (date DESC)
     `);
     console.log("✓ events owners column ready");
+
+    await client.query(`
+      ALTER TABLE events
+      ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    `);
+    await client.query(`
+      UPDATE events
+      SET updated_at = created_at
+      WHERE updated_at IS NULL
+    `);
+    await client.query(`
+      ALTER TABLE events
+      ADD COLUMN IF NOT EXISTS last_update_type TEXT
+    `);
+    console.log("✓ events updated_at + last_update_type columns ready");
 
     await client.query(`
       CREATE TABLE IF NOT EXISTS attendance_sessions (

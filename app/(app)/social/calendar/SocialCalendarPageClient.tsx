@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { getContentPosts, createContentPost, updateContentPost, deleteContentPost } from "@/app/actions/content-posts";
 import type { ContentPostRow } from "@/app/actions/content-posts";
 import { type MemberChoice } from "@/components/MemberMultiSelect";
+import { useConfirmDialog } from "@/components/ConfirmDialog";
 import {
   type PublicHoliday,
   buildHolidaysByDate,
@@ -72,6 +73,7 @@ export default function SocialCalendarPageClient({
       .map((member) => ({ id: member.id, name: member.name }))
       .sort((a, b) => a.name.localeCompare(b.name))
   );
+  const { confirm: confirmDelete, dialog: confirmDialog } = useConfirmDialog();
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<ContentPost>(EMPTY_POST);
   const [viewMonth, setViewMonth] = useState(() => new Date().getMonth());
@@ -258,6 +260,16 @@ export default function SocialCalendarPageClient({
 
   const handleDeletePost = async (id: number) => {
     const deletedPost = posts.find((post) => post.id === id);
+    const caption = deletedPost?.caption?.trim();
+    const ok = await confirmDelete({
+      title: "Delete post?",
+      message: caption
+        ? `Are you sure you want to delete "${caption.slice(0, 60)}${caption.length > 60 ? "…" : ""}"? This cannot be undone.`
+        : "Are you sure you want to delete this post? This cannot be undone.",
+      confirmText: "Delete",
+      variant: "danger",
+    });
+    if (!ok) return;
 
     setPosts((current) => current.filter((post) => post.id !== id));
 
@@ -425,6 +437,8 @@ export default function SocialCalendarPageClient({
   };
 
   return (
+    <>
+    {confirmDialog}
     <div className="min-h-screen bg-slate-50">
       <SocialCalendarHeader canEdit={!!canEdit} onPlanPost={() => openNew()} />
 
@@ -830,8 +844,9 @@ export default function SocialCalendarPageClient({
         }}
         onPostChange={setEditing}
         onSave={savePost}
-        onDelete={() => {
-          void handleDeletePost(editing.id);
+        onDelete={async () => {
+          const targetId = editing.id;
+          await handleDeletePost(targetId);
           setModalOpen(false);
           setEditing(EMPTY_POST);
         }}
@@ -860,5 +875,6 @@ export default function SocialCalendarPageClient({
         }}
       />
     </div>
+    </>
   );
 }

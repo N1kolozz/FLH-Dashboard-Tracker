@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Modal from "@/components/Modal";
+import { useConfirmDialog } from "@/components/ConfirmDialog";
 import AppSelect from "@/components/ui/Select";
 import EmptyState from "@/components/EmptyState";
 import { getMembers, addMember, deleteMember, updateMember } from "@/app/actions/members";
@@ -74,6 +75,7 @@ export default function TeamPage({
   initialSession: Session | null;
   initialMembers: TeamMember[];
 }) {
+  const { confirm: confirmDelete, dialog: confirmDialog } = useConfirmDialog();
   const [members, setMembers] = useState<TeamMember[]>(sortMembers(initialMembers));
   const [modalOpen, setModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -223,7 +225,16 @@ export default function TeamPage({
   };
 
   const handleDeleteMember = async (id: number) => {
-    if (!confirm("Are you sure you want to delete this member?")) return;
+    const target = members.find((member) => member.id === id);
+    const ok = await confirmDelete({
+      title: "Delete member?",
+      message: target
+        ? `Are you sure you want to delete "${target.name}"? This cannot be undone.`
+        : "Are you sure you want to delete this member? This cannot be undone.",
+      confirmText: "Delete",
+      variant: "danger",
+    });
+    if (!ok) return;
     const deletedMember = members.find((member) => member.id === id);
 
     setMembers((current) => current.filter((member) => member.id !== id));
@@ -253,6 +264,8 @@ export default function TeamPage({
   const canEdit = session && (session.role === "ADMIN" || session.role === "HEAD");
 
   return (
+    <>
+    {confirmDialog}
     <div className="min-h-screen bg-slate-50">
       <header className="border-b border-purple-200/70 bg-gradient-to-r from-violet-50/70 via-purple-50/65 to-fuchsia-50/70 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-4 sm:px-6 2xl:flex-row 2xl:items-center 2xl:justify-between">
@@ -482,5 +495,6 @@ export default function TeamPage({
         </Modal>
       )}
     </div>
+    </>
   );
 }

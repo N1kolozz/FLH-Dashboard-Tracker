@@ -111,6 +111,43 @@ export async function createEvent(data: {
   }
 }
 
+function normalizeDateOnly(value: string | null | undefined): string {
+  if (!value) return "";
+  const trimmed = String(value).trim();
+  if (!trimmed) return "";
+  return trimmed.split("T")[0].split(" ")[0];
+}
+
+function detectEventUpdateType(
+  oldRow: {
+    title: string;
+    date: string | null;
+    time: string | null;
+    end_time: string | null;
+    location: string | null;
+    department: string | null;
+    description: string | null;
+  },
+  next: {
+    title: string;
+    date: string;
+    time: string;
+    endTime: string;
+    location: string;
+    department: string;
+    description: string;
+  }
+): string {
+  if (normalizeDateOnly(oldRow.date) !== normalizeDateOnly(next.date)) return "date";
+  if ((oldRow.time ?? "") !== (next.time ?? "")) return "time";
+  if ((oldRow.end_time ?? "") !== (next.endTime ?? "")) return "time";
+  if ((oldRow.location ?? "") !== (next.location ?? "")) return "location";
+  if ((oldRow.department ?? "") !== (next.department ?? "")) return "department";
+  if ((oldRow.title ?? "") !== (next.title ?? "")) return "title";
+  if ((oldRow.description ?? "") !== (next.description ?? "")) return "description";
+  return "details";
+}
+
 export async function updateEvent(
   id: number,
   data: {
@@ -127,9 +164,20 @@ export async function updateEvent(
   try {
     const session = await requireDepartmentManagerSession("Management");
     const actorUserId = getSessionUserId(session);
+
+    const oldRes = await pool.query(
+      `SELECT title, date::text AS date, time, end_time, location, department, description
+       FROM events WHERE id = $1`,
+      [id]
+    );
+    const oldRow = oldRes.rows[0];
+    const lastUpdateType = oldRow ? detectEventUpdateType(oldRow, data) : "details";
+
     await pool.query(
       `UPDATE events
-       SET title=$1, date=$2, time=$3, end_time=$4, location=$5, department=$6, description=$7, owner_user_ids=$8
+       SET title=$1, date=$2, time=$3, end_time=$4, location=$5, department=$6, description=$7,
+           owner_user_ids=$8, updated_at=(CURRENT_TIMESTAMP AT TIME ZONE 'UTC'),
+           last_update_type=$10
        WHERE id=$9`,
       [
         data.title,
@@ -141,6 +189,7 @@ export async function updateEvent(
         data.description,
         normalizeOwnerUserIds(data.ownerUserIds),
         id,
+        lastUpdateType,
       ]
     );
 

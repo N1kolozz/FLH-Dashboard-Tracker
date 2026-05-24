@@ -81,11 +81,11 @@ export function SocialCalendarToolbar({
             Switch between month and week, then choose either a roomy slide layout or a zoomed-out fit layout.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex rounded-2xl bg-slate-100 p-1 text-sm">
+        <div className="flex w-full flex-col gap-2 xl:w-auto xl:flex-row xl:flex-wrap xl:items-center xl:justify-start">
+          <div className="flex w-full rounded-2xl bg-slate-100 p-1 text-sm xl:w-auto">
             <button
               onClick={onShowMonth}
-              className={`rounded-xl px-4 py-2 font-medium transition-colors ${
+              className={`flex-1 rounded-xl px-4 py-2 text-center font-medium transition-colors ${
                 calendarView === "month" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
               }`}
             >
@@ -93,17 +93,17 @@ export function SocialCalendarToolbar({
             </button>
             <button
               onClick={onShowWeek}
-              className={`rounded-xl px-4 py-2 font-medium transition-colors ${
+              className={`flex-1 rounded-xl px-4 py-2 text-center font-medium transition-colors ${
                 calendarView === "week" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
               }`}
             >
               Week
             </button>
           </div>
-          <div className="flex rounded-2xl bg-slate-100 p-1 text-sm">
+          <div className="flex w-full rounded-2xl bg-slate-100 p-1 text-sm xl:w-auto">
             <button
               onClick={() => onLayoutChange("slide")}
-              className={`rounded-xl px-4 py-2 font-medium transition-colors ${
+              className={`flex-1 rounded-xl px-4 py-2 text-center font-medium transition-colors ${
                 calendarLayout === "slide" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
               }`}
             >
@@ -111,29 +111,29 @@ export function SocialCalendarToolbar({
             </button>
             <button
               onClick={() => onLayoutChange("fit")}
-              className={`rounded-xl px-4 py-2 font-medium transition-colors ${
+              className={`flex-1 rounded-xl px-4 py-2 text-center font-medium transition-colors ${
                 calendarLayout === "fit" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
               }`}
             >
               Fit
             </button>
           </div>
-          <div className="flex flex-nowrap items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50/80 p-1">
+          <div className="flex w-full items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50/80 p-1 xl:w-auto">
             <button
               onClick={() => onNavigate("prev")}
-              className="whitespace-nowrap rounded-xl border border-transparent bg-white px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100"
+              className="flex-1 rounded-xl border border-transparent bg-white px-4 py-2 text-center text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100"
             >
               ← Prev
             </button>
             <button
               onClick={onGoToToday}
-              className="whitespace-nowrap rounded-xl border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-medium text-violet-700 transition-colors hover:bg-violet-100"
+              className="flex-1 rounded-xl border border-violet-200 bg-violet-50 px-4 py-2 text-center text-sm font-medium text-violet-700 transition-colors hover:bg-violet-100"
             >
               Today
             </button>
             <button
               onClick={() => onNavigate("next")}
-              className="whitespace-nowrap rounded-xl border border-transparent bg-white px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100"
+              className="flex-1 rounded-xl border border-transparent bg-white px-4 py-2 text-center text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100"
             >
               Next →
             </button>
@@ -141,7 +141,7 @@ export function SocialCalendarToolbar({
         </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
+      <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-xs xl:justify-start">
         {(Object.keys(PLATFORM_CONFIG) as Platform[]).map((platform) => (
           <span
             key={platform}

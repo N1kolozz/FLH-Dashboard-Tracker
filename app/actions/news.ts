@@ -18,7 +18,9 @@ export interface DashboardNewsItem {
   href: string | null;
   created_at: string;
   author_name: string | null;
+  author_user_id: number | null;
   review_status?: string;
+  update_type?: string | null;
 }
 
 type AnnouncementRow = {
@@ -27,6 +29,7 @@ type AnnouncementRow = {
   body: string | null;
   created_at: Date | string;
   author_name: string | null;
+  author_user_id: number | null;
 };
 
 type EventNewsRow = {
@@ -34,6 +37,8 @@ type EventNewsRow = {
   title: string;
   body: string | null;
   created_at: Date | string;
+  updated_at: Date | string | null;
+  last_update_type: string | null;
   event_date: string | null;
   department: string | null;
 };
@@ -43,6 +48,8 @@ type ProjectNewsRow = {
   title: string;
   body: string | null;
   created_at: Date | string;
+  updated_at: Date | string | null;
+  last_update_type: string | null;
   status: string | null;
   deadline: string | null;
 };
@@ -84,7 +91,8 @@ export async function getDashboardNews() {
            np.title,
            np.body,
            (np.created_at AT TIME ZONE 'UTC')::text || 'Z' AS created_at,
-           u.full_name AS author_name
+           u.full_name AS author_name,
+           np.created_by_user_id AS author_user_id
          FROM news_posts np
          LEFT JOIN users u ON u.id = np.created_by_user_id
          ORDER BY np.created_at DESC
@@ -96,10 +104,12 @@ export async function getDashboardNews() {
            e.title,
            e.description AS body,
            (e.created_at AT TIME ZONE 'UTC')::text || 'Z' AS created_at,
+           (e.updated_at AT TIME ZONE 'UTC')::text || 'Z' AS updated_at,
+           e.last_update_type,
            e.date::text AS event_date,
            e.department
          FROM events e
-         ORDER BY e.created_at DESC
+         ORDER BY GREATEST(e.created_at, COALESCE(e.updated_at, e.created_at)) DESC
          LIMIT 20`
       ),
       pool.query(
@@ -108,10 +118,12 @@ export async function getDashboardNews() {
            p.name AS title,
            p.description AS body,
            (p.created_at AT TIME ZONE 'UTC')::text || 'Z' AS created_at,
+           (p.updated_at AT TIME ZONE 'UTC')::text || 'Z' AS updated_at,
+           p.last_update_type,
            p.status,
            p.deadline::text AS deadline
          FROM projects p
-         ORDER BY p.created_at DESC
+         ORDER BY GREATEST(p.created_at, COALESCE(p.updated_at, p.created_at)) DESC
          LIMIT 20`
       ),
     ]);
@@ -127,39 +139,58 @@ export async function getDashboardNews() {
         href: null,
         created_at: serializeTimestamp(item.created_at),
         author_name: item.author_name,
+        author_user_id: item.author_user_id,
       })
     );
 
     const events = (eventsRes.rows as EventNewsRow[]).map(
-      (item): DashboardNewsItem => ({
-        id: `event-${item.id}`,
-        source_id: item.id,
-        type: "event",
-        title: item.title,
-        body: item.body ?? "",
-        meta: [formatDateLabel("Event date", item.event_date), formatLabel(item.department)]
-          .filter(Boolean)
-          .join(" · "),
-        href: "/events",
-        created_at: serializeTimestamp(item.created_at),
-        author_name: null,
-      })
+      (item): DashboardNewsItem => {
+        const updateType = item.last_update_type ?? null;
+        const effectiveTimestamp =
+          updateType && item.updated_at
+            ? serializeTimestamp(item.updated_at)
+            : serializeTimestamp(item.created_at);
+        return {
+          id: `event-${item.id}`,
+          source_id: item.id,
+          type: "event",
+          title: item.title,
+          body: item.body ?? "",
+          meta: [formatDateLabel("Event date", item.event_date), formatLabel(item.department)]
+            .filter(Boolean)
+            .join(" · "),
+          href: "/events",
+          created_at: effectiveTimestamp,
+          author_name: null,
+          author_user_id: null,
+          update_type: updateType,
+        };
+      }
     );
 
     const projects = (projectsRes.rows as ProjectNewsRow[]).map(
-      (item): DashboardNewsItem => ({
-        id: `project-${item.id}`,
-        source_id: item.id,
-        type: "project",
-        title: item.title,
-        body: item.body ?? "",
-        meta: [formatLabel(item.status), formatDateLabel("Deadline", item.deadline)]
-          .filter(Boolean)
-          .join(" · "),
-        href: "/projects/overview",
-        created_at: serializeTimestamp(item.created_at),
-        author_name: null,
-      })
+      (item): DashboardNewsItem => {
+        const updateType = item.last_update_type ?? null;
+        const effectiveTimestamp =
+          updateType && item.updated_at
+            ? serializeTimestamp(item.updated_at)
+            : serializeTimestamp(item.created_at);
+        return {
+          id: `project-${item.id}`,
+          source_id: item.id,
+          type: "project",
+          title: item.title,
+          body: item.body ?? "",
+          meta: [formatLabel(item.status), formatDateLabel("Deadline", item.deadline)]
+            .filter(Boolean)
+            .join(" · "),
+          href: "/projects/overview",
+          created_at: effectiveTimestamp,
+          author_name: null,
+          author_user_id: null,
+          update_type: updateType,
+        };
+      }
     );
 
     const news = [...announcements, ...events, ...projects]
@@ -220,6 +251,7 @@ export async function getDashboardNews() {
             : `/social/calendar?reviewId=${row.id}&postId=${row.entity_id}`,
           created_at: serializeTimestamp(row.created_at),
           author_name: row.submitted_by_name,
+          author_user_id: null,
           review_status: row.status,
         })
       );
@@ -284,5 +316,36 @@ export async function createNewsPost(data: { title: string; body: string }) {
   } catch (error) {
     console.error("Error creating news post:", error);
     return { error: "Failed to create news post" };
+  }
+}
+
+export async function deleteNewsPost(id: number) {
+  try {
+    const session = await getSession();
+    if (!session) return { error: "Not authorized" };
+
+    const role = session.role.toUpperCase();
+    const userId = getSessionUserId(session);
+
+    const existing = await pool.query(
+      `SELECT created_by_user_id FROM news_posts WHERE id = $1`,
+      [id]
+    );
+    if (existing.rows.length === 0) return { error: "Post not found" };
+
+    const createdBy = existing.rows[0].created_by_user_id as number | null;
+    const isOwner = userId !== null && createdBy === userId;
+    const isAdmin = role === "ADMIN";
+    const isHeadOwner = role === "HEAD" && isOwner;
+
+    if (!isAdmin && !isHeadOwner) {
+      return { error: "Not authorized to delete this post" };
+    }
+
+    await pool.query(`DELETE FROM news_posts WHERE id = $1`, [id]);
+    return { success: true };
+  } catch (error) {
+    console.error("Error deleting news post:", error);
+    return { error: "Failed to delete news post" };
   }
 }

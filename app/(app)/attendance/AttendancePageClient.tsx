@@ -3,6 +3,7 @@
 import { useCallback, useState } from "react";
 import EmptyState from "@/components/EmptyState";
 import Modal from "@/components/Modal";
+import { useConfirmDialog } from "@/components/ConfirmDialog";
 import AppSelect from "@/components/ui/Select";
 import type { EventRow } from "@/app/actions/events";
 import {
@@ -132,6 +133,7 @@ export default function AttendancePage({
   initialEvents: EventRow[];
   initialDetails: AttendanceDetails | null;
 }) {
+  const { confirm: confirmDelete, dialog: confirmDialog } = useConfirmDialog();
   const [session] = useState<Session | null>(initialSession);
   const [sessions, setSessions] = useState<AttendanceSessionRow[]>(initialSessions);
   const [details, setDetails] = useState<AttendanceDetails | null>(initialDetails);
@@ -263,7 +265,13 @@ export default function AttendancePage({
   };
 
   const removeSession = async (attendanceSession: AttendanceSessionRow) => {
-    if (!confirm(`Delete attendance for "${attendanceSession.title}"?`)) return;
+    const ok = await confirmDelete({
+      title: "Delete attendance?",
+      message: `Are you sure you want to delete attendance for "${attendanceSession.title}"? This cannot be undone.`,
+      confirmText: "Delete",
+      variant: "danger",
+    });
+    if (!ok) return;
     setError("");
     const result = await deleteAttendanceSession(attendanceSession.id);
     if (result.success) {
@@ -364,6 +372,8 @@ export default function AttendancePage({
   }
 
   return (
+    <>
+    {confirmDialog}
     <div className="min-h-screen bg-purple-50/30">
       <header className="border-b border-purple-200/70 bg-gradient-to-r from-violet-50/80 via-purple-50/70 to-fuchsia-50/80 backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
@@ -872,5 +882,6 @@ export default function AttendancePage({
         </div>
       </Modal>
     </div>
+    </>
   );
 }
