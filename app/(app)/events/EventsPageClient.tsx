@@ -70,7 +70,7 @@ const EMPTY: CalEvent = {
   time: "",
   endTime: "",
   location: "",
-  department: "other",
+  department: "all",
   description: "",
   ownerUserIds: [],
   createdAt: "",
@@ -273,6 +273,7 @@ export default function EventsPage({
         setEditing(prev => ({
           ...prev,
           title: res.data.title || prev.title,
+          date: res.data.date || prev.date,
           department: res.data.department || prev.department,
           description: res.data.description || prev.description,
           location: res.data.location || prev.location,

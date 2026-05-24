@@ -132,41 +132,58 @@ export async function getDailyBriefingForToday(): Promise<DailyBriefingResult> {
 export async function generateItinerary(prompt: string) {
   try {
     if (!process.env.GEMINI_API_KEY) {
-      return { 
-        success: false, 
-        error: "GEMINI_API_KEY is not set in your environment variables. Please add it to your .env file." 
+      return {
+        success: false,
+        error: "GEMINI_API_KEY is not set in your environment variables. Please add it to your .env file."
       };
     }
 
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const today = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Tbilisi",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
 
-    const systemInstruction = `You are an expert event planner AI. You help generate structured event itineraries and logistics details based on brief user inputs.
-You MUST output all text (title, description, and location) in grammatically correct, formal Georgian language (ქართული).
+    const systemInstruction = `You are a smart event assistant for FLH Dashboard. Extract structured event details from the user's free-form input and return a single JSON object.
 
-CRITICAL GEORGIAN TERMINOLOGY RULES:
-- ALWAYS use the word "ღონისძიება" (event) and its correct forms (e.g., "ღონისძიების"). NEVER use incorrect forms like "ღონისმევის".
-- ALWAYS use the word "ლოჯისტიკა" (logistics). NEVER use "ლოგისტიკა".
-- Ensure spelling, grammar, and phrasing are perfectly natural in Georgian.
+CORE RULES:
+1. Only populate fields the user explicitly mentioned or that can be directly inferred. Do NOT invent content.
+2. For "description": write only what the user described in their own words. You may add a brief, helpful agenda or checklist ONLY when the event type genuinely benefits from it (e.g., a festival, PR campaign launch, project kick-off, workshop). For simple meetings or check-ins, keep the description short and factual.
+3. Never add fabricated team roles, unmentioned equipment lists, or generic filler text.
+4. All text fields (title, description, location) MUST be in formal, grammatically correct Georgian (ქართული).
 
-You MUST output a valid JSON object with EXACTLY the following fields:
-- "title": A short, professional title for the event in Georgian (string).
-- "department": One of the following exact string values representing the best fit: "pr", "projects", "other". Use "projects" for anything logistics or operations-related.
-- "description": A detailed itinerary, list of required logistics/equipment, and team roles, formatted professionally with line breaks, in Georgian (string).
-- "location": A short string representing the location in Georgian if mentioned, or "" (empty string).
-- "time": A suggested start time in HH:mm format (e.g., "09:00" or "14:30") if implied, or "" (empty string).
-- "endTime": A suggested end time in HH:mm format, or "" (empty string).
+DATE & TIME:
+- Today is ${today}. Use this to resolve relative dates ("tomorrow", "next Friday", etc.).
+- If the user states a specific date, extract it as "YYYY-MM-DD". Otherwise "".
+- If the user states a start time, extract as "HH:mm" (24-hour clock). Otherwise "".
+- If the user states an end time or duration, derive "endTime" as "HH:mm". Otherwise "".
 
-Do NOT include any markdown formatting. Return strictly the raw JSON object.`;
+DEPARTMENT — choose exactly one:
+- "pr"       → PR, social media, marketing, communications, content creation
+- "projects" → project management, operations, logistics, construction, technical
+- "all"      → company-wide, all-hands, general / cross-department events
+- "other"    → anything that doesn't clearly fit the above
 
-    const result = await model.generateContent({
-      contents: [
-        { role: "user", parts: [{ text: systemInstruction }] },
-        { role: "user", parts: [{ text: `Generate event details for this idea: ${prompt}` }] }
-      ]
+OUTPUT: Return ONLY a raw JSON object, no markdown, no extra text:
+{
+  "title": string,
+  "date": string,
+  "time": string,
+  "endTime": string,
+  "department": "all" | "pr" | "projects" | "other",
+  "location": string,
+  "description": string
+}`;
+
+    const model = genAI.getGenerativeModel({
+      model: "gemini-2.5-flash",
+      systemInstruction,
     });
-    
+
+    const result = await model.generateContent(prompt);
     const responseText = result.response.text();
-    
+
     // Find the first balanced JSON object in the response
     let jsonString = "";
     const firstOpen = responseText.indexOf('{');
@@ -187,7 +204,7 @@ Do NOT include any markdown formatting. Return strictly the raw JSON object.`;
     if (!jsonString) {
       throw new Error("Model did not return a valid JSON object.");
     }
-    
+
     const parsed = JSON.parse(jsonString);
     return { success: true, data: parsed };
   } catch (error: unknown) {
