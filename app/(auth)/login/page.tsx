@@ -95,7 +95,7 @@ export default function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors outline-none text-slate-700"
-                  placeholder="name@flh.org"
+                  placeholder="Enter your email"
                   required
                 />
               </div>
