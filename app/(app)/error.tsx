@@ -4,6 +4,7 @@
 // layout chrome stay rendered — only the page content shows the fallback.
 
 import { useEffect } from "react";
+import { log } from "@/lib/logger";
 
 export default function AppError({
   error,
@@ -13,7 +14,7 @@ export default function AppError({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error("App error boundary:", error.message, error.digest);
+    log.error("App error boundary", error, { digest: error.digest });
   }, [error]);
 
   return (

@@ -4,6 +4,7 @@
 // flow rather than bouncing them through the root error boundary.
 
 import { useEffect } from "react";
+import { log } from "@/lib/logger";
 
 export default function AuthError({
   error,
@@ -13,7 +14,7 @@ export default function AuthError({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error("Auth error boundary:", error.message, error.digest);
+    log.error("Auth error boundary", error, { digest: error.digest });
   }, [error]);
 
   return (

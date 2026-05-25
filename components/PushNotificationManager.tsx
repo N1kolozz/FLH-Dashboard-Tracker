@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import * as Popover from "@radix-ui/react-popover";
+import { log } from "@/lib/logger";
 
 type PushKeyResponse = {
   configured: boolean;
@@ -108,7 +109,7 @@ export default function PushNotificationManager({
         setIsSubscribed(false);
       }
     } catch (error) {
-      console.error("Failed to load push status:", error);
+      log.error("Failed to load push status", error);
       setStatusMessage("Could not check notification status on this device.");
     } finally {
       setHasCheckedStatus(true);
@@ -211,7 +212,7 @@ export default function PushNotificationManager({
       setStatusMessage("Alerts are on for this device.");
       notifyPushStatusChanged();
     } catch (error) {
-      console.error("Failed to enable notifications:", error);
+      log.error("Failed to enable notifications", error);
       setStatusMessage("Could not enable notifications on this device.");
     } finally {
       setIsBusy(false);
@@ -251,7 +252,7 @@ export default function PushNotificationManager({
       setStatusMessage("Alerts are off for this device.");
       notifyPushStatusChanged();
     } catch (error) {
-      console.error("Failed to disable notifications:", error);
+      log.error("Failed to disable notifications", error);
       setStatusMessage("Could not turn off notifications right now.");
     } finally {
       setIsBusy(false);
@@ -309,14 +310,15 @@ export default function PushNotificationManager({
         const failures = data.failures ?? [];
 
         if (failures.length > 0) {
-          console.group(`[push test] ${failed} failure${failed === 1 ? "" : "s"}`);
           failures.forEach((failure) => {
-            const who = failure.userName ?? failure.userEmail ?? "unknown user";
-            console.warn(
-              `${who} @ ${failure.endpointHost} — ${failure.status} ${failure.reason}${failure.deleted ? " [removed stale subscription]" : ""}`
-            );
+            log.warn("Push test delivery failed", {
+              recipient: failure.userName ?? failure.userEmail ?? "unknown user",
+              endpointHost: failure.endpointHost,
+              status: failure.status,
+              reason: failure.reason,
+              staleSubscriptionRemoved: failure.deleted,
+            });
           });
-          console.groupEnd();
         }
 
         const failedSummary =
@@ -336,7 +338,7 @@ export default function PushNotificationManager({
         setStatusMessage("Test notification sent.");
       }
     } catch (error) {
-      console.error("Failed to send test notification:", error);
+      log.error("Failed to send test notification", error);
       setStatusMessage("Could not send a test notification right now.");
     } finally {
       setIsBusy(false);

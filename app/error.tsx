@@ -5,6 +5,7 @@
 // callback from Next.js. Calling reset() re-renders the affected segment.
 
 import { useEffect } from "react";
+import { log } from "@/lib/logger";
 
 export default function RootError({
   error,
@@ -16,7 +17,7 @@ export default function RootError({
   useEffect(() => {
     // The error is already logged server-side; this is a safety net for
     // unhandled client errors. Avoid logging PII.
-    console.error("Root error boundary:", error.message, error.digest);
+    log.error("Root error boundary", error, { digest: error.digest });
   }, [error]);
 
   return (
