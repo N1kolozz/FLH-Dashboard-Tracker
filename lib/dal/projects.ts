@@ -1,3 +1,8 @@
+// Data Access Layer (DAL) for projects.
+// This module owns all raw SQL for the projects table. Server actions in
+// app/actions/projects.ts call these functions rather than writing SQL inline,
+// keeping the query logic in one place and making it easier to test or swap.
+
 import { pool } from "@/lib/db";
 import { normalizeOwnerUserIds } from "@/lib/owner-users";
 import { ProjectRow } from "@/types";
@@ -13,13 +18,21 @@ export async function fetchAllProjects(): Promise<ProjectRow[]> {
        p.deadline::text,
        p.team,
        p.tags,
+       -- Migration-compatibility: early rows only have the legacy owner_user_id
+       -- (singular). If the new owner_user_ids array is still empty we fall back
+       -- to wrapping the legacy column so the rest of the codebase always sees
+       -- a consistent array shape.
        COALESCE(
          NULLIF(p.owner_user_ids, '{}'),
          CASE WHEN p.owner_user_id IS NULL THEN '{}'::INTEGER[] ELSE ARRAY[p.owner_user_id] END
        ) AS owner_user_ids,
+       -- Force UTC suffix so JS Date parsing is unambiguous on all platforms.
        (p.created_at AT TIME ZONE 'UTC')::text || 'Z' as created_at,
        (p.updated_at AT TIME ZONE 'UTC')::text || 'Z' as updated_at
      FROM projects p
+     -- Default sort: kanban column order first, then priority within each column,
+     -- then newest-first as a tiebreaker. The board UI re-sorts client-side too,
+     -- but this order is what server components and the overview page see.
      ORDER BY
        CASE p.status
          WHEN 'planning' THEN 0
@@ -114,14 +127,21 @@ export async function insertProject(data: {
   return res.rows[0];
 }
 
+// Strips the time component that Postgres DATE columns can carry when cast to
+// text (e.g. "2026-05-28T00:00:00.000Z" → "2026-05-28"). Without this,
+// a round-tripped deadline would always look "changed" because the stored
+// value and the form value differ in format even though the date is the same.
 function normalizeDeadline(value: string | null | undefined): string {
   if (!value) return "";
   const trimmed = String(value).trim();
   if (!trimmed) return "";
-  // Strip time component if present (e.g. "2026-05-28T00:00:00.000Z" -> "2026-05-28")
   return trimmed.split("T")[0].split(" ")[0];
 }
 
+// Compares the old DB row with the incoming update and returns a label for
+// what changed. The label is stored as last_update_type and drives the push
+// notification message — "status changed" is more useful than a generic "updated".
+// Priority order: status > deadline > priority > name > description > details.
 function detectProjectUpdateType(
   oldRow: {
     name: string;

@@ -1,35 +1,47 @@
+// Next.js Edge Middleware — runs on every non-static request before any page or
+// API handler. Its only job is lightweight session gating: read the cookie,
+// verify the JWT signature, and redirect unauthenticated users to /login.
+//
+// Heavy authorization (role checks, department checks) is NOT done here because
+// middleware runs in the Edge Runtime which has limited Node.js APIs. Instead,
+// individual server actions call requireAuthenticatedSession() / requireHeadOrAdminSession()
+// from lib/action-auth.ts, which have full access to the pg pool and all helpers.
+
 import { NextRequest, NextResponse } from "next/server";
 import { decrypt } from "@/lib/session-token";
 
+// These path prefixes bypass the session check entirely.
+// /api routes handle their own auth (or are intentionally public, e.g. /api/holidays).
 const publicRoutes = ["/login", "/create-password", "/api"];
 
 export async function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname;
 
-  // Let server action requests through — they handle their own auth
-  // (Without this, middleware's 307 redirect preserves POST method,
-  //  causing browsers to replay every server action POST to /login)
+  // Server actions arrive as POST requests with a "next-action" header.
+  // If we redirected them here (e.g. to /login), the browser would replay the
+  // POST to /login with method preserved (307 Temporary Redirect), which breaks
+  // the action entirely. Server actions guard themselves via action-auth.ts, so
+  // passing them through here is safe.
   if (req.headers.get("next-action")) {
     return NextResponse.next();
   }
 
   const isPublicRoute = publicRoutes.some((route) => path.startsWith(route));
 
-  // Get session
   const cookie = req.cookies.get("session")?.value;
   const session = cookie ? await decrypt(cookie) : null;
 
-  // Protect all non-public routes
+  // Unauthenticated access to any protected route → redirect to login.
   if (!isPublicRoute && !session) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
-  // Redirect to dashboard if logged in and trying to access auth pages
+  // Logged-in users hitting the auth pages → send them to the dashboard.
   if (isPublicRoute && session && (path === "/login" || path === "/create-password")) {
     return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 
-  // Next.js convention: redirect from / directly to /dashboard if logged in
+  // Root path has no page of its own; send logged-in users to the dashboard.
   if (path === "/" && session) {
     return NextResponse.redirect(new URL("/dashboard", req.url));
   }

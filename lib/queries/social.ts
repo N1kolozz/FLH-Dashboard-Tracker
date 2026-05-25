@@ -1,6 +1,14 @@
+// Social media statistics queries, wrapped with Next.js unstable_cache for a
+// 5-minute server-side TTL. All queries use LATERAL subqueries so that every
+// platform row is resolved in a single round-trip, regardless of how many
+// social_accounts rows exist.
+
 import { unstable_cache } from "next/cache";
 import { pool } from "@/lib/db";
 
+// How long the cached stats live before Next.js re-runs the underlying query.
+// 300 s = 5 minutes. Matches the scrape cadence — there is no point fetching
+// more often because the scraper only writes once per day anyway.
 export const SOCIAL_CACHE_REVALIDATE_SECONDS = 300;
 
 export interface PlatformStats {
@@ -32,6 +40,18 @@ export type SocialPlatform = "instagram" | "tiktok" | "facebook";
 export type SocialHistoryRange = "30" | "90" | "all";
 
 async function querySocialStats(): Promise<StatsResponse> {
+  // One query, four LATERAL subqueries per account row:
+  //   latest  — the most recent snapshot (today's or last recorded)
+  //   prev    — the snapshot immediately before latest (for daily_growth)
+  //   wk      — a snapshot ~7 days ago (window: -10 to -7 to tolerate missed scrapes)
+  //   mo      — a snapshot ~30 days ago (window: -35 to -30 for the same reason)
+  //
+  // Growth values are only emitted when both endpoints exist — null means
+  // "not enough history yet", not "zero growth".
+  //
+  // daily_growth has the extra guard: (latest.recorded_date - prev.recorded_date) = 1
+  // so it only reports a day-over-day change when the two rows are truly consecutive.
+  // If the scraper missed yesterday, we show null rather than a misleading multi-day delta.
   const result = await pool.query<{
     platform: string;
     name: string;
@@ -71,6 +91,7 @@ async function querySocialStats(): Promise<StatsResponse> {
       TO_CHAR(latest.recorded_date, 'YYYY-MM-DD') AS last_updated,
       TO_CHAR(latest.created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS scraped_at
     FROM social_accounts sa
+    -- Most recent snapshot for each account
     LEFT JOIN LATERAL (
       SELECT followers, total_likes, posts_count, recorded_date, created_at
       FROM follower_history
@@ -78,6 +99,7 @@ async function querySocialStats(): Promise<StatsResponse> {
       ORDER BY recorded_date DESC, created_at DESC
       LIMIT 1
     ) latest ON true
+    -- Previous day's snapshot (for daily delta)
     LEFT JOIN LATERAL (
       SELECT followers, recorded_date
       FROM follower_history
@@ -87,6 +109,7 @@ async function querySocialStats(): Promise<StatsResponse> {
       ORDER BY recorded_date DESC
       LIMIT 1
     ) prev ON true
+    -- Snapshot from ~7 days ago (tolerance window avoids null on missed scrape days)
     LEFT JOIN LATERAL (
       SELECT followers
       FROM follower_history
@@ -97,6 +120,7 @@ async function querySocialStats(): Promise<StatsResponse> {
       ORDER BY recorded_date DESC
       LIMIT 1
     ) wk ON true
+    -- Snapshot from ~30 days ago (same tolerance window)
     LEFT JOIN LATERAL (
       SELECT followers
       FROM follower_history
@@ -130,6 +154,9 @@ async function querySocialStats(): Promise<StatsResponse> {
   return stats;
 }
 
+// Wrap with unstable_cache so that repeated RSC renders within the same 5-minute
+// window return the cached value without hitting the database again.
+// The cache key ["social-stats"] is global — all users share one cached result.
 const getCachedSocialStats = unstable_cache(querySocialStats, ["social-stats"], {
   revalidate: SOCIAL_CACHE_REVALIDATE_SECONDS,
 });
@@ -147,6 +174,10 @@ async function querySocialHistory(
   let dateFilter = "";
   const queryParams: string[] = [platform];
 
+  // Build the WHERE clause fragment based on the requested range.
+  // "30" / "90" are relative to the latest recorded date (not today's date) so
+  // the chart still shows data even if the scraper hasn't run today.
+  // An explicit start/end window overrides the range (used by the history API).
   if (start && end) {
     dateFilter = "AND fh.recorded_date BETWEEN $2::date AND $3::date";
     queryParams.push(start, end);
@@ -157,6 +188,7 @@ async function querySocialHistory(
     dateFilter =
       "AND latest.max_recorded_date IS NOT NULL AND fh.recorded_date >= latest.max_recorded_date - 89";
   }
+  // range === "all" → no dateFilter, returns every row for that platform
 
   const result = await pool.query<{
     date: string;

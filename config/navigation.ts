@@ -1,3 +1,16 @@
+// Central navigation configuration consumed by Sidebar.tsx.
+//
+// Permission flags on NavLink control whether the link is *rendered* in the
+// sidebar for the current user. They are UI-only guards — every server action
+// independently enforces its own authorization via lib/action-auth.ts.
+//
+// Flag meaning (Sidebar reads the session and filters accordingly):
+//   requiresAdminRole        → only ADMIN
+//   requiresHeadRole         → ADMIN or HEAD
+//   requiresAttendanceManager → ADMIN, HEAD, or Management department
+//   requiresWorkloadAccess   → ADMIN, HEAD, or Management department
+//   (no flag)                → any logged-in user
+
 import { Icons } from "@/components/Icons";
 
 export interface NavLink {

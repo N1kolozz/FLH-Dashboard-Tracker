@@ -2,19 +2,21 @@ import { headers } from "next/headers";
 import { pool } from "./db";
 import { getSession } from "@/lib/auth";
 
-/**
- * Log a user activity
- */
+// Inserts a row into user_activities and associates it with the user's current
+// open user_session row (if any). Called from server actions and the tracking
+// action to record page views and mutations.
 export async function logActivity(
   action: string,
   path: string = "",
   details: Record<string, unknown> = {},
+  // overrideUserId lets the login/logout actions log before a session cookie exists.
   overrideUserId?: number
 ) {
   try {
     const session = await getSession();
-    
-    // Don't track admins
+
+    // ADMIN activity is intentionally not tracked — admins are operators, not
+    // regular users, and their high-volume actions would skew activity reports.
     if (session?.role === "ADMIN") {
       return;
     }
@@ -23,21 +25,21 @@ export async function logActivity(
     if (!userId) {
       userId = session?.userId ? Number(session.userId) : undefined;
     }
-    
+
     if (!userId) return;
 
     const headersList = headers();
+    // x-forwarded-for is set by Vercel/proxies; x-real-ip is a common nginx header.
     const ipAddress = headersList.get("x-forwarded-for") || headersList.get("x-real-ip") || "unknown";
     const userAgent = headersList.get("user-agent") || "unknown";
 
-    // 1. Try to find the active user_session for this user
-    // We update last_ping and duration_seconds for the current session.
+    // Link this activity to the user's most recent open session so the admin
+    // panel can group activities per session. We don't create a session here —
+    // that is handled by the tracking server action (pingSession / endSession).
     let sessionId: number | null = null;
-    
-    // Find the latest active session created in the last 12 hours
     const resSession = await pool.query(
-      `SELECT id FROM user_sessions 
-       WHERE user_id = $1 AND is_active = TRUE 
+      `SELECT id FROM user_sessions
+       WHERE user_id = $1 AND is_active = TRUE
        ORDER BY start_time DESC LIMIT 1`,
       [userId]
     );
@@ -60,6 +62,7 @@ export async function logActivity(
       ]
     );
   } catch (error) {
+    // Never let activity logging crash a user-facing action.
     console.error("Failed to log activity:", error);
   }
 }
