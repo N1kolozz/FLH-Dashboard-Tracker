@@ -1,4 +1,5 @@
 import type { MutableRefObject, ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import MemberAvatarStack from "@/components/MemberAvatarStack";
 import MemberMultiSelect, { type MemberChoice } from "@/components/MemberMultiSelect";
@@ -98,7 +99,9 @@ export function ProjectCardContent({
   reviewStatus?: ProjectReviewStatus | null;
   actionSlot?: ReactNode;
 }) {
-  const deadlineDelta = daysUntilDeadline(project.deadline);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const deadlineDelta = mounted ? daysUntilDeadline(project.deadline) : null;
 
   return (
     <>
@@ -132,7 +135,7 @@ export function ProjectCardContent({
           )}
         </div>
         <div className="flex items-center gap-1.5">
-          {deadlineDelta !== null && (
+          {deadlineDelta !== null && reviewStatus?.status !== "approved" && (
             <span
               className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-semibold uppercase tracking-wide ${
                 deadlineDelta < 0
@@ -754,6 +757,9 @@ export function ProjectDetailModal({
   onClose: () => void;
   onEdit?: (project: Project) => void;
 }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   if (!project) {
     return (
       <Modal open={open} onClose={onClose} title="Project details" maxWidth="max-w-2xl">
@@ -762,7 +768,7 @@ export function ProjectDetailModal({
     );
   }
 
-  const deadlineDelta = daysUntilDeadline(project.deadline);
+  const deadlineDelta = mounted ? daysUntilDeadline(project.deadline) : null;
   const statusLabel = COLUMNS.find((column) => column.id === project.status)?.label ?? project.status;
   const formattedDeadline = project.deadline
     ? new Date(`${project.deadline}T00:00:00`).toLocaleDateString(undefined, {
