@@ -468,9 +468,12 @@ export async function broadcastTestNotification(payload: PushNotificationPayload
         deleted: response.shouldDelete,
       });
 
-      console.error(
-        `[push] broadcast failed for ${row.full_name ?? row.email ?? "unknown"} @ ${endpointHost}: ${response.status} ${response.reason}`
-      );
+      log.error("Push broadcast failed", {
+        recipient: row.full_name ?? row.email ?? "unknown",
+        endpointHost,
+        status: response.status,
+        reason: response.reason,
+      });
 
       await markPushFailure(row.endpoint, response.reason, response.shouldDelete);
     })
