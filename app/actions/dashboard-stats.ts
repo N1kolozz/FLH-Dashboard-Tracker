@@ -2,6 +2,7 @@
 
 import { pool } from "@/lib/db";
 import { requireAuthenticatedSession } from "@/lib/action-auth";
+import { log } from "@/lib/logger";
 
 export interface DashboardCounts {
   projectCount: number;
@@ -36,7 +37,7 @@ export async function getDashboardCounts(): Promise<DashboardCounts> {
       teamCount: parseInt(teamRes.rows[0].count),
     };
   } catch (error) {
-    console.error("Error fetching dashboard counts:", error);
+    log.error("Error fetching dashboard counts", error);
     return {
       projectCount: 0,
       inventoryCount: 0,

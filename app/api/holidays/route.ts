@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { log } from "@/lib/logger";
 
 /** ISO 3166-1 alpha-2 — Georgia */
 const COUNTRY = "GE";
@@ -16,7 +17,7 @@ export async function GET(request: Request) {
       next: { revalidate: 86400 },
     });
     if (!upstream.ok) {
-      console.warn("Holidays API upstream non-OK", {
+      log.warn("Holidays API upstream non-OK", {
         status: upstream.status,
         year: y,
         country: COUNTRY,
@@ -25,7 +26,7 @@ export async function GET(request: Request) {
     }
     const rawList: unknown = await upstream.json();
     if (!Array.isArray(rawList)) {
-      console.warn("Holidays API upstream returned non-array payload", {
+      log.warn("Holidays API upstream returned non-array payload", {
         year: y,
         country: COUNTRY,
       });
@@ -44,7 +45,7 @@ export async function GET(request: Request) {
     }
     return NextResponse.json(out);
   } catch (error) {
-    console.error("Holidays API fetch failed", {
+    log.error("Holidays API fetch failed", {
       year: y,
       country: COUNTRY,
       error: String(error),

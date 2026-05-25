@@ -6,6 +6,7 @@ import { normalizeOwnerUserIds } from "@/lib/owner-users";
 import { createPushNotification, notifySubscribers } from "@/lib/push";
 import { getSessionUserId } from "@/lib/permissions";
 import { logActivity } from "@/lib/activity";
+import { log } from "@/lib/logger";
 
 export interface EventRow {
   id: number;
@@ -43,7 +44,7 @@ export async function getEvents() {
     );
     return { success: true, events: res.rows as EventRow[] };
   } catch (error) {
-    console.error("Error fetching events:", error);
+    log.error("Error fetching events", error);
     return { error: "Failed to fetch events" };
   }
 }
@@ -92,7 +93,7 @@ export async function createEvent(data: {
         }),
       });
     } catch (pushError) {
-      console.error("Error sending event push notification:", pushError);
+      log.error("Error sending event push notification", pushError);
     }
 
     await logActivity("create_event", "/events", { eventId: res.rows[0].id, title: data.title }, actorUserId || undefined);
@@ -106,7 +107,7 @@ export async function createEvent(data: {
           : String(createdAt),
     };
   } catch (error) {
-    console.error("Error creating event:", error);
+    log.error("Error creating event", error);
     return { error: "Failed to create event" };
   }
 }
@@ -208,14 +209,14 @@ export async function updateEvent(
         }),
       });
     } catch (pushError) {
-      console.error("Error sending event update notification:", pushError);
+      log.error("Error sending event update notification", pushError);
     }
 
     await logActivity("update_event", "/events", { eventId: id, title: data.title }, actorUserId || undefined);
 
     return { success: true };
   } catch (error) {
-    console.error("Error updating event:", error);
+    log.error("Error updating event", error);
     return { error: "Failed to update event" };
   }
 }
@@ -228,7 +229,7 @@ export async function deleteEvent(id: number) {
     await logActivity("delete_event", "/events", { eventId: id }, actorUserId || undefined);
     return { success: true };
   } catch (error) {
-    console.error("Error deleting event:", error);
+    log.error("Error deleting event", error);
     return { error: "Failed to delete event" };
   }
 }

@@ -15,6 +15,7 @@ import {
   deleteProjectFromDB,
 } from "@/lib/dal/projects";
 import { logActivity } from "@/lib/activity";
+import { log } from "@/lib/logger";
 
 export async function getProjects() {
   try {
@@ -22,7 +23,7 @@ export async function getProjects() {
     const projects = await fetchAllProjects();
     return { success: true, projects };
   } catch (error) {
-    console.error("Error fetching projects:", error);
+    log.error("Error fetching projects", error);
     return { error: "Failed to fetch projects" };
   }
 }
@@ -34,7 +35,7 @@ export async function getRejectedProjects() {
     const projects = await fetchRejectedProjects();
     return { success: true, projects };
   } catch (error) {
-    console.error("Error fetching rejected projects:", error);
+    log.error("Error fetching rejected projects", error);
     return { error: "Failed to fetch rejected projects" };
   }
 }
@@ -72,7 +73,7 @@ export async function createProject(data: {
         }),
       });
     } catch (pushError) {
-      console.error("Error sending project push notification:", pushError);
+      log.error("Error sending project push notification", pushError);
     }
 
     await logActivity(
@@ -95,7 +96,7 @@ export async function createProject(data: {
           : String(updatedAt),
     };
   } catch (error) {
-    console.error("Error creating project:", error);
+    log.error("Error creating project", error);
     return { error: "Failed to create project" };
   }
 }
@@ -185,7 +186,7 @@ export async function updateProject(
         }),
       });
     } catch (pushError) {
-      console.error("Error sending project update notification:", pushError);
+      log.error("Error sending project update notification", pushError);
     }
 
     await logActivity(
@@ -205,7 +206,7 @@ export async function updateProject(
             : undefined,
     };
   } catch (error) {
-    console.error("Error updating project:", error);
+    log.error("Error updating project", error);
     return { error: "Failed to update project" };
   }
 }
@@ -224,7 +225,7 @@ export async function deleteProject(id: number) {
     );
     return { success: true };
   } catch (error) {
-    console.error("Error deleting project:", error);
+    log.error("Error deleting project", error);
     return { error: "Failed to delete project" };
   }
 }

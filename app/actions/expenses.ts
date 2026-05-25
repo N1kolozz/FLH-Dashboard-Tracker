@@ -4,6 +4,7 @@ import { pool } from "@/lib/db";
 import { requireAuthenticatedSession, requireDepartmentManagerSession } from "@/lib/action-auth";
 import { getSessionUserId } from "@/lib/permissions";
 import { logActivity } from "@/lib/activity";
+import { log } from "@/lib/logger";
 
 export interface ExpenseRow {
   id: number;
@@ -24,7 +25,7 @@ export async function getExpenses() {
     );
     return { success: true, expenses: res.rows as ExpenseRow[] };
   } catch (error) {
-    console.error("Error fetching expenses:", error);
+    log.error("Error fetching expenses", error);
     return { error: "Failed to fetch expenses" };
   }
 }
@@ -65,7 +66,7 @@ export async function createExpense(data: {
           : String(createdAt),
     };
   } catch (error) {
-    console.error("Error creating expense:", error);
+    log.error("Error creating expense", error);
     return { error: "Failed to create expense" };
   }
 }
@@ -99,7 +100,7 @@ export async function updateExpense(
     await logActivity("update_expense", "/logistics/expenses", { expenseId: id, description: data.description, amount: data.amount }, actorUserId || undefined);
     return { success: true };
   } catch (error) {
-    console.error("Error updating expense:", error);
+    log.error("Error updating expense", error);
     return { error: "Failed to update expense" };
   }
 }
@@ -112,7 +113,7 @@ export async function deleteExpense(id: number) {
     await logActivity("delete_expense", "/logistics/expenses", { expenseId: id }, actorUserId || undefined);
     return { success: true };
   } catch (error) {
-    console.error("Error deleting expense:", error);
+    log.error("Error deleting expense", error);
     return { error: "Failed to delete expense" };
   }
 }

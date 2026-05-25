@@ -6,7 +6,9 @@ import { cookies } from "next/headers";
 import { compare, hash } from "bcryptjs";
 import { redirect } from "next/navigation";
 import { logActivity } from "@/lib/activity";
+import { assertSameOrigin } from "@/lib/action-auth";
 import { endSession } from "@/app/actions/tracking";
+import { log } from "@/lib/logger";
 
 const SESSION_COOKIE_NAME = "session";
 const SESSION_COOKIE_OPTIONS = {
@@ -52,6 +54,7 @@ async function setSessionCookie(sessionData: {
 
 export async function checkEmail(email: string) {
   try {
+    assertSameOrigin();
     const res = await pool.query("SELECT id, password_hash FROM users WHERE email = $1", [email]);
     if (res.rows.length === 0) {
       return { exists: false };
@@ -62,13 +65,14 @@ export async function checkEmail(email: string) {
       hasPassword: !!user.password_hash,
     };
   } catch (error) {
-    console.error("Error checking email:", error);
+    log.error("Error checking email", error);
     return { error: "Database error" };
   }
 }
 
 export async function login(email: string, password: string) {
   try {
+    assertSameOrigin();
     const res = await pool.query(USER_SESSION_SELECT, [email]);
     if (res.rows.length === 0) return { error: "Invalid credentials" };
 
@@ -91,13 +95,14 @@ export async function login(email: string, password: string) {
 
     return { success: true };
   } catch (error) {
-    console.error("Login error:", error);
+    log.error("Login error", error);
     return { error: getAuthActionErrorMessage(error, "Login failed") };
   }
 }
 
 export async function createPassword(email: string, password: string) {
   try {
+    assertSameOrigin();
     const res = await pool.query(USER_SESSION_SELECT, [email]);
     if (res.rows.length === 0) return { error: "User not found" };
 
@@ -120,7 +125,7 @@ export async function createPassword(email: string, password: string) {
 
     return { success: true };
   } catch (error) {
-    console.error("Create password error:", error);
+    log.error("Create password error", error);
     return { error: getAuthActionErrorMessage(error, "Failed to create password") };
   }
 }

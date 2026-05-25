@@ -7,6 +7,7 @@ import {
   assertCanAssignPrivilegedRole,
   assertHeadOrAdmin,
 } from "@/lib/permissions";
+import { log } from "@/lib/logger";
 
 export async function addMember(formData: {
   fullName: string;
@@ -45,7 +46,7 @@ export async function addMember(formData: {
           : String(createdAt),
     };
   } catch (error) {
-    console.error("Error adding member:", error);
+    log.error("Error adding member", error);
     return {
       error:
         error instanceof Error ? error.message : "Failed to add member",
@@ -61,7 +62,7 @@ export async function getMembers() {
     );
     return { success: true, members: res.rows };
   } catch (error) {
-    console.error("Error fetching members:", error);
+    log.error("Error fetching members", error);
     return { error: "Failed to fetch members" };
   }
 }
@@ -73,7 +74,7 @@ export async function deleteMember(id: number) {
     await pool.query("DELETE FROM users WHERE id = $1", [id]);
     return { success: true };
   } catch (error) {
-    console.error("Error deleting member:", error);
+    log.error("Error deleting member", error);
     return {
       error:
         error instanceof Error ? error.message : "Failed to delete member",
@@ -115,7 +116,7 @@ export async function updateMember(
 
     return { success: true };
   } catch (error) {
-    console.error("Error updating member:", error);
+    log.error("Error updating member", error);
     return {
       error:
         error instanceof Error ? error.message : "Failed to update member",

@@ -3,6 +3,7 @@
 import { pool } from "@/lib/db";
 import { requireAuthenticatedSession } from "@/lib/action-auth";
 import { indexRowsByOwner } from "@/lib/owner-users";
+import { log } from "@/lib/logger";
 
 export interface WorkloadMember {
   id: number;
@@ -175,7 +176,7 @@ export async function getWorkloadData(): Promise<
 
     return { success: true, members };
   } catch (error) {
-    console.error("Error fetching workload data:", error);
+    log.error("Error fetching workload data", error);
     return { error: "Failed to fetch workload data" };
   }
 }

@@ -4,6 +4,7 @@ import {
   type SocialHistoryRange,
   type SocialPlatform,
 } from "@/lib/queries/social";
+import { log } from "@/lib/logger";
 
 export { type HistoryPoint } from "@/lib/queries/social";
 
@@ -50,7 +51,7 @@ export async function GET(request: NextRequest) {
       })
     );
   } catch (err) {
-    console.error("History API error:", err);
+    log.error("History API error", err);
     return NextResponse.json(
       { error: "Failed to fetch history", details: String(err) },
       { status: 500 }

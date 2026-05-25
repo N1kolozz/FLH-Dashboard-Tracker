@@ -2,6 +2,7 @@
 
 import { pool } from "@/lib/db";
 import { requireAuthenticatedSession, requireDepartmentManagerSession } from "@/lib/action-auth";
+import { log } from "@/lib/logger";
 
 export interface ImpactRecordRow {
   id: number;
@@ -45,7 +46,7 @@ export async function getImpactRecords() {
     );
     return { success: true, records: res.rows as ImpactRecordRow[] };
   } catch (error) {
-    console.error("Error fetching impact records:", error);
+    log.error("Error fetching impact records", error);
     return { error: "Failed to fetch impact records" };
   }
 }
@@ -98,7 +99,7 @@ export async function createImpactRecord(data: {
           : String(createdAt),
     };
   } catch (error) {
-    console.error("Error creating impact record:", error);
+    log.error("Error creating impact record", error);
     return { error: "Failed to create impact record" };
   }
 }
@@ -145,7 +146,7 @@ export async function updateImpactRecord(
     );
     return { success: true };
   } catch (error) {
-    console.error("Error updating impact record:", error);
+    log.error("Error updating impact record", error);
     return { error: "Failed to update impact record" };
   }
 }
@@ -156,7 +157,7 @@ export async function deleteImpactRecord(id: number) {
     await pool.query("DELETE FROM impact_records WHERE id = $1", [id]);
     return { success: true };
   } catch (error) {
-    console.error("Error deleting impact record:", error);
+    log.error("Error deleting impact record", error);
     return { error: "Failed to delete impact record" };
   }
 }

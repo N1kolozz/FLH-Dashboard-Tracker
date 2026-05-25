@@ -12,6 +12,7 @@ import {
   DepartmentSummary,
   MonthlySummaryData,
 } from "@/types";
+import { log } from "@/lib/logger";
 
 interface SummaryUserRow {
   id: number;
@@ -396,7 +397,7 @@ export async function getMonthlySummary(
 
     return { success: true, data };
   } catch (error) {
-    console.error("Error fetching monthly summary:", error);
+    log.error("Error fetching monthly summary", error);
     return { error: "Failed to fetch monthly summary" };
   }
 }

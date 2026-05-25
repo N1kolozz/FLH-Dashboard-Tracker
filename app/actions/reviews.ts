@@ -7,6 +7,7 @@ import {
 } from "@/lib/action-auth";
 import { getSessionUserId } from "@/lib/permissions";
 import { createPushNotification, notifySubscribers } from "@/lib/push";
+import { log } from "@/lib/logger";
 
 // Review workflow types
 export interface ReviewRequest {
@@ -142,13 +143,13 @@ export async function submitForReview(
           });
         }
       } catch (pushError) {
-        console.error("Error sending review submission push notification:", pushError);
+        log.error("Error sending review submission push notification", pushError);
       }
     }
 
     return { success: true, id: res.rows[0].id };
   } catch (error) {
-    console.error("Error submitting for review:", error);
+    log.error("Error submitting for review", error);
     return { error: "Failed to submit for review" };
   }
 }
@@ -193,7 +194,7 @@ export async function approveReview(reviewId: number, feedback?: string) {
 
     return { success: true };
   } catch (error) {
-    console.error("Error approving review:", error);
+    log.error("Error approving review", error);
     return { error: "Failed to approve" };
   }
 }
@@ -240,7 +241,7 @@ export async function rejectReview(reviewId: number, feedback: string) {
 
     return { success: true };
   } catch (error) {
-    console.error("Error rejecting review:", error);
+    log.error("Error rejecting review", error);
     return { error: "Failed to reject" };
   }
 }
@@ -266,7 +267,7 @@ export async function getReviewForEntity(
     );
     return { review: res.rows[0] || null };
   } catch (error) {
-    console.error("Error fetching review:", error);
+    log.error("Error fetching review", error);
     return { review: null };
   }
 }
@@ -302,7 +303,7 @@ export async function getPendingReviews(): Promise<{
 
     return { reviews: res.rows };
   } catch (error) {
-    console.error("Error fetching pending reviews:", error);
+    log.error("Error fetching pending reviews", error);
     return { reviews: [], error: "Failed to fetch pending reviews" };
   }
 }
@@ -313,7 +314,7 @@ export async function getProjectReviewStatuses(): Promise<ReviewStatusMap> {
     await requireAuthenticatedSession();
     return await getLatestReviewStatuses("project");
   } catch (error) {
-    console.error("Error fetching review statuses:", error);
+    log.error("Error fetching review statuses", error);
     return {};
   }
 }
@@ -323,7 +324,7 @@ export async function getPostReviewStatuses(): Promise<ReviewStatusMap> {
     await requireAuthenticatedSession();
     return await getLatestReviewStatuses("content_post");
   } catch (error) {
-    console.error("Error fetching post review statuses:", error);
+    log.error("Error fetching post review statuses", error);
     return {};
   }
 }

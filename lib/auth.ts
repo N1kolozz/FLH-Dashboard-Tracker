@@ -23,9 +23,12 @@ export async function updateSession(request: NextRequest): Promise<Response | un
   const parsed = await decrypt(session);
   if (!parsed) return;
   const res = new Response("OK");
+  // In production we send Secure so the cookie is never transmitted over
+  // plain HTTP. In dev we omit it because localhost is plain HTTP.
+  const secureAttr = process.env.NODE_ENV === "production" ? "; Secure" : "";
   res.headers.append(
     "Set-Cookie",
-    `session=${await encrypt(parsed)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${getSessionMaxAgeSeconds()}`
+    `session=${await encrypt(parsed)}; Path=/; HttpOnly; SameSite=Lax${secureAttr}; Max-Age=${getSessionMaxAgeSeconds()}`
   );
   return res;
 }

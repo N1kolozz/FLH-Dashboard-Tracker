@@ -5,6 +5,7 @@ import { getSession } from "@/lib/auth";
 import { requireAuthenticatedSession } from "@/lib/action-auth";
 import { canPublishNews, getSessionUserId } from "@/lib/permissions";
 import { createPushNotification, notifySubscribers } from "@/lib/push";
+import { log } from "@/lib/logger";
 
 export type DashboardNewsType = "announcement" | "event" | "project" | "review";
 
@@ -261,7 +262,7 @@ export async function getDashboardNews() {
 
     return { success: true, news, reviewItems };
   } catch (error) {
-    console.error("Error fetching dashboard news:", error);
+    log.error("Error fetching dashboard news", error);
     return { error: "Failed to fetch news" };
   }
 }
@@ -302,7 +303,7 @@ export async function createNewsPost(data: { title: string; body: string }) {
         }),
       });
     } catch (pushError) {
-      console.error("Error sending news push notification:", pushError);
+      log.error("Error sending news push notification", pushError);
     }
 
     return {
@@ -314,7 +315,7 @@ export async function createNewsPost(data: { title: string; body: string }) {
           : String(createdAt),
     };
   } catch (error) {
-    console.error("Error creating news post:", error);
+    log.error("Error creating news post", error);
     return { error: "Failed to create news post" };
   }
 }
@@ -345,7 +346,7 @@ export async function deleteNewsPost(id: number) {
     await pool.query(`DELETE FROM news_posts WHERE id = $1`, [id]);
     return { success: true };
   } catch (error) {
-    console.error("Error deleting news post:", error);
+    log.error("Error deleting news post", error);
     return { error: "Failed to delete news post" };
   }
 }

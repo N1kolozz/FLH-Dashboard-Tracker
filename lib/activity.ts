@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import { pool } from "./db";
 import { getSession } from "@/lib/auth";
+import { log } from "@/lib/logger";
 
 // Inserts a row into user_activities and associates it with the user's current
 // open user_session row (if any). Called from server actions and the tracking
@@ -63,6 +64,6 @@ export async function logActivity(
     );
   } catch (error) {
     // Never let activity logging crash a user-facing action.
-    console.error("Failed to log activity:", error);
+    log.error("Failed to log activity", error);
   }
 }

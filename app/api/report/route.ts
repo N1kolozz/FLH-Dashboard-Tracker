@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
+import { log } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
@@ -95,7 +96,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (err) {
-    console.error("Report API error:", err);
+    log.error("Report API error", err);
     return NextResponse.json(
       { error: "Failed to generate report", details: String(err) },
       { status: 500 }

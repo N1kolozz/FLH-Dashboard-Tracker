@@ -5,6 +5,7 @@ import { requireAuthenticatedSession, requireDepartmentManagerSession } from "@/
 import { normalizeOwnerUserIds } from "@/lib/owner-users";
 import { createPushNotification, notifySubscribers } from "@/lib/push";
 import { getSessionUserId } from "@/lib/permissions";
+import { log } from "@/lib/logger";
 
 export interface ContentPostRow {
   id: number;
@@ -40,7 +41,7 @@ export async function getContentPosts() {
     );
     return { success: true, posts: res.rows as ContentPostRow[] };
   } catch (error) {
-    console.error("Error fetching content posts:", error);
+    log.error("Error fetching content posts", error);
     return { error: "Failed to fetch content posts" };
   }
 }
@@ -94,7 +95,7 @@ export async function createContentPost(data: {
         }),
       });
     } catch (pushError) {
-      console.error("Error sending content post push notification:", pushError);
+      log.error("Error sending content post push notification", pushError);
     }
 
     return {
@@ -106,7 +107,7 @@ export async function createContentPost(data: {
           : String(createdAt),
     };
   } catch (error) {
-    console.error("Error creating content post:", error);
+    log.error("Error creating content post", error);
     return { error: "Failed to create content post" };
   }
 }
@@ -158,12 +159,12 @@ export async function updateContentPost(
         }),
       });
     } catch (pushError) {
-      console.error("Error sending content post update push notification:", pushError);
+      log.error("Error sending content post update push notification", pushError);
     }
 
     return { success: true };
   } catch (error) {
-    console.error("Error updating content post:", error);
+    log.error("Error updating content post", error);
     return { error: "Failed to update content post" };
   }
 }
@@ -174,7 +175,7 @@ export async function deleteContentPost(id: number) {
     await pool.query("DELETE FROM content_posts WHERE id = $1", [id]);
     return { success: true };
   } catch (error) {
-    console.error("Error deleting content post:", error);
+    log.error("Error deleting content post", error);
     return { error: "Failed to delete content post" };
   }
 }

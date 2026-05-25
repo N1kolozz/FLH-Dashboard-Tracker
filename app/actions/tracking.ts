@@ -4,8 +4,9 @@ import { headers } from "next/headers";
 import { pool } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { logActivity } from "@/lib/activity";
+import { log } from "@/lib/logger";
 
-// ── 30-Day Data Retention Cleanup ───────────────────────────────────
+// â”€â”€ 30-Day Data Retention Cleanup â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Runs at most once every 24 hours to keep the DB clean.
 const RETENTION_DAYS = 30;
 const CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -26,7 +27,7 @@ async function cleanupOldData() {
       ),
     ]);
   } catch (error) {
-    console.error("Error cleaning up old tracking data:", error);
+    log.error("Error cleaning up old tracking data", error);
   }
 }
 
@@ -83,7 +84,7 @@ export async function pingSession() {
       );
     }
   } catch (error) {
-    console.error("Error pinging session:", error);
+    log.error("Error pinging session", error);
   }
 }
 
@@ -105,6 +106,6 @@ export async function endSession() {
       [session.userId]
     );
   } catch (error) {
-    console.error("Error ending session:", error);
+    log.error("Error ending session", error);
   }
 }

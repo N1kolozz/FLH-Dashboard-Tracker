@@ -4,6 +4,7 @@ import { pool } from "@/lib/db";
 import { requireAuthenticatedSession, requireDepartmentManagerSession } from "@/lib/action-auth";
 import { getSessionUserId } from "@/lib/permissions";
 import { logActivity } from "@/lib/activity";
+import { log } from "@/lib/logger";
 
 export interface CheckoutRow {
   id: number;
@@ -55,7 +56,7 @@ export async function getInventoryItems() {
 
     return { success: true, items: result };
   } catch (error) {
-    console.error("Error fetching inventory:", error);
+    log.error("Error fetching inventory", error);
     return { error: "Failed to fetch inventory" };
   }
 }
@@ -98,7 +99,7 @@ export async function createInventoryItem(data: {
           : String(createdAt),
     };
   } catch (error) {
-    console.error("Error creating inventory item:", error);
+    log.error("Error creating inventory item", error);
     return { error: "Failed to create inventory item" };
   }
 }
@@ -134,7 +135,7 @@ export async function updateInventoryItem(
     await logActivity("update_inventory", "/logistics/inventory", { itemId: id, name: data.name }, actorUserId || undefined);
     return { success: true };
   } catch (error) {
-    console.error("Error updating inventory item:", error);
+    log.error("Error updating inventory item", error);
     return { error: "Failed to update inventory item" };
   }
 }
@@ -147,7 +148,7 @@ export async function deleteInventoryItem(id: number) {
     await logActivity("delete_inventory", "/logistics/inventory", { itemId: id }, actorUserId || undefined);
     return { success: true };
   } catch (error) {
-    console.error("Error deleting inventory item:", error);
+    log.error("Error deleting inventory item", error);
     return { error: "Failed to delete inventory item" };
   }
 }
@@ -189,7 +190,7 @@ export async function checkoutItem(itemId: number, person: string) {
       client.release();
     }
   } catch (error) {
-    console.error("Error checking out item:", error);
+    log.error("Error checking out item", error);
     return { error: "Failed to check out item" };
   }
 }
@@ -233,7 +234,7 @@ export async function checkinItem(itemId: number) {
       client.release();
     }
   } catch (error) {
-    console.error("Error checking in item:", error);
+    log.error("Error checking in item", error);
     return { error: "Failed to check in item" };
   }
 }

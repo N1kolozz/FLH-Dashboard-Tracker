@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { log } from "@/lib/logger";
 
 // Scraping no longer runs here (Playwright/Chromium not available on Vercel).
 // It runs in GitHub Actions. This endpoint can trigger that workflow if configured.
@@ -34,7 +35,7 @@ export async function POST(request: NextRequest) {
       );
       if (!res.ok) {
         const text = await res.text();
-        console.error("GitHub Actions trigger failed:", res.status, text);
+        log.error("GitHub Actions trigger failed", { status: res.status, body: text });
         return NextResponse.json(
           { error: "Failed to trigger workflow", details: text },
           { status: 502 }
@@ -46,7 +47,7 @@ export async function POST(request: NextRequest) {
         timestamp: new Date().toISOString(),
       });
     } catch (err) {
-      console.error("Scrape API error:", err);
+      log.error("Scrape API error", err);
       return NextResponse.json(
         { error: "Trigger failed", details: String(err) },
         { status: 500 }

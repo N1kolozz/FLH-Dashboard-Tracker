@@ -17,6 +17,7 @@ import {
   DepartmentAttendanceStat,
   AttendanceStats,
 } from "@/types";
+import { log } from "@/lib/logger";
 
 const ATTENDANCE_STATUSES: AttendanceStatus[] = [
   "pending",
@@ -112,7 +113,7 @@ async function notifyAttendancePrompt(options: {
       }),
     });
   } catch (pushError) {
-    console.error("Error sending attendance push notification:", pushError);
+    log.error("Error sending attendance push notification", pushError);
   }
 }
 
@@ -193,7 +194,7 @@ export async function getAttendanceSessions() {
 
     return { success: true, sessions: res.rows as AttendanceSessionRow[] };
   } catch (error) {
-    console.error("Error fetching attendance sessions:", error);
+    log.error("Error fetching attendance sessions", error);
     return { error: "Failed to fetch attendance sessions" };
   }
 }
@@ -262,7 +263,7 @@ export async function getAttendanceSessionDetails(id: number) {
       records: recordsRes.rows as AttendanceRecordRow[],
     };
   } catch (error) {
-    console.error("Error fetching attendance details:", error);
+    log.error("Error fetching attendance details", error);
     return { error: "Failed to fetch attendance details" };
   }
 }
@@ -338,7 +339,7 @@ export async function createAttendanceSession(data: {
           : String(res.rows[0].updated_at),
     };
   } catch (error) {
-    console.error("Error creating attendance session:", error);
+    log.error("Error creating attendance session", error);
     return { error: "Failed to create attendance session" };
   }
 }
@@ -412,7 +413,7 @@ export async function updateAttendanceSession(
 
     return { success: true };
   } catch (error) {
-    console.error("Error updating attendance session:", error);
+    log.error("Error updating attendance session", error);
     return { error: "Failed to update attendance session" };
   }
 }
@@ -430,7 +431,7 @@ export async function deleteAttendanceSession(id: number) {
     );
     return { success: true };
   } catch (error) {
-    console.error("Error deleting attendance session:", error);
+    log.error("Error deleting attendance session", error);
     return { error: "Failed to delete attendance session" };
   }
 }
@@ -471,7 +472,7 @@ export async function setAttendanceSessionActive(id: number, isActive: boolean) 
 
     return { success: true };
   } catch (error) {
-    console.error("Error updating attendance activation:", error);
+    log.error("Error updating attendance activation", error);
     return { error: "Failed to update attendance activation" };
   }
 }
@@ -551,7 +552,7 @@ export async function updateAttendanceRecord(
 
     return { success: true, id: res.rows[0].id as number };
   } catch (error) {
-    console.error("Error updating attendance record:", error);
+    log.error("Error updating attendance record", error);
     return { error: "Failed to update attendance record" };
   }
 }
@@ -612,7 +613,7 @@ export async function getPendingAttendancePrompt() {
           : null,
     };
   } catch (error) {
-    console.error("Error fetching attendance prompt:", error);
+    log.error("Error fetching attendance prompt", error);
     return { error: "Failed to fetch attendance prompt" };
   }
 }
@@ -690,7 +691,7 @@ export async function submitMyAttendance(
 
     return { success: true };
   } catch (error) {
-    console.error("Error submitting attendance:", error);
+    log.error("Error submitting attendance", error);
     return { error: "Failed to submit attendance" };
   }
 }
@@ -773,7 +774,7 @@ export async function getAttendanceStats() {
       } satisfies AttendanceStats,
     };
   } catch (error) {
-    console.error("Error fetching attendance stats:", error);
+    log.error("Error fetching attendance stats", error);
     return { error: "Failed to fetch attendance stats" };
   }
 }

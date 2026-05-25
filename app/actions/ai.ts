@@ -5,6 +5,7 @@ import type { PoolClient } from "pg";
 import { pool } from "@/lib/db";
 import { requireAuthenticatedSession } from "@/lib/action-auth";
 import { getSessionUserId } from "@/lib/permissions";
+import { log } from "@/lib/logger";
 
 // Initialize the Google Generative AI SDK
 // The user will need to add GEMINI_API_KEY to their .env file
@@ -85,6 +86,22 @@ async function cleanupOldDailyBriefings(briefingDate: string) {
   );
 }
 
+// Fallback briefing used when Gemini is unavailable (rate limited, API down,
+// model renamed, network failure). Returns a static, deterministic Georgian
+// sentence assembled from the stats we already queried — no AI call needed.
+// We do NOT persist this to the daily_briefings table so the next successful
+// generation can replace it on the user's next dashboard load.
+function buildFallbackBriefing(params: {
+  greeting: string;
+  projectCount: number;
+  eventCount: number;
+  activeUsersLine: string;
+  sessionCount: number;
+}): string {
+  const { greeting, projectCount, eventCount, activeUsersLine, sessionCount } = params;
+  return `${greeting}. დღეს გვაქვს ${projectCount} აქტიური პროექტი და ${eventCount} მომავალი ღონისძიება. ${activeUsersLine} ბოლო 24 საათში ${sessionCount} სესია დაფიქსირდა.`;
+}
+
 async function getAuthenticatedBriefingUserId() {
   const session = await requireAuthenticatedSession();
   const userId = getSessionUserId(session);
@@ -124,7 +141,7 @@ export async function getDailyBriefingForToday(): Promise<DailyBriefingResult> {
     }
 
     const message = error instanceof Error ? error.message : String(error);
-    console.error("Daily Briefing lookup error:", error);
+    log.error("Daily Briefing lookup error", error);
     return { success: false, error: message };
   }
 }
@@ -209,7 +226,7 @@ OUTPUT: Return ONLY a raw JSON object, no markdown, no extra text:
     return { success: true, data: parsed };
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Failed to generate itinerary. Please try again.";
-    console.error("AI Generation error:", error);
+    log.error("AI Generation error", error);
     return { success: false, error: message };
   }
 }
@@ -291,7 +308,7 @@ export async function generateDailyBriefing(): Promise<DailyBriefingResult> {
       ? `ბოლო 24 საათში სისტემაში შემოვიდნენ: ${activeUsers.join(", ")}.`
       : "ბოლო 24 საათში სისტემაში არცერთი მომხმარებელი არ დაფიქსირებულა.";
 
-    const model = genAI.getGenerativeModel({ model: "gemini-3.1-flash-lite-preview" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
 
     const prompt = `შენ ხარ FLHUB-ის ასისტენტი — ქართული ღონისძიებების სააგენტოს შიდა პლატფორმა. \
 დაწერე დღიური ბრიფინგი გუნდისთვის — 2-4 წინადადება, თბილი და ბუნებრივი ქართული ენით. \
@@ -309,26 +326,68 @@ export async function generateDailyBriefing(): Promise<DailyBriefingResult> {
 არ გამოიყენო markdown, bullet point-ები ან სიები. \
 დაწერე მხოლოდ ბრიფინგის ტექსტი — თანმიმდევრული პარაგრაფი.`;
 
-    const result = await model.generateContent(prompt);
-    let text = result.response.text().trim();
+    // Attempt the Gemini call. If it fails for any reason (rate limit, network,
+    // model deprecation), we fall back to a deterministic Georgian briefing
+    // assembled from the stats we already have. The fallback is intentionally
+    // NOT persisted so the next dashboard load can retry the AI call.
+    let text: string;
+    let usedFallback = false;
+    try {
+      const result = await model.generateContent(prompt);
+      text = result.response.text().trim();
+      // Strip stray markdown that the model sometimes returns despite the prompt.
+      text = text.replace(/[*#`]/g, '').trim();
+      if (!text) throw new Error("Gemini returned empty content");
+    } catch (geminiError) {
+      // Surface as much detail as the SDK gives us so we can diagnose model
+      // / quota / auth issues from Vercel logs. The Gemini SDK attaches the
+      // HTTP status and a "status" string ("INVALID_ARGUMENT", "NOT_FOUND",
+      // "RESOURCE_EXHAUSTED" for quota, "PERMISSION_DENIED" for access, …)
+      // either on the error object directly or in error.message JSON.
+      const err = geminiError as {
+        message?: string;
+        status?: number | string;
+        statusText?: string;
+        errorDetails?: unknown;
+      };
+      log.error("Gemini briefing call failed; serving fallback", geminiError, {
+        userId,
+        briefingDate,
+        modelName: "gemini-2.5-flash-lite",
+        geminiStatus: err?.status,
+        geminiStatusText: err?.statusText,
+        geminiMessage: err?.message,
+        geminiErrorDetails: err?.errorDetails,
+      });
+      text = buildFallbackBriefing({
+        greeting,
+        projectCount,
+        eventCount,
+        activeUsersLine,
+        sessionCount,
+      });
+      usedFallback = true;
+    }
 
-    // Clean up any stray markdown
-    text = text.replace(/[*#`]/g, '').trim();
-
-    const saved = await client.query<DailyBriefingRow>(
-      `INSERT INTO daily_briefings (user_id, briefing_date, briefing)
-       VALUES ($1, $2::date, $3)
-       ON CONFLICT (user_id, briefing_date)
-       DO UPDATE SET briefing = daily_briefings.briefing
-       RETURNING briefing`,
-      [userId, briefingDate, text]
-    );
+    // Only persist real (AI-generated) briefings. The fallback is transient.
+    let storedBriefing: string = text;
+    if (!usedFallback) {
+      const saved = await client.query<DailyBriefingRow>(
+        `INSERT INTO daily_briefings (user_id, briefing_date, briefing)
+         VALUES ($1, $2::date, $3)
+         ON CONFLICT (user_id, briefing_date)
+         DO UPDATE SET briefing = daily_briefings.briefing
+         RETURNING briefing`,
+        [userId, briefingDate, text]
+      );
+      storedBriefing = saved.rows[0]?.briefing ?? text;
+    }
 
     await client.query("COMMIT");
 
     return {
       success: true,
-      briefing: saved.rows[0]?.briefing ?? text,
+      briefing: storedBriefing,
       briefingDate,
       alreadyGenerated: false,
     };
@@ -337,12 +396,12 @@ export async function generateDailyBriefing(): Promise<DailyBriefingResult> {
       try {
         await client.query("ROLLBACK");
       } catch (rollbackError) {
-        console.error("Daily Briefing rollback error:", rollbackError);
+        log.error("Daily Briefing rollback error", rollbackError);
       }
     }
 
     const message = error instanceof Error ? error.message : String(error);
-    console.error("Daily Briefing error:", error);
+    log.error("Daily Briefing error", error);
     return { success: false, error: message };
   } finally {
     client?.release();
