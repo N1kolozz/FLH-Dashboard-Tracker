@@ -21,8 +21,8 @@ import {
 //
 // Exported so unauthenticated actions (login, createPassword) can call it too —
 // they don't use the require* helpers below but still need CSRF protection.
-export function assertSameOrigin() {
-  const h = headers();
+export async function assertSameOrigin() {
+  const h = await headers();
   const isServerAction = h.get("next-action") !== null;
   if (!isServerAction) return;
 
@@ -49,14 +49,14 @@ export function assertSameOrigin() {
 }
 
 export async function requireAuthenticatedSession(): Promise<Session> {
-  assertSameOrigin();
+  await assertSameOrigin();
   const session = await getSession();
   assertAuthenticated(session);
   return session;
 }
 
 export async function requireHeadOrAdminSession(): Promise<Session> {
-  assertSameOrigin();
+  await assertSameOrigin();
   return assertHeadOrAdmin(await getSession());
 }
 
@@ -64,6 +64,6 @@ export async function requireDepartmentManagerSession(
   department: string,
   label = department
 ): Promise<Session> {
-  assertSameOrigin();
+  await assertSameOrigin();
   return assertCanManageDepartment(await getSession(), department, label);
 }

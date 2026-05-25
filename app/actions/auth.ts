@@ -49,12 +49,12 @@ async function setSessionCookie(sessionData: {
     ...sessionData,
     userId: String(sessionData.userId),
   });
-  cookies().set(SESSION_COOKIE_NAME, sessionCookieStr, SESSION_COOKIE_OPTIONS);
+  (await cookies()).set(SESSION_COOKIE_NAME, sessionCookieStr, SESSION_COOKIE_OPTIONS);
 }
 
 export async function checkEmail(email: string) {
   try {
-    assertSameOrigin();
+    await assertSameOrigin();
     const res = await pool.query("SELECT id, password_hash FROM users WHERE email = $1", [email]);
     if (res.rows.length === 0) {
       return { exists: false };
@@ -72,7 +72,7 @@ export async function checkEmail(email: string) {
 
 export async function login(email: string, password: string) {
   try {
-    assertSameOrigin();
+    await assertSameOrigin();
     const res = await pool.query(USER_SESSION_SELECT, [email]);
     if (res.rows.length === 0) return { error: "Invalid credentials" };
 
@@ -102,7 +102,7 @@ export async function login(email: string, password: string) {
 
 export async function createPassword(email: string, password: string) {
   try {
-    assertSameOrigin();
+    await assertSameOrigin();
     const res = await pool.query(USER_SESSION_SELECT, [email]);
     if (res.rows.length === 0) return { error: "User not found" };
 
@@ -133,6 +133,6 @@ export async function createPassword(email: string, password: string) {
 export async function logout() {
   await logActivity("logout", "/dashboard");
   await endSession();
-  cookies().delete(SESSION_COOKIE_NAME);
+  (await cookies()).delete(SESSION_COOKIE_NAME);
   redirect("/login");
 }

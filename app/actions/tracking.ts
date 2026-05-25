@@ -39,7 +39,7 @@ export async function pingSession() {
     const session = await getSession();
     if (!session?.userId || session.role === "ADMIN") return;
 
-    const headersList = headers();
+    const headersList = await headers();
     const ipAddress = headersList.get("x-forwarded-for") || headersList.get("x-real-ip") || "unknown";
     const userAgent = headersList.get("user-agent") || "unknown";
 

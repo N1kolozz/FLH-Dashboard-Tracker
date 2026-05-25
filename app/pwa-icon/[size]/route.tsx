@@ -33,10 +33,8 @@ function renderIcon(size: number, isTransparent: boolean) {
   );
 }
 
-export async function GET(
-  request: Request,
-  { params }: { params: { size: string } }
-) {
+export async function GET(request: Request, props: { params: Promise<{ size: string }> }) {
+  const params = await props.params;
   const size = params.size;
   const { searchParams } = new URL(request.url);
   const isTransparent = searchParams.get("bg") === "transparent";

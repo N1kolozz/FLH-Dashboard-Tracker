@@ -29,7 +29,7 @@ export async function logActivity(
 
     if (!userId) return;
 
-    const headersList = headers();
+    const headersList = await headers();
     // x-forwarded-for is set by Vercel/proxies; x-real-ip is a common nginx header.
     const ipAddress = headersList.get("x-forwarded-for") || headersList.get("x-real-ip") || "unknown";
     const userAgent = headersList.get("user-agent") || "unknown";

@@ -10,7 +10,7 @@ import {
 export { decrypt, encrypt, type Session };
 
 export async function getSession(): Promise<Session | null> {
-  const session = cookies().get("session")?.value;
+  const session = (await cookies()).get("session")?.value;
   if (!session) return null;
   return await decrypt(session);
 }

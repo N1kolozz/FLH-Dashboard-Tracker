@@ -1,7 +1,11 @@
-// Social media statistics queries, wrapped with Next.js unstable_cache for a
-// 5-minute server-side TTL. All queries use LATERAL subqueries so that every
-// platform row is resolved in a single round-trip, regardless of how many
-// social_accounts rows exist.
+// Social media statistics queries, cached for 5 minutes server-side.
+// All queries use LATERAL subqueries so that every platform row is resolved
+// in a single round-trip, regardless of how many social_accounts rows exist.
+//
+// Currently uses unstable_cache. The Next 15 `"use cache"` directive is the
+// long-term replacement but requires `experimental.cacheComponents` which is
+// canary-only. Swap when it lands in stable — the call sites won't need to
+// change (the exported getSocialStats / getSocialHistory signatures are stable).
 
 import { unstable_cache } from "next/cache";
 import { pool } from "@/lib/db";
@@ -154,9 +158,8 @@ async function querySocialStats(): Promise<StatsResponse> {
   return stats;
 }
 
-// Wrap with unstable_cache so that repeated RSC renders within the same 5-minute
-// window return the cached value without hitting the database again.
-// The cache key ["social-stats"] is global — all users share one cached result.
+// Cached read path. The cache key ["social-stats"] is global — all users
+// share one cached result, since the query has no per-request input.
 const getCachedSocialStats = unstable_cache(querySocialStats, ["social-stats"], {
   revalidate: SOCIAL_CACHE_REVALIDATE_SECONDS,
 });
@@ -231,6 +234,9 @@ async function querySocialHistory(
   }));
 }
 
+// Cached per-platform history. unstable_cache treats arguments as part of the
+// cache key automatically — each unique (platform, range, start, end) combo
+// gets its own entry.
 const getCachedSocialHistory = unstable_cache(
   async (
     platform: SocialPlatform,

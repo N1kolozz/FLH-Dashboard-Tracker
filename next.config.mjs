@@ -3,6 +3,7 @@ const nextConfig = {
   poweredByHeader: false,
   allowedDevOrigins: ["192.168.0.105", "192.168.0.*", "*.local"],
 
+
   async headers() {
     return [
       {
