@@ -13,13 +13,19 @@ import {
 // it to the host the request was sent to. If they don't match, the request was
 // triggered cross-origin and we refuse to process it.
 //
-// In dev we also allow requests with no origin (some local tooling strips it).
-// In production a missing origin is treated as a CSRF attempt and rejected.
+// Server-component page renders also invoke these helpers (the dashboard awaits
+// getDashboardCounts/News during SSR). Those are same-process calls riding on a
+// GET navigation, which browsers don't tag with an Origin header — so we skip
+// the check unless this request is actually a server-action invocation. Next.js
+// marks those with the "next-action" header (same signal the middleware uses).
 //
 // Exported so unauthenticated actions (login, createPassword) can call it too —
 // they don't use the require* helpers below but still need CSRF protection.
 export function assertSameOrigin() {
   const h = headers();
+  const isServerAction = h.get("next-action") !== null;
+  if (!isServerAction) return;
+
   const origin = h.get("origin");
   const host = h.get("host");
 
