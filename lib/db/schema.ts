@@ -43,6 +43,7 @@ export const users = pgTable("users", {
   // e.g. 'Management', 'Projects', 'PR & Social'
   department: varchar("department", { length: 100 }).notNull(),
   position: varchar("position", { length: 255 }).default(""),
+  phoneNumber: varchar("phone_number", { length: 50 }).default(""),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

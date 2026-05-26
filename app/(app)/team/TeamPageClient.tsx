@@ -8,6 +8,7 @@ import EmptyState from "@/components/EmptyState";
 import { getMembers, addMember, deleteMember, updateMember } from "@/app/actions/members";
 import { avatarColor, getInitials } from "@/lib/member-avatar";
 import { getStoredSkeletonCount, resolveSkeletonCount, setStoredSkeletonCount } from "@/lib/loading-skeleton";
+import { Icons } from "@/components/Icons";
 import TeamSubnav from "@/components/TeamSubnav";
 
 import type { Session } from "@/lib/auth";
@@ -21,6 +22,7 @@ interface TeamMember {
   department: string;
   email: string;
   position: string;
+  phone_number: string;
   created_at: string;
 }
 
@@ -86,13 +88,13 @@ export default function TeamPage({
   const [cachedMemberCount, setCachedMemberCount] = useState(0);
   
   // Add Form State
-  const [formData, setFormData] = useState({ fullName: "", role: "", department: "Other", email: "", systemRole: "MEMBER" });
+  const [formData, setFormData] = useState({ fullName: "", role: "", department: "Other", email: "", systemRole: "MEMBER", phoneNumber: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   // Edit Form State
   const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
-  const [editData, setEditData] = useState({ fullName: "", email: "", department: "Other", systemRole: "MEMBER", position: "" });
+  const [editData, setEditData] = useState({ fullName: "", email: "", department: "Other", systemRole: "MEMBER", position: "", phoneNumber: "" });
   const [editError, setEditError] = useState("");
   const [editLoading, setEditLoading] = useState(false);
 
@@ -132,7 +134,7 @@ export default function TeamPage({
     setError("");
     
     const res = await addMember(formData);
-    
+
     if (res.error) {
       setError(res.error);
     } else {
@@ -146,6 +148,7 @@ export default function TeamPage({
               department: formData.department,
               email: formData.email.trim(),
               position: formData.role.trim(),
+              phone_number: formData.phoneNumber.trim(),
               created_at:
                 typeof res.createdAt === "string" && res.createdAt
                   ? res.createdAt
@@ -156,7 +159,7 @@ export default function TeamPage({
         );
       }
       setModalOpen(false);
-      setFormData({ fullName: "", role: "", department: "Other", email: "", systemRole: "MEMBER" });
+      setFormData({ fullName: "", role: "", department: "Other", email: "", systemRole: "MEMBER", phoneNumber: "" });
       void refreshMembers();
     }
     setLoading(false);
@@ -170,6 +173,7 @@ export default function TeamPage({
       department: m.department,
       systemRole: m.role,
       position: m.position || "",
+      phoneNumber: m.phone_number || "",
     });
     setEditError("");
     setEditModalOpen(true);
@@ -196,6 +200,7 @@ export default function TeamPage({
                   department: editData.department,
                   role: editData.systemRole || "MEMBER",
                   position: editData.position.trim(),
+                  phone_number: editData.phoneNumber.trim(),
                 }
               : member
           )
@@ -366,12 +371,20 @@ export default function TeamPage({
                     {m.role === "ADMIN" && <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700 border border-red-200">Admin</span>}
                     {m.role === "HEAD" && <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">Head</span>}
                   </div>
-                  {m.email && (
-                    <div className="mt-3 pt-3 border-t border-slate-100">
-                      <p className="text-xs text-slate-500 flex items-center gap-1.5 truncate">
-                        <svg className="w-3.5 h-3.5 shrink-0 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-                        {m.email}
-                      </p>
+                  {(m.email || m.phone_number) && (
+                    <div className="mt-3 pt-3 border-t border-slate-100 space-y-1.5">
+                      {m.email && (
+                        <p className="text-xs text-slate-500 flex items-center gap-1.5 truncate">
+                          <span className="shrink-0 text-slate-400">{Icons.mail}</span>
+                          {m.email}
+                        </p>
+                      )}
+                      {m.phone_number && (
+                        <p className="text-xs text-slate-500 flex items-center gap-1.5 truncate">
+                          <span className="shrink-0 text-slate-400">{Icons.phone}</span>
+                          {m.phone_number}
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
@@ -422,6 +435,10 @@ export default function TeamPage({
                 />
                 <p className="text-[10px] text-slate-400 mt-1">Head = full access like Admin</p>
               </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Phone Number <span className="text-slate-400 font-normal">(optional)</span></label>
+              <input type="tel" value={formData.phoneNumber} onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400" placeholder="e.g., +995 555 123 456" />
             </div>
             <div className="flex items-center gap-3 pt-2">
               <button disabled={loading} type="submit" className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-75 text-white text-sm font-medium rounded-lg transition-colors">
@@ -481,6 +498,10 @@ export default function TeamPage({
                     </div>
                   </>
                 )}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Phone Number <span className="text-slate-400 font-normal">(optional)</span></label>
+                  <input type="tel" value={editData.phoneNumber} onChange={(e) => setEditData({ ...editData, phoneNumber: e.target.value })} className="w-full text-slate-500 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400" placeholder="e.g., +995 555 123 456" />
+                </div>
                 <div className="flex items-center gap-3 pt-2">
                   <button type="button" onClick={() => { setEditModalOpen(false); setEditingMember(null); }} className="flex-1 px-4 py-2 border border-slate-200 text-slate-600 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors">
                     Cancel

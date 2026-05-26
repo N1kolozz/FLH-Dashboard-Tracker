@@ -1,22 +1,24 @@
 import React from "react";
-import { 
-  LayoutDashboard, 
-  Megaphone, 
-  Calendar, 
-  BarChart3, 
-  ClipboardList, 
-  Layout, 
-  TrendingUp, 
-  Package, 
-  CircleDollarSign, 
-  Star, 
-  CalendarCheck, 
-  Users, 
-  FileText, 
-  ShieldCheck, 
-  Monitor, 
+import {
+  LayoutDashboard,
+  Megaphone,
+  Calendar,
+  BarChart3,
+  ClipboardList,
+  Layout,
+  TrendingUp,
+  Package,
+  CircleDollarSign,
+  Star,
+  CalendarCheck,
+  Users,
+  FileText,
+  ShieldCheck,
+  Monitor,
   Smartphone,
-  Briefcase
+  Briefcase,
+  Mail,
+  Phone
 } from "lucide-react";
 
 /**
@@ -48,6 +50,8 @@ export const Icons = {
   team: <Users size={DEFAULT_SIZE} strokeWidth={DEFAULT_STROKE} />,
   workload: <Briefcase size={DEFAULT_SIZE} strokeWidth={DEFAULT_STROKE} />,
   summary: <FileText size={DEFAULT_SIZE} strokeWidth={DEFAULT_STROKE} />,
+  mail: <Mail size={14} strokeWidth={DEFAULT_STROKE} />,
+  phone: <Phone size={14} strokeWidth={DEFAULT_STROKE} />,
   admin: <ShieldCheck size={DEFAULT_SIZE} strokeWidth={DEFAULT_STROKE} />,
   desktop: <Monitor size={DEFAULT_SIZE} strokeWidth={DEFAULT_STROKE} />,
   mobile: <Smartphone size={DEFAULT_SIZE} strokeWidth={DEFAULT_STROKE} />,

@@ -17,6 +17,7 @@ export default async function TeamPage() {
               department: string;
               email: string;
               position: string;
+              phone_number: string;
               created_at: string;
             }[])
           : []

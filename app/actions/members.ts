@@ -15,6 +15,7 @@ export async function addMember(formData: {
   role: string;
   department: string;
   systemRole: string;
+  phoneNumber?: string;
 }) {
   try {
     const session = assertHeadOrAdmin(await getSession());
@@ -31,8 +32,8 @@ export async function addMember(formData: {
     }
 
     const insertRes = await pool.query(
-      "INSERT INTO users (email, full_name, role, department, position) VALUES ($1, $2, $3, $4, $5) RETURNING id, created_at",
-      [formData.email, formData.fullName, targetRole, formData.department, formData.role || ""]
+      "INSERT INTO users (email, full_name, role, department, position, phone_number) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, created_at",
+      [formData.email, formData.fullName, targetRole, formData.department, formData.role || "", formData.phoneNumber?.trim() || ""]
     );
 
     const createdAt = insertRes.rows[0].created_at;
@@ -58,7 +59,7 @@ export async function getMembers() {
   try {
     await requireAuthenticatedSession();
     const res = await pool.query(
-      "SELECT id, full_name as name, role, department, email, position, created_at FROM users WHERE role != 'ADMIN' ORDER BY created_at DESC"
+      "SELECT id, full_name as name, role, department, email, position, phone_number, created_at FROM users WHERE role != 'ADMIN' ORDER BY created_at DESC"
     );
     return { success: true, members: res.rows };
   } catch (error) {
@@ -90,6 +91,7 @@ export async function updateMember(
     department: string;
     systemRole: string;
     position: string;
+    phoneNumber?: string;
   }
 ) {
   try {
@@ -110,8 +112,8 @@ export async function updateMember(
     }
 
     await pool.query(
-      "UPDATE users SET full_name = $1, email = $2, department = $3, role = $4, position = $5 WHERE id = $6",
-      [data.fullName, data.email, data.department, targetRole, data.position || "", id]
+      "UPDATE users SET full_name = $1, email = $2, department = $3, role = $4, position = $5, phone_number = $6 WHERE id = $7",
+      [data.fullName, data.email, data.department, targetRole, data.position || "", data.phoneNumber?.trim() || "", id]
     );
 
     return { success: true };
