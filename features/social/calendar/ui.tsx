@@ -1,3 +1,4 @@
+import { useState } from "react";
 import FixedPortal from "@/components/FixedPortal";
 import MemberAvatarStack from "@/components/MemberAvatarStack";
 import MemberMultiSelect, { type MemberChoice } from "@/components/MemberMultiSelect";
@@ -6,7 +7,9 @@ import AppSelect from "@/components/ui/Select";
 import { holidayLabel, type PublicHoliday } from "@/lib/public-holidays";
 import {
   PLATFORM_CONFIG,
+  PLATFORM_SHORT_LABEL,
   STATUS_CONFIG,
+  type ApprovalStatus,
   type CalendarLayout,
   type CalendarView,
   type ContentPost,
@@ -14,12 +17,22 @@ import {
   type PostStatus,
 } from "@/features/social/calendar/model";
 
+const APPROVAL_STATUS_CONFIG: Record<string, { label: string; classes: string }> = {
+  rejected: { label: "Rejected", classes: "bg-rose-100 text-rose-700 border border-rose-200" },
+  pending: { label: "Pending Review", classes: "bg-amber-100 text-amber-700 border border-amber-200" },
+  approved: { label: "Approved", classes: "bg-emerald-100 text-emerald-700 border border-emerald-200" },
+};
+
 export function SocialCalendarHeader({
   canEdit,
+  pageView,
   onPlanPost,
+  onPageViewChange,
 }: {
   canEdit: boolean;
+  pageView: "calendar" | "list";
   onPlanPost: () => void;
+  onPageViewChange: (view: "calendar" | "list") => void;
 }) {
   return (
     <header className="border-b border-purple-200/70 bg-gradient-to-r from-violet-100/70 via-purple-100/65 to-fuchsia-100/70 backdrop-blur-md">
@@ -33,14 +46,30 @@ export function SocialCalendarHeader({
           </h1>
           <p className="mt-0.5 text-xs text-slate-500">Plan and schedule posts across platforms</p>
         </div>
-        {canEdit ? (
-          <button
-            onClick={onPlanPost}
-            className="h-10 w-full rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-purple-700 sm:w-auto"
-          >
-            + Plan Post
-          </button>
-        ) : null}
+        <div className="flex w-full items-center gap-3 sm:w-auto">
+          <div className="flex h-10 rounded-lg bg-slate-200/80 p-0.5">
+            <button
+              onClick={() => onPageViewChange("calendar")}
+              className={`flex-1 rounded-md px-4 text-xs font-semibold transition-colors sm:flex-none ${pageView === "calendar" ? "bg-white shadow-sm text-slate-800" : "text-slate-500 hover:text-slate-700"}`}
+            >
+              Calendar
+            </button>
+            <button
+              onClick={() => onPageViewChange("list")}
+              className={`flex-1 rounded-md px-4 text-xs font-semibold transition-colors sm:flex-none ${pageView === "list" ? "bg-white shadow-sm text-slate-800" : "text-slate-500 hover:text-slate-700"}`}
+            >
+              List
+            </button>
+          </div>
+          {canEdit ? (
+            <button
+              onClick={onPlanPost}
+              className="h-10 w-full rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-purple-700 sm:w-auto"
+            >
+              + Plan Post
+            </button>
+          ) : null}
+        </div>
       </div>
     </header>
   );
@@ -325,6 +354,7 @@ export function PostFormModal({
   isHeadOrAdmin,
   members,
   reviewStatus,
+  saveError,
   onClose,
   onPostChange,
   onSave,
@@ -338,6 +368,7 @@ export function PostFormModal({
   isHeadOrAdmin: boolean;
   members: MemberChoice[];
   reviewStatus: { status: string; reviewId: number; feedback: string | null } | null;
+  saveError?: string | null;
   onClose: () => void;
   onPostChange: (post: ContentPost) => void;
   onSave: () => void;
@@ -401,8 +432,20 @@ export function PostFormModal({
               disabled={!canEdit}
               value={post.status}
               onValueChange={(v) => onPostChange({ ...post, status: v as PostStatus })}
-              options={(Object.keys(STATUS_CONFIG) as PostStatus[]).map((s) => ({ value: s, label: STATUS_CONFIG[s].label }))}
+              options={(Object.keys(STATUS_CONFIG) as PostStatus[]).map((s) => ({
+                value: s,
+                label: STATUS_CONFIG[s].label,
+                disabled: s === "published" && !isHeadOrAdmin && reviewStatus?.status !== "approved",
+              }))}
             />
+            {!isHeadOrAdmin && reviewStatus?.status !== "approved" && post.id ? (
+              <p className="mt-1 flex items-center gap-1 text-[11px] text-slate-400">
+                <svg className="h-3 w-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                Published requires HEAD approval
+              </p>
+            ) : null}
           </div>
         </div>
         <div>
@@ -433,6 +476,19 @@ export function PostFormModal({
                 <span className="font-semibold">Approved for publishing</span>
                 {reviewStatus.feedback ? (
                   <span className="text-emerald-600">- {reviewStatus.feedback}</span>
+                ) : null}
+              </div>
+            ) : null}
+            {reviewStatus?.status === "rejected" ? (
+              <div className="flex flex-col gap-1 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                <div className="flex items-center gap-2">
+                  <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  <span className="font-semibold">Rejected by HEAD</span>
+                </div>
+                {reviewStatus.feedback ? (
+                  <p className="pl-6 text-rose-600">{reviewStatus.feedback}</p>
                 ) : null}
               </div>
             ) : null}
@@ -467,6 +523,15 @@ export function PostFormModal({
                 Review This Post
               </button>
             ) : null}
+          </div>
+        ) : null}
+
+        {saveError ? (
+          <div className="flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm text-rose-700">
+            <svg className="mt-0.5 h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>{saveError}</span>
           </div>
         ) : null}
 
@@ -576,6 +641,17 @@ export function PostDetailModal({
             {reviewStatus.feedback ? <span className="text-emerald-600">— {reviewStatus.feedback}</span> : null}
           </div>
         ) : null}
+        {reviewStatus?.status === "rejected" ? (
+          <div className="flex flex-col gap-1 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+            <div className="flex items-center gap-2">
+              <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              <span className="font-semibold">Rejected by HEAD</span>
+            </div>
+            {reviewStatus.feedback ? <p className="pl-6 text-rose-600">{reviewStatus.feedback}</p> : null}
+          </div>
+        ) : null}
         {reviewStatus?.status === "pending" ? (
           <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
             <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -672,5 +748,320 @@ export function PostReviewModal({
         </div>
       ) : null}
     </Modal>
+  );
+}
+
+const PLATFORMS: Platform[] = ["instagram", "tiktok", "facebook"];
+const STATUSES: PostStatus[] = ["draft", "scheduled", "published"];
+const APPROVALS: { value: ApprovalStatus | "all"; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "not_requested", label: "No review" },
+  { value: "pending", label: "Pending" },
+  { value: "approved", label: "Approved" },
+  { value: "rejected", label: "Rejected" },
+];
+
+export function PostListView({
+  posts,
+  members,
+  canEdit,
+  onOpenPost,
+  onEditPost,
+}: {
+  posts: ContentPost[];
+  members: MemberChoice[];
+  canEdit: boolean;
+  onOpenPost: (post: ContentPost) => void;
+  onEditPost?: (post: ContentPost) => void;
+}) {
+  const memberMap = Object.fromEntries(members.map((m) => [m.id, m.name]));
+  const [search, setSearch] = useState("");
+  const [platformFilter, setPlatformFilter] = useState<Platform | "all">("all");
+  const [statusFilter, setStatusFilter] = useState<PostStatus | "all">("all");
+  const [approvalFilter, setApprovalFilter] = useState<ApprovalStatus | "all">("all");
+  const [sortDir, setSortDir] = useState<"desc" | "asc">("desc");
+
+  const filtered = posts
+    .filter((p) =>
+      (platformFilter === "all" || p.platform === platformFilter) &&
+      (statusFilter === "all" || p.status === statusFilter) &&
+      (approvalFilter === "all" || p.approvalStatus === approvalFilter) &&
+      (search.trim() === "" || p.caption.toLowerCase().includes(search.trim().toLowerCase()))
+    )
+    .sort((a, b) => {
+      const d = sortDir === "desc" ? b.date.localeCompare(a.date) : a.date.localeCompare(b.date);
+      return d || a.time.localeCompare(b.time);
+    });
+
+  const hasActiveFilters = platformFilter !== "all" || statusFilter !== "all" || approvalFilter !== "all" || search.trim() !== "";
+
+  if (posts.length === 0) {
+    return (
+      <div className="rounded-[28px] border border-dashed border-slate-200 bg-white/80 px-6 py-16 text-center">
+        <p className="text-sm font-semibold text-slate-700">No posts yet</p>
+        <p className="mt-1 text-sm text-slate-400">Planned posts will appear here.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {/* Filter bar */}
+      <div className="flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-white px-4 py-3 shadow-sm">
+        {/* Search */}
+        <div className="relative w-full">
+          <svg className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+          </svg>
+          <input
+            type="text"
+            placeholder="Search captions…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-8 pr-3 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-violet-400 focus:bg-white focus:ring-2 focus:ring-violet-100"
+          />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded text-slate-400 hover:text-slate-600"
+            >
+              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
+        </div>
+
+        {/* Mobile: Radix selects */}
+        <div className="grid grid-cols-2 gap-2 sm:hidden">
+          <AppSelect
+            value={platformFilter}
+            onValueChange={(v) => setPlatformFilter(v as Platform | "all")}
+            options={[
+              { value: "all", label: "All platforms" },
+              ...PLATFORMS.map((p) => ({ value: p, label: PLATFORM_CONFIG[p].label })),
+            ]}
+            className="w-full"
+          />
+          <AppSelect
+            value={statusFilter}
+            onValueChange={(v) => setStatusFilter(v as PostStatus | "all")}
+            options={[
+              { value: "all", label: "All statuses" },
+              ...STATUSES.map((s) => ({ value: s, label: STATUS_CONFIG[s].label })),
+            ]}
+            className="w-full"
+          />
+          <AppSelect
+            value={approvalFilter}
+            onValueChange={(v) => setApprovalFilter(v as ApprovalStatus | "all")}
+            options={APPROVALS.map(({ value, label }) => ({
+              value,
+              label: value === "all" ? "All approvals" : label,
+            }))}
+            className="w-full"
+          />
+          <AppSelect
+            value={sortDir}
+            onValueChange={(v) => setSortDir(v as "asc" | "desc")}
+            options={[
+              { value: "desc", label: "Date — newest" },
+              { value: "asc", label: "Date — oldest" },
+            ]}
+            className="w-full"
+          />
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={() => { setSearch(""); setPlatformFilter("all"); setStatusFilter("all"); setApprovalFilter("all"); }}
+              className="col-span-2 rounded-xl border border-rose-200 bg-rose-50 py-2 text-[11px] font-semibold text-rose-600 transition-colors hover:bg-rose-100"
+            >
+              Clear filters
+            </button>
+          )}
+        </div>
+
+        {/* Desktop: chip buttons */}
+        <div className="hidden sm:flex flex-wrap items-center gap-2">
+          {/* Platform chips */}
+          <div className="flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1">
+            <button
+              type="button"
+              onClick={() => setPlatformFilter("all")}
+              className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-colors ${platformFilter === "all" ? "bg-white text-slate-700 shadow-sm" : "text-slate-400 hover:text-slate-600"}`}
+            >
+              All
+            </button>
+            {PLATFORMS.map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => setPlatformFilter(platformFilter === p ? "all" : p)}
+                className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-colors ${platformFilter === p ? "bg-white text-slate-700 shadow-sm" : "text-slate-400 hover:text-slate-600"}`}
+              >
+                {PLATFORM_SHORT_LABEL[p]}
+              </button>
+            ))}
+          </div>
+
+          {/* Status chips */}
+          <div className="flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1">
+            <button
+              type="button"
+              onClick={() => setStatusFilter("all")}
+              className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-colors ${statusFilter === "all" ? "bg-white text-slate-700 shadow-sm" : "text-slate-400 hover:text-slate-600"}`}
+            >
+              All
+            </button>
+            {STATUSES.map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setStatusFilter(statusFilter === s ? "all" : s)}
+                className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-colors ${statusFilter === s ? "bg-white text-slate-700 shadow-sm" : "text-slate-400 hover:text-slate-600"}`}
+              >
+                {STATUS_CONFIG[s].label}
+              </button>
+            ))}
+          </div>
+
+          {/* Approval filter */}
+          <div className="flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1">
+            {APPROVALS.map(({ value, label }) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setApprovalFilter(approvalFilter === value ? "all" : (value as ApprovalStatus | "all"))}
+                className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-colors ${approvalFilter === value ? "bg-white text-slate-700 shadow-sm" : "text-slate-400 hover:text-slate-600"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* Sort by date */}
+          <button
+            type="button"
+            onClick={() => setSortDir((d) => (d === "desc" ? "asc" : "desc"))}
+            className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] font-semibold text-slate-500 transition-colors hover:bg-white hover:text-slate-700"
+            title="Toggle date sort direction"
+          >
+            <svg className={`h-3 w-3 transition-transform ${sortDir === "asc" ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+            </svg>
+            Date {sortDir === "desc" ? "↓" : "↑"}
+          </button>
+
+          {/* Clear filters */}
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={() => { setSearch(""); setPlatformFilter("all"); setStatusFilter("all"); setApprovalFilter("all"); }}
+              className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] font-semibold text-rose-600 transition-colors hover:bg-rose-100"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Result count */}
+      <p className="px-1 text-[11px] text-slate-400">
+        {filtered.length === posts.length
+          ? `${posts.length} post${posts.length !== 1 ? "s" : ""}`
+          : `${filtered.length} of ${posts.length} posts`}
+      </p>
+
+      {/* Table */}
+      <div className="overflow-hidden rounded-[28px] border border-slate-200/80 bg-white shadow-sm">
+        {filtered.length === 0 ? (
+          <div className="px-6 py-14 text-center">
+            <p className="text-sm font-semibold text-slate-600">No posts match your filters</p>
+            <p className="mt-1 text-[13px] text-slate-400">Try adjusting or clearing the filters above.</p>
+          </div>
+        ) : (
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="border-b border-slate-100 bg-slate-50/80">
+              <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400">Platform</th>
+              <th className="w-full px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400">Caption</th>
+              <th className="whitespace-nowrap px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400">Date</th>
+              <th className="whitespace-nowrap px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400">Status</th>
+              <th className="px-5 py-3" />
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+          {filtered.map((post) => {
+            const isRejected = post.approvalStatus === "rejected";
+            const ownerNames = post.ownerUserIds.map((id) => memberMap[id]).filter(Boolean);
+            const approvalBadge = APPROVAL_STATUS_CONFIG[post.approvalStatus];
+            const platformCfg = PLATFORM_CONFIG[post.platform] ?? PLATFORM_CONFIG["instagram"];
+
+            return (
+              <tr
+                key={post.id}
+                onClick={() => onOpenPost(post)}
+                className={`group cursor-pointer transition-colors ${
+                  isRejected ? "bg-rose-50/60 hover:bg-rose-50" : "hover:bg-violet-50/40"
+                }`}
+              >
+                <td className="whitespace-nowrap px-5 py-4">
+                  <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${isRejected ? "border-rose-200 bg-rose-100 text-rose-700" : platformCfg.color}`}>
+                    <span className={`h-1.5 w-1.5 rounded-full ${isRejected ? "bg-rose-500" : platformCfg.dot}`} />
+                    {platformCfg.label}
+                  </span>
+                </td>
+
+                <td className="max-w-0 px-5 py-4">
+                  <p className={`truncate text-sm font-medium ${isRejected ? "text-rose-800 line-through decoration-rose-400/60" : "text-slate-800"}`}>
+                    {post.caption || "—"}
+                  </p>
+                  {ownerNames.length > 0 && (
+                    <p className="mt-0.5 truncate text-[11px] text-slate-400">{ownerNames.join(", ")}</p>
+                  )}
+                </td>
+
+                <td className="whitespace-nowrap px-5 py-4">
+                  <p className="text-sm font-medium text-slate-700">
+                    {post.date
+                      ? new Date(`${post.date}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+                      : "—"}
+                  </p>
+                  {post.time && <p className="text-[11px] text-slate-400">{post.time}</p>}
+                </td>
+
+                <td className="whitespace-nowrap px-5 py-4">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${STATUS_CONFIG[post.status].classes}`}>
+                      {STATUS_CONFIG[post.status].label}
+                    </span>
+                    {approvalBadge && (
+                      <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${approvalBadge.classes}`}>
+                        {approvalBadge.label}
+                      </span>
+                    )}
+                  </div>
+                </td>
+
+                <td className="whitespace-nowrap px-5 py-4 text-right">
+                  {canEdit && onEditPost && !isRejected && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); onEditPost(post); }}
+                      className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-slate-50"
+                    >
+                      Edit
+                    </button>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+          </tbody>
+        </table>
+        )}
+      </div>
+    </div>
   );
 }

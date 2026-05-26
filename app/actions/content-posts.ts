@@ -16,6 +16,7 @@ export interface ContentPostRow {
   status: string;
   notes: string;
   owner_user_ids: number[];
+  approval_status: string;
   created_at: string;
 }
 
@@ -35,6 +36,7 @@ export async function getContentPosts() {
            NULLIF(cp.owner_user_ids, '{}'),
            CASE WHEN cp.owner_user_id IS NULL THEN '{}'::INTEGER[] ELSE ARRAY[cp.owner_user_id] END
          ) AS owner_user_ids,
+         cp.approval_status,
          cp.created_at
        FROM content_posts cp
        ORDER BY cp.date DESC, cp.time ASC`
@@ -112,6 +114,37 @@ export async function createContentPost(data: {
   }
 }
 
+// Compares the old DB row with the incoming update and returns a label for
+// what changed. Drives the "Updated" badge in the dashboard news feed.
+// Priority: status > date > time > platform > caption > notes > details.
+function detectContentPostUpdateType(
+  oldRow: {
+    platform: string;
+    caption: string;
+    date: string | null;
+    time: string | null;
+    status: string;
+    notes: string | null;
+  },
+  next: {
+    platform: string;
+    caption: string;
+    date: string;
+    time: string;
+    status: string;
+    notes: string;
+  }
+): string {
+  if ((oldRow.status ?? "") !== (next.status ?? "")) return "status";
+  const oldDate = (oldRow.date ?? "").split("T")[0].split(" ")[0];
+  if (oldDate !== (next.date ?? "")) return "date";
+  if ((oldRow.time ?? "") !== (next.time ?? "")) return "time";
+  if ((oldRow.platform ?? "") !== (next.platform ?? "")) return "platform";
+  if ((oldRow.caption ?? "") !== (next.caption ?? "")) return "caption";
+  if ((oldRow.notes ?? "") !== (next.notes ?? "")) return "notes";
+  return "details";
+}
+
 export async function updateContentPost(
   id: number,
   data: {
@@ -127,9 +160,32 @@ export async function updateContentPost(
   try {
     const session = await requireDepartmentManagerSession("PR & Social");
     const actorUserId = getSessionUserId(session);
+
+    const oldRes = await pool.query(
+      `SELECT platform, caption, date::text AS date, time, status, notes, approval_status
+       FROM content_posts WHERE id = $1`,
+      [id]
+    );
+    const oldRow = oldRes.rows[0];
+
+    // Non-HEAD/ADMIN users cannot set status to "published" without approval
+    const isHeadOrAdmin = session.role === "ADMIN" || session.role === "HEAD";
+    if (data.status === "published" && !isHeadOrAdmin) {
+      const approvalStatus = (oldRow?.approval_status ?? "") as string;
+      if (approvalStatus !== "approved") {
+        return { error: "This post must be approved by a HEAD before it can be published." };
+      }
+    }
+
+    const lastUpdateType = oldRow
+      ? detectContentPostUpdateType(oldRow, data)
+      : "details";
+
     await pool.query(
       `UPDATE content_posts
-       SET platform=$1, caption=$2, date=$3, time=$4, status=$5, notes=$6, owner_user_ids=$7
+       SET platform=$1, caption=$2, date=$3, time=$4, status=$5, notes=$6, owner_user_ids=$7,
+           updated_at=(CURRENT_TIMESTAMP AT TIME ZONE 'UTC'),
+           last_update_type=$9
        WHERE id=$8`,
       [
         data.platform,
@@ -140,6 +196,7 @@ export async function updateContentPost(
         data.notes,
         normalizeOwnerUserIds(data.ownerUserIds),
         id,
+        lastUpdateType,
       ]
     );
 

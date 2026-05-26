@@ -355,7 +355,9 @@ export const contentPosts = pgTable(
     approvalStatus: varchar("approval_status", { length: 50 })
       .notNull()
       .default("not_requested"),
+    lastUpdateType: text("last_update_type"),
     createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
   },
   (table) => ({
     dateTimeIdx: index("content_posts_date_time_idx").on(table.date, table.time),

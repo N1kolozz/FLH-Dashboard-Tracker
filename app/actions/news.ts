@@ -7,7 +7,7 @@ import { canPublishNews, getSessionUserId } from "@/lib/permissions";
 import { createPushNotification, notifySubscribers } from "@/lib/push";
 import { log } from "@/lib/logger";
 
-export type DashboardNewsType = "announcement" | "event" | "project" | "review";
+export type DashboardNewsType = "announcement" | "event" | "project" | "review" | "content";
 
 export interface DashboardNewsItem {
   id: string;
@@ -55,6 +55,17 @@ type ProjectNewsRow = {
   deadline: string | null;
 };
 
+type ContentPostNewsRow = {
+  id: number;
+  platform: string;
+  caption: string;
+  status: string;
+  post_date: string | null;
+  created_at: Date | string;
+  updated_at: Date | string | null;
+  last_update_type: string | null;
+};
+
 function serializeTimestamp(value: Date | string) {
   if (value instanceof Date) return value.toISOString();
   if (typeof value === "string") return value.replace(" ", "T");
@@ -85,13 +96,13 @@ function formatDateLabel(label: string, value: string | null) {
 export async function getDashboardNews() {
   try {
     await requireAuthenticatedSession();
-    const [announcementsRes, eventsRes, projectsRes] = await Promise.all([
+    const [announcementsRes, eventsRes, projectsRes, contentPostsRes] = await Promise.all([
       pool.query(
         `SELECT
            np.id,
            np.title,
            np.body,
-           (np.created_at AT TIME ZONE 'UTC')::text || 'Z' AS created_at,
+           to_char(np.created_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at,
            u.full_name AS author_name,
            np.created_by_user_id AS author_user_id
          FROM news_posts np
@@ -104,8 +115,8 @@ export async function getDashboardNews() {
            e.id,
            e.title,
            e.description AS body,
-           (e.created_at AT TIME ZONE 'UTC')::text || 'Z' AS created_at,
-           (e.updated_at AT TIME ZONE 'UTC')::text || 'Z' AS updated_at,
+           to_char(e.created_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at,
+           to_char(e.updated_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS updated_at,
            e.last_update_type,
            e.date::text AS event_date,
            e.department
@@ -118,14 +129,28 @@ export async function getDashboardNews() {
            p.id,
            p.name AS title,
            p.description AS body,
-           (p.created_at AT TIME ZONE 'UTC')::text || 'Z' AS created_at,
-           (p.updated_at AT TIME ZONE 'UTC')::text || 'Z' AS updated_at,
+           to_char(p.created_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at,
+           to_char(p.updated_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS updated_at,
            p.last_update_type,
            p.status,
            p.deadline::text AS deadline
          FROM projects p
          ORDER BY GREATEST(p.created_at, COALESCE(p.updated_at, p.created_at)) DESC
          LIMIT 20`
+      ),
+      pool.query(
+        `SELECT
+           cp.id,
+           cp.platform,
+           cp.caption,
+           cp.status,
+           cp.date::text AS post_date,
+           to_char(cp.created_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at,
+           to_char(cp.updated_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS updated_at,
+           cp.last_update_type
+         FROM content_posts cp
+         ORDER BY GREATEST(cp.created_at, COALESCE(cp.updated_at, cp.created_at)) DESC
+         LIMIT 15`
       ),
     ]);
 
@@ -194,21 +219,49 @@ export async function getDashboardNews() {
       }
     );
 
-    const news = [...announcements, ...events, ...projects]
-      .sort(
-        (a, b) =>
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      )
-      .slice(0, 30);
+    const platformLabels: Record<string, string> = {
+      instagram: "Instagram",
+      tiktok: "TikTok",
+      facebook: "Facebook",
+    };
 
-    // Fetch pending reviews for HEAD/ADMIN (these go to the top)
+    const contentPosts = (contentPostsRes.rows as ContentPostNewsRow[]).map(
+      (item): DashboardNewsItem => {
+        const platformLabel = platformLabels[item.platform] ?? formatLabel(item.platform);
+        const statusLabel = formatLabel(item.status);
+        const updateType = item.last_update_type ?? null;
+        const effectiveTimestamp =
+          updateType && item.updated_at
+            ? serializeTimestamp(item.updated_at)
+            : serializeTimestamp(item.created_at);
+        return {
+          id: `content-${item.id}`,
+          source_id: item.id,
+          type: "content",
+          title: `${platformLabel} Post`,
+          body: item.caption,
+          meta: [statusLabel, formatDateLabel("Scheduled", item.post_date)]
+            .filter(Boolean)
+            .join(" · "),
+          href: `/social/calendar?postId=${item.id}`,
+          created_at: effectiveTimestamp,
+          author_name: null,
+          author_user_id: null,
+          update_type: updateType,
+        };
+      }
+    );
+
+    // Fetch reviews for HEAD/ADMIN — pending ones are pinned to the top; resolved ones join the main feed
     let reviewItems: DashboardNewsItem[] = [];
+    let resolvedReviewItems: DashboardNewsItem[] = [];
     try {
       const reviewRes = await pool.query(
         `SELECT rr.id, rr.entity_type, rr.entity_id, rr.status,
-                (rr.created_at AT TIME ZONE 'UTC')::text || 'Z' AS created_at,
+                to_char(rr.created_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at,
+                to_char(rr.reviewed_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS reviewed_at,
                 u.full_name as submitted_by_name,
-                CASE 
+                CASE
                   WHEN rr.entity_type = 'project' THEN p.name
                   WHEN rr.entity_type = 'content_post' THEN cp.caption
                 END as entity_name
@@ -217,48 +270,60 @@ export async function getDashboardNews() {
          LEFT JOIN projects p ON rr.entity_type = 'project' AND p.id = rr.entity_id
          LEFT JOIN content_posts cp ON rr.entity_type = 'content_post' AND cp.id = rr.entity_id
          WHERE (
-           -- Only keep if the referenced entity still exists
            ((rr.entity_type = 'project' AND p.id IS NOT NULL) OR
             (rr.entity_type = 'content_post' AND cp.id IS NOT NULL))
          ) AND (
-           -- Only show pending, or ones reviewed recently (last 48 hours)
-           rr.status = 'pending' OR 
+           rr.status = 'pending' OR
            (rr.reviewed_at IS NOT NULL AND rr.reviewed_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') - INTERVAL '48 hours')
          )
          ORDER BY rr.reviewed_at DESC NULLS LAST, rr.created_at DESC
          LIMIT 10`
       );
 
-      reviewItems = reviewRes.rows.map(
-        (row: {
-          id: number;
-          entity_type: string;
-          entity_id: number;
-          status: string;
-          created_at: Date | string;
-          submitted_by_name: string | null;
-          entity_name: string | null;
-        }): DashboardNewsItem => ({
-          id: `review-${row.id}`,
-          source_id: row.id,
-          type: "review",
-          title: `${row.entity_type === "project" ? "Project" : "Post"} review`,
-          body: row.entity_name || "Untitled",
-          meta: row.submitted_by_name
-            ? `Submitted by ${row.submitted_by_name}`
-            : "Submitted for review",
-          href: row.entity_type === "project"
-            ? `/projects?reviewId=${row.id}&projectId=${row.entity_id}`
-            : `/social/calendar?reviewId=${row.id}&postId=${row.entity_id}`,
-          created_at: serializeTimestamp(row.created_at),
-          author_name: row.submitted_by_name,
-          author_user_id: null,
-          review_status: row.status,
-        })
-      );
+      const mapReviewRow = (row: {
+        id: number;
+        entity_type: string;
+        entity_id: number;
+        status: string;
+        created_at: Date | string;
+        reviewed_at: Date | string | null;
+        submitted_by_name: string | null;
+        entity_name: string | null;
+      }): DashboardNewsItem => ({
+        id: `review-${row.id}`,
+        source_id: row.id,
+        type: "review",
+        title: `${row.entity_type === "project" ? "Project" : "Post"} review`,
+        body: row.entity_name || "Untitled",
+        meta: row.submitted_by_name
+          ? `Submitted by ${row.submitted_by_name}`
+          : "Submitted for review",
+        href: row.entity_type === "project"
+          ? `/projects?reviewId=${row.id}&projectId=${row.entity_id}`
+          : `/social/calendar?reviewId=${row.id}&postId=${row.entity_id}`,
+        // Use reviewed_at for resolved reviews so they sort by when they were acted on
+        created_at: row.status !== "pending" && row.reviewed_at
+          ? serializeTimestamp(row.reviewed_at)
+          : serializeTimestamp(row.created_at),
+        author_name: row.submitted_by_name,
+        author_user_id: null,
+        review_status: row.status,
+      });
+
+      const allReviews = reviewRes.rows.map(mapReviewRow);
+      reviewItems = allReviews.filter((r) => r.review_status === "pending");
+      resolvedReviewItems = allReviews.filter((r) => r.review_status !== "pending");
     } catch {
       // Don't fail the whole query if reviews table doesn't exist
     }
+
+    // Merge resolved reviews into the main feed so they sort by date alongside other news
+    const news = [...announcements, ...events, ...projects, ...contentPosts, ...resolvedReviewItems]
+      .sort(
+        (a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      )
+      .slice(0, 30);
 
     return { success: true, news, reviewItems };
   } catch (error) {

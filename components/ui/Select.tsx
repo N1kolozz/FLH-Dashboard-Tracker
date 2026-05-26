@@ -6,6 +6,7 @@ import { ChevronDown, Check } from "lucide-react";
 export interface SelectOption {
   value: string;
   label: string;
+  disabled?: boolean;
 }
 
 interface AppSelectProps {
@@ -46,7 +47,8 @@ export default function AppSelect({
               <Select.Item
                 key={option.value}
                 value={option.value}
-                className="relative flex cursor-pointer select-none items-center rounded-md px-3 py-2 pr-8 text-sm text-slate-700 outline-none hover:bg-purple-50 hover:text-purple-700 focus:bg-purple-50 focus:text-purple-700 data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[state=checked]:font-medium"
+                disabled={option.disabled}
+                className="relative flex cursor-pointer select-none items-center rounded-md px-3 py-2 pr-8 text-sm text-slate-700 outline-none hover:bg-purple-50 hover:text-purple-700 focus:bg-purple-50 focus:text-purple-700 data-[disabled]:pointer-events-none data-[disabled]:opacity-40 data-[state=checked]:font-medium"
               >
                 <Select.ItemText>{option.label}</Select.ItemText>
                 <Select.ItemIndicator className="absolute right-2.5">

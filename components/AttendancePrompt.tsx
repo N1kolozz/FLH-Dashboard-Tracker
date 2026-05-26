@@ -7,7 +7,7 @@ import {
 } from "@/app/actions/attendance";
 import type { AttendancePromptRow } from "@/types";
 
-type ResponseStatus = "present" | "absent" | "excused";
+type ResponseStatus = "present" | "absent";
 
 const REASON_PRESETS = [
   "Sick",
@@ -34,12 +34,6 @@ const STATUS_OPTIONS: {
     label: "Absent",
     description: "I cannot attend.",
     className: "border-rose-300 bg-rose-50 text-rose-800",
-  },
-  {
-    value: "excused",
-    label: "Excused",
-    description: "I need an excused absence.",
-    className: "border-amber-300 bg-amber-50 text-amber-800",
   },
 ];
 
@@ -111,7 +105,7 @@ export default function AttendancePrompt({
 
   if (!prompt) return null;
 
-  const needsReason = status === "absent" || status === "excused";
+  const needsReason = status === "absent";
 
   const submit = async () => {
     if (needsReason && !reason.trim()) {
@@ -163,7 +157,7 @@ export default function AttendancePrompt({
         </div>
 
         <div className="max-h-[70vh] space-y-5 overflow-y-auto bg-purple-50/30 px-5 py-5 sm:px-6">
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             {STATUS_OPTIONS.map((option) => {
               const active = status === option.value;
               return (

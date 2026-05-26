@@ -7,6 +7,8 @@ export type CalendarLayout = "slide" | "fit";
 export type CalendarView = "month" | "week";
 export { getMonthDays, MONTHS, WEEKDAYS } from "@/lib/calendar-ui";
 
+export type ApprovalStatus = "not_requested" | "pending" | "approved" | "rejected";
+
 export interface ContentPost {
   id: number;
   platform: Platform;
@@ -16,6 +18,7 @@ export interface ContentPost {
   status: PostStatus;
   notes: string;
   ownerUserIds: number[];
+  approvalStatus: ApprovalStatus;
   createdAt: string;
 }
 
@@ -64,6 +67,7 @@ export const EMPTY_POST: ContentPost = {
   status: "draft",
   notes: "",
   ownerUserIds: [],
+  approvalStatus: "not_requested",
   createdAt: "",
 };
 
@@ -89,6 +93,7 @@ export function rowToPost(row: ContentPostRow): ContentPost {
     status: row.status as PostStatus,
     notes: row.notes,
     ownerUserIds: normalizeOwnerUserIds(row.owner_user_ids),
+    approvalStatus: (row.approval_status ?? "not_requested") as ApprovalStatus,
     createdAt: row.created_at,
   };
 }

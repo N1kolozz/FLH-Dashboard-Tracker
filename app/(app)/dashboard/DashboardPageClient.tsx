@@ -72,6 +72,9 @@ const UPDATE_TYPE_LABELS: Record<string, string> = {
   time: "Time updated",
   location: "Location updated",
   department: "Department updated",
+  platform: "Platform updated",
+  caption: "Caption updated",
+  notes: "Notes updated",
   details: "Updated",
 };
 
@@ -116,6 +119,15 @@ const NEWS_CONFIG: Record<
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+  },
+  content: {
+    label: "Content Post",
+    badge: "bg-cyan-100 text-cyan-700 border-cyan-200",
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
       </svg>
     ),
   },
@@ -196,7 +208,7 @@ function NewsItem({
           {item.meta || "FLH update"}
         </p>
         <div className="flex shrink-0 items-center gap-2">
-          {(item.href && item.review_status === "pending") && (
+          {(item.href && (item.review_status === "pending" || item.type === "content")) && (
             <span className="inline-flex items-center gap-1 text-xs font-semibold text-purple-600">
               Open
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -227,7 +239,7 @@ function NewsItem({
     </>
   );
 
-  if (item.href && item.review_status === "pending") {
+  if (item.href && (item.review_status === "pending" || item.type === "content")) {
     return (
       <Link href={item.href} className={className}>
         {content}

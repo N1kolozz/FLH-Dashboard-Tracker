@@ -417,6 +417,21 @@ async function migrate() {
     console.log("✓ content_posts owners column ready");
 
     await client.query(`
+      ALTER TABLE content_posts
+      ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    `);
+    await client.query(`
+      UPDATE content_posts
+      SET updated_at = created_at
+      WHERE updated_at IS NULL
+    `);
+    await client.query(`
+      ALTER TABLE content_posts
+      ADD COLUMN IF NOT EXISTS last_update_type TEXT
+    `);
+    console.log("✓ content_posts updated_at + last_update_type columns ready");
+
+    await client.query(`
       CREATE TABLE IF NOT EXISTS review_requests (
         id SERIAL PRIMARY KEY,
         entity_type VARCHAR(50) NOT NULL,

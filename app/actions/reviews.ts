@@ -236,7 +236,10 @@ export async function rejectReview(reviewId: number, feedback: string) {
         [review.entity_id]
       );
     } else {
-      await pool.query(`DELETE FROM content_posts WHERE id = $1`, [review.entity_id]);
+      await pool.query(
+        `UPDATE content_posts SET approval_status = 'rejected' WHERE id = $1`,
+        [review.entity_id]
+      );
     }
 
     return { success: true };

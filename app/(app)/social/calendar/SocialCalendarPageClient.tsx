@@ -47,6 +47,7 @@ import {
 import {
   PostDetailModal,
   PostFormModal,
+  PostListView,
   PostReviewModal,
   SelectedDayDetailsDrawer,
   SocialCalendarHeader,
@@ -78,6 +79,7 @@ export default function SocialCalendarPageClient({
   const [editing, setEditing] = useState<ContentPost>(EMPTY_POST);
   const [viewMonth, setViewMonth] = useState(() => new Date().getMonth());
   const [viewYear, setViewYear] = useState(() => new Date().getFullYear());
+  const [pageView, setPageView] = useState<"calendar" | "list">("calendar");
   const [calendarView, setCalendarView] = useState<CalendarView>("month");
   const [calendarLayout, setCalendarLayout] = useState<CalendarLayout>("slide");
   const [calendarCursor, setCalendarCursor] = useState(() => getLocalISODate());
@@ -93,6 +95,7 @@ export default function SocialCalendarPageClient({
   const [reviewTarget, setReviewTarget] = useState<{ postId: number; reviewId: number; postCaption: string } | null>(null);
   const [reviewFeedback, setReviewFeedback] = useState("");
   const [reviewSaving, setReviewSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [detailPost, setDetailPost] = useState<ContentPost | null>(null);
   const deepLinkHandledRef = useRef(false);
 
@@ -136,16 +139,15 @@ export default function SocialCalendarPageClient({
     const urlReviewId = urlParams.get("reviewId");
     const urlPostId = urlParams.get("postId");
 
-    if (!urlReviewId || !urlPostId) {
+    if (!urlPostId) {
       return;
     }
 
     deepLinkHandledRef.current = true;
     const postId = Number(urlPostId);
-    const reviewId = Number(urlReviewId);
     const targetPost = initialPosts.find((post) => post.id === postId) ?? null;
 
-    if (!targetPost || !Number.isInteger(reviewId)) {
+    if (!targetPost) {
       return;
     }
 
@@ -156,18 +158,24 @@ export default function SocialCalendarPageClient({
       setViewMonth(targetMonth.getMonth());
       setViewYear(targetMonth.getFullYear());
       setCalendarCursor(targetDate);
-      setSelectedDate(targetDate);
     }
 
-    setTimeout(() => {
-      setReviewTarget({
-        postId,
-        reviewId,
-        postCaption: targetPost.caption,
-      });
-      setReviewFeedback("");
-      setReviewModalOpen(true);
-    }, 300);
+    const reviewId = urlReviewId ? Number(urlReviewId) : null;
+    if (reviewId !== null && Number.isInteger(reviewId)) {
+      setTimeout(() => {
+        setReviewTarget({
+          postId,
+          reviewId,
+          postCaption: targetPost.caption,
+        });
+        setReviewFeedback("");
+        setReviewModalOpen(true);
+      }, 300);
+    } else {
+      setTimeout(() => {
+        setDetailPost(rowToPost(targetPost));
+      }, 300);
+    }
   }, [initialPosts]);
 
   const holidaysByDate = useMemo(() => buildHolidaysByDate(publicHolidays), [publicHolidays]);
@@ -229,8 +237,10 @@ export default function SocialCalendarPageClient({
             )
           );
         }
+        setSaveError("error" in result && result.error ? result.error : "Failed to save post.");
         return;
       }
+      setSaveError(null);
     } else {
       const result = await createContentPost(getPostPayload(nextPost));
 
@@ -253,6 +263,7 @@ export default function SocialCalendarPageClient({
       );
     }
 
+    setSaveError(null);
     setModalOpen(false);
     setEditing(EMPTY_POST);
     void refreshPosts();
@@ -295,6 +306,7 @@ export default function SocialCalendarPageClient({
   };
 
   const openPostModal = (post: ContentPost, dateStr?: string) => {
+    setSaveError(null);
     setCalendarCursor(dateStr ?? post.date);
     setSelectedDate(null);
     setEditing(post);
@@ -440,7 +452,12 @@ export default function SocialCalendarPageClient({
     <>
     {confirmDialog}
     <div className="min-h-screen bg-slate-50">
-      <SocialCalendarHeader canEdit={!!canEdit} onPlanPost={() => openNew()} />
+      <SocialCalendarHeader
+        canEdit={!!canEdit}
+        pageView={pageView}
+        onPlanPost={() => openNew()}
+        onPageViewChange={(v) => { setPageView(v); if (v === "list") setSelectedDate(null); }}
+      />
 
       <div className="mx-auto max-w-[1400px] space-y-5 px-4 py-6 sm:px-6">
         {/* Stats */}
@@ -471,20 +488,29 @@ export default function SocialCalendarPageClient({
           </div>
         )}
 
-        <SocialCalendarToolbar
-          calendarView={calendarView}
-          calendarLayout={calendarLayout}
-          monthLabel={monthLabel}
-          weekLabel={weekLabel}
-          onShowMonth={() => setCalendarView("month")}
-          onShowWeek={() => {
-            setCalendarCursor(selectedDate ?? fallbackWeekAnchor);
-            setCalendarView("week");
-          }}
-          onLayoutChange={setCalendarLayout}
-          onNavigate={navigateCalendar}
-          onGoToToday={goToToday}
-        />
+        {pageView === "list" ? (
+          <PostListView
+            posts={posts}
+            members={members}
+            canEdit={!!canEdit}
+            onOpenPost={openPostPreview}
+            onEditPost={canEdit ? openPostEdit : undefined}
+          />
+        ) : (<>
+          <SocialCalendarToolbar
+            calendarView={calendarView}
+            calendarLayout={calendarLayout}
+            monthLabel={monthLabel}
+            weekLabel={weekLabel}
+            onShowMonth={() => setCalendarView("month")}
+            onShowWeek={() => {
+              setCalendarCursor(selectedDate ?? fallbackWeekAnchor);
+              setCalendarView("week");
+            }}
+            onLayoutChange={setCalendarLayout}
+            onNavigate={navigateCalendar}
+            onGoToToday={goToToday}
+          />
 
         {isLoadingData ? (
           <CalendarDataSkeleton calendarView={calendarView} isFitLayout={isFitLayout} />
@@ -568,11 +594,11 @@ export default function SocialCalendarPageClient({
                                 e.stopPropagation();
                                 openPostPreview(p);
                               }}
-                              className={`rounded-md border px-1 py-0.5 text-[9px] font-semibold sm:px-1.5 ${PLATFORM_CONFIG[p.platform].color}`}
+                              className={`rounded-md border px-1 py-0.5 text-[9px] font-semibold sm:px-1.5 ${p.approvalStatus === "rejected" ? "border-rose-300 bg-rose-100 text-rose-700" : PLATFORM_CONFIG[p.platform].color}`}
                               title={p.caption}
                             >
                               <div className="flex items-center justify-between gap-1">
-                                <span className="truncate">{PLATFORM_SHORT_LABEL[p.platform]}</span>
+                                <span className="truncate">{p.approvalStatus === "rejected" ? "✕" : PLATFORM_SHORT_LABEL[p.platform]}</span>
                                 {p.time && <span className="shrink-0 opacity-70">{p.time}</span>}
                               </div>
                             </div>
@@ -602,11 +628,11 @@ export default function SocialCalendarPageClient({
                                 e.stopPropagation();
                                 openPostPreview(p);
                               }}
-                              className={`group/card relative rounded-xl border px-2.5 py-2 text-[11px] font-medium transition-transform hover:-translate-y-0.5 ${PLATFORM_CONFIG[p.platform].color}`}
+                              className={`group/card relative rounded-xl border px-2.5 py-2 text-[11px] font-medium transition-transform hover:-translate-y-0.5 ${p.approvalStatus === "rejected" ? "border-rose-300 bg-rose-100 text-rose-700" : PLATFORM_CONFIG[p.platform].color}`}
                               title={p.caption}
                             >
                               <div className="flex items-center justify-between gap-2">
-                                <span className="truncate">{PLATFORM_CONFIG[p.platform].label}</span>
+                                <span className="truncate">{p.approvalStatus === "rejected" ? "Rejected" : PLATFORM_CONFIG[p.platform].label}</span>
                                 <div className="flex shrink-0 items-center gap-1">
                                   {p.time && <span className="text-[10px] opacity-75">{p.time}</span>}
                                   {canEdit && (
@@ -727,11 +753,11 @@ export default function SocialCalendarPageClient({
                                 e.stopPropagation();
                                 openPostPreview(p);
                               }}
-                              className={`rounded-md border px-1 py-0.5 text-[9px] font-semibold sm:px-1.5 ${PLATFORM_CONFIG[p.platform].color}`}
+                              className={`rounded-md border px-1 py-0.5 text-[9px] font-semibold sm:px-1.5 ${p.approvalStatus === "rejected" ? "border-rose-300 bg-rose-100 text-rose-700" : PLATFORM_CONFIG[p.platform].color}`}
                               title={p.caption}
                             >
                               <div className="flex items-center justify-between gap-1">
-                                <span className="truncate">{PLATFORM_SHORT_LABEL[p.platform]}</span>
+                                <span className="truncate">{p.approvalStatus === "rejected" ? "✕" : PLATFORM_SHORT_LABEL[p.platform]}</span>
                                 {p.time && <span className="shrink-0 opacity-70">{p.time}</span>}
                               </div>
                             </div>
@@ -801,6 +827,7 @@ export default function SocialCalendarPageClient({
             </div>
           </div>
         )}
+        </>)}
       </div>
 
       <SelectedDayDetailsDrawer
@@ -838,15 +865,18 @@ export default function SocialCalendarPageClient({
         isHeadOrAdmin={!!isHeadOrAdmin}
         members={members}
         reviewStatus={editing.id ? reviewStatuses[editing.id] || null : null}
+        saveError={saveError}
         onClose={() => {
+          setSaveError(null);
           setModalOpen(false);
           setEditing(EMPTY_POST);
         }}
-        onPostChange={setEditing}
+        onPostChange={(p) => { setSaveError(null); setEditing(p); }}
         onSave={savePost}
         onDelete={async () => {
           const targetId = editing.id;
           await handleDeletePost(targetId);
+          setSaveError(null);
           setModalOpen(false);
           setEditing(EMPTY_POST);
         }}

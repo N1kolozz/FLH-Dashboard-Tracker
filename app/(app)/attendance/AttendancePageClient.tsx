@@ -57,7 +57,6 @@ const EMPTY_FORM: AttendanceFormState = {
 const STATUS_OPTIONS: Exclude<AttendanceStatus, "pending">[] = [
   "present",
   "absent",
-  "excused",
 ];
 
 const STATUS_CONFIG: Record<
@@ -83,10 +82,10 @@ const STATUS_CONFIG: Record<
     activeButton: "border-rose-300 bg-rose-100 text-rose-800",
   },
   excused: {
-    label: "Excused",
-    chip: "bg-amber-100 text-amber-700 border-amber-200",
-    dot: "bg-amber-500",
-    activeButton: "border-amber-300 bg-amber-100 text-amber-800",
+    label: "Absent",
+    chip: "bg-rose-100 text-rose-700 border-rose-200",
+    dot: "bg-rose-500",
+    activeButton: "border-rose-300 bg-rose-100 text-rose-800",
   },
 };
 
@@ -472,7 +471,7 @@ export default function AttendancePage({
                           />
                         </div>
                         <p className="mt-2 text-xs text-slate-500">
-                          {attendanceSession.present_count} present · {attendanceSession.absent_count} absent · {attendanceSession.excused_count} excused
+                          {attendanceSession.present_count} present · {attendanceSession.absent_count} absent
                         </p>
                       </button>
                     );
@@ -574,7 +573,7 @@ export default function AttendancePage({
                     </div>
                   </div>
 
-                  <div className="mt-5 grid gap-3 sm:grid-cols-4">
+                  <div className="mt-5 grid gap-3 sm:grid-cols-3">
                     <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
                       <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">Rate</p>
                       <p className="mt-1 text-xl font-bold text-slate-900">{formatRate(selectedSessionRate)}</p>
@@ -585,11 +584,7 @@ export default function AttendancePage({
                           {STATUS_CONFIG[status].label}
                         </p>
                         <p className="mt-1 text-xl font-bold">
-                          {status === "present"
-                            ? details.session.present_count
-                            : status === "absent"
-                              ? details.session.absent_count
-                              : details.session.excused_count}
+                          {status === "present" ? details.session.present_count : details.session.absent_count}
                         </p>
                       </div>
                     ))}
@@ -601,7 +596,7 @@ export default function AttendancePage({
                     <div>
                       <h3 className="text-sm font-semibold text-slate-900">Team Members</h3>
                       <p className="text-xs text-slate-500">
-                        Mark Present, Absent, or Excused and keep the reason when needed.
+                        Mark Present or Absent and keep the reason when needed.
                       </p>
                     </div>
                     {isDetailLoading && (
@@ -725,7 +720,6 @@ export default function AttendancePage({
                   <th className="px-3 py-2">Rate</th>
                   <th className="px-3 py-2">Present</th>
                   <th className="px-3 py-2">Absent</th>
-                  <th className="px-3 py-2">Excused</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-purple-50">
@@ -748,12 +742,11 @@ export default function AttendancePage({
                     </td>
                     <td className="px-3 py-3">{member.present_count}</td>
                     <td className="px-3 py-3">{member.absent_count}</td>
-                    <td className="px-3 py-3">{member.excused_count}</td>
                   </tr>
                 ))}
                 {memberStats.length === 0 && (
                   <tr>
-                    <td className="px-3 py-6 text-center text-slate-500" colSpan={6}>
+                    <td className="px-3 py-6 text-center text-slate-500" colSpan={5}>
                       No member attendance data yet.
                     </td>
                   </tr>
