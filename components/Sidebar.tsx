@@ -7,6 +7,7 @@ import type { Session } from "@/lib/auth";
 import { logout } from "@/app/actions/auth";
 import FlhIconMark from "@/components/FlhIconMark";
 import PushNotificationManager from "@/components/PushNotificationManager";
+import VoiceAssistant from "@/components/VoiceAssistant";
 
 import { NAV_SECTIONS } from "@/config/navigation";
 
@@ -124,11 +125,14 @@ export default function Sidebar({ session }: { session: Session | null }) {
           className="h-8 w-8 shrink-0"
         />
         {!collapsed && (
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="text-sm font-bold text-slate-800 leading-none truncate">FLHUB</p>
             <p className="text-[10px] text-slate-500 mt-0.5">Dashboard</p>
           </div>
         )}
+        <span className="hidden md:contents">
+          <VoiceAssistant collapsed={collapsed} />
+        </span>
       </div>
 
       {/* Nav Links */}
@@ -254,7 +258,7 @@ export default function Sidebar({ session }: { session: Session | null }) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
-        <div className="relative z-10 flex items-center gap-2">
+        <div className="relative z-10 flex flex-1 items-center gap-2">
           <FlhIconMark
             width={28}
             height={30}
@@ -262,6 +266,9 @@ export default function Sidebar({ session }: { session: Session | null }) {
             className="h-7 w-7 shrink-0"
           />
           <h2 className="text-sm font-bold text-slate-800 leading-none">FLHUB</h2>
+        </div>
+        <div className="relative z-10">
+          <VoiceAssistant />
         </div>
       </div>
 

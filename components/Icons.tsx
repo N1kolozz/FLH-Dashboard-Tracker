@@ -18,7 +18,8 @@ import {
   Smartphone,
   Briefcase,
   Mail,
-  Phone
+  Phone,
+  AudioLines
 } from "lucide-react";
 
 /**
@@ -52,6 +53,7 @@ export const Icons = {
   summary: <FileText size={DEFAULT_SIZE} strokeWidth={DEFAULT_STROKE} />,
   mail: <Mail size={14} strokeWidth={DEFAULT_STROKE} />,
   phone: <Phone size={14} strokeWidth={DEFAULT_STROKE} />,
+  voiceAssistant: <AudioLines size={18} strokeWidth={DEFAULT_STROKE} />,
   admin: <ShieldCheck size={DEFAULT_SIZE} strokeWidth={DEFAULT_STROKE} />,
   desktop: <Monitor size={DEFAULT_SIZE} strokeWidth={DEFAULT_STROKE} />,
   mobile: <Smartphone size={DEFAULT_SIZE} strokeWidth={DEFAULT_STROKE} />,
