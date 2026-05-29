@@ -449,13 +449,13 @@ export function PostFormModal({
           </div>
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700">Notes</label>
+          <label className="mb-1 block text-sm font-medium text-slate-700">Notes <p className="text-xs text-slate-500">(Links and Resources)</p></label>
           <textarea
             disabled={!canEdit}
             value={post.notes}
             onChange={(event) => onPostChange({ ...post, notes: event.target.value })}
             rows={2}
-            className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-300 disabled:bg-slate-50"
+            className="w-full resize-y rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-500 min-h-[100px] focus:outline-none focus:ring-2 focus:ring-purple-300 disabled:bg-slate-50"
             placeholder="Internal notes..."
           />
         </div>
