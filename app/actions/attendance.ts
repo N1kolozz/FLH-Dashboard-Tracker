@@ -127,6 +127,7 @@ async function syncAttendanceRecords(sessionId?: number) {
          LEFT JOIN events e ON e.id = s.event_id
          JOIN users u ON u.id = r.user_id
          WHERE s.id = r.session_id
+           AND s.created_by_user_id IS DISTINCT FROM u.id
            AND ${ATTENDANCE_AUDIENCE_CONDITION}
        )`,
     [sessionId ?? null]
@@ -139,6 +140,7 @@ async function syncAttendanceRecords(sessionId?: number) {
      LEFT JOIN events e ON e.id = s.event_id
      CROSS JOIN users u
      WHERE ($1::INTEGER IS NULL OR s.id = $1)
+       AND s.created_by_user_id IS DISTINCT FROM u.id
        AND ${ATTENDANCE_AUDIENCE_CONDITION}
      ON CONFLICT (session_id, user_id) DO NOTHING`,
     [sessionId ?? null]
@@ -576,6 +578,7 @@ export async function getPendingAttendancePrompt() {
        LEFT JOIN events e ON e.id = s.event_id
        JOIN users u ON u.id = $1
        WHERE s.is_active = TRUE
+         AND s.created_by_user_id IS DISTINCT FROM $1
          AND ${ATTENDANCE_AUDIENCE_CONDITION}
        ON CONFLICT (session_id, user_id) DO NOTHING`,
       [userId]
@@ -599,6 +602,7 @@ export async function getPendingAttendancePrompt() {
        WHERE s.is_active = TRUE
          AND r.user_id = $1
          AND r.status = 'pending'
+         AND s.created_by_user_id IS DISTINCT FROM $1
          AND ${ATTENDANCE_AUDIENCE_CONDITION}
        ORDER BY s.meeting_date ASC, s.created_at ASC
        LIMIT 1`,
