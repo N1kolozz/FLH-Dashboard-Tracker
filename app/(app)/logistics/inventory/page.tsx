@@ -8,12 +8,14 @@ export default async function InventoryPage() {
     getInventoryItems(),
   ]);
 
+  const hasItems = "success" in itemsResult && itemsResult.items;
+
   return (
     <InventoryPageClient
       initialSession={session}
-      initialItems={
-        "success" in itemsResult && itemsResult.items ? itemsResult.items : []
-      }
+      initialItems={hasItems ? itemsResult.items : []}
+      initialTotal={hasItems ? itemsResult.total ?? 0 : 0}
+      initialPageSize={hasItems ? itemsResult.pageSize ?? 15 : 15}
     />
   );
 }

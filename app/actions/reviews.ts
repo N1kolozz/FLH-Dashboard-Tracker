@@ -1,6 +1,7 @@
 "use server";
 
-import { pool } from "@/lib/db";
+import { after } from "next/server";
+import { pool, withTransaction } from "@/lib/db";
 import {
   requireAuthenticatedSession,
   requireHeadOrAdminSession,
@@ -78,33 +79,45 @@ export async function submitForReview(
     const session = await requireAuthenticatedSession();
     const userId = getSessionUserId(session);
 
-    const existing = await pool.query(
-      `SELECT id FROM review_requests 
-       WHERE entity_type = $1 AND entity_id = $2 AND status = 'pending'`,
-      [entityType, entityId]
-    );
-    if (existing.rows.length > 0) {
+    // Mirror the pending state onto the entity AND insert the review request
+    // atomically — a partial write would leave the entity flagged pending with
+    // no matching review row (or vice versa).
+    const txResult = await withTransaction(async (client) => {
+      const existing = await client.query(
+        `SELECT id FROM review_requests
+         WHERE entity_type = $1 AND entity_id = $2 AND status = 'pending'`,
+        [entityType, entityId]
+      );
+      if (existing.rows.length > 0) {
+        return { duplicate: true as const };
+      }
+
+      if (entityType === "project") {
+        await client.query(
+          `UPDATE projects SET review_status = 'pending' WHERE id = $1`,
+          [entityId]
+        );
+      } else {
+        await client.query(
+          `UPDATE content_posts SET approval_status = 'pending' WHERE id = $1`,
+          [entityId]
+        );
+      }
+
+      const res = await client.query(
+        `INSERT INTO review_requests (entity_type, entity_id, submitted_by)
+         VALUES ($1, $2, $3)
+         RETURNING id, created_at`,
+        [entityType, entityId, userId]
+      );
+
+      return { duplicate: false as const, reviewId: res.rows[0].id as number };
+    });
+
+    if (txResult.duplicate) {
       return { error: "Already submitted for review" };
     }
-
-    if (entityType === "project") {
-      await pool.query(
-        `UPDATE projects SET review_status = 'pending' WHERE id = $1`,
-        [entityId]
-      );
-    } else {
-      await pool.query(
-        `UPDATE content_posts SET approval_status = 'pending' WHERE id = $1`,
-        [entityId]
-      );
-    }
-
-    const res = await pool.query(
-      `INSERT INTO review_requests (entity_type, entity_id, submitted_by)
-       VALUES ($1, $2, $3)
-       RETURNING id, created_at`,
-      [entityType, entityId, userId]
-    );
+    const reviewId = txResult.reviewId;
 
     if (entityType === "content_post") {
       try {
@@ -128,18 +141,23 @@ export async function submitForReview(
           const platformLabel = PLATFORM_LABEL[post.platform] ?? post.platform;
           const caption = post.caption ? ` — ${post.caption.slice(0, 60)}${post.caption.length > 60 ? "…" : ""}` : "";
 
-          const reviewId = res.rows[0].id as number;
-          await notifySubscribers({
-            topic: "content",
-            userIds: headAdminIds,
-            excludeUserId: userId,
-            payload: createPushNotification({
-              topic: "content",
-              title: `პოსტი საჭიროებს შემოწმებას: ${platformLabel}`,
-              body: `შეამოწმეთ კონტენტ კალენდარი${caption}.`,
-              url: `/social/calendar?postId=${entityId}&reviewId=${reviewId}`,
-              tag: `content-review-${entityId}`,
-            }),
+          after(async () => {
+            try {
+              await notifySubscribers({
+                topic: "content",
+                userIds: headAdminIds,
+                excludeUserId: userId,
+                payload: createPushNotification({
+                  topic: "content",
+                  title: `პოსტი საჭიროებს შემოწმებას: ${platformLabel}`,
+                  body: `შეამოწმეთ კონტენტ კალენდარი${caption}.`,
+                  url: `/social/calendar?postId=${entityId}&reviewId=${reviewId}`,
+                  tag: `content-review-${entityId}`,
+                }),
+              });
+            } catch (pushError) {
+              log.error("Error sending review submission push notification", pushError);
+            }
           });
         }
       } catch (pushError) {
@@ -147,7 +165,7 @@ export async function submitForReview(
       }
     }
 
-    return { success: true, id: res.rows[0].id };
+    return { success: true, id: reviewId };
   } catch (error) {
     log.error("Error submitting for review", error);
     return { error: "Failed to submit for review" };
@@ -160,36 +178,44 @@ export async function approveReview(reviewId: number, feedback?: string) {
     const session = await requireHeadOrAdminSession();
     const userId = getSessionUserId(session);
 
-    const reviewRes = await pool.query(
-      `SELECT * FROM review_requests WHERE id = $1 AND status = 'pending'`,
-      [reviewId]
-    );
-    if (reviewRes.rows.length === 0) {
+    const notFound = await withTransaction(async (client) => {
+      const reviewRes = await client.query(
+        `SELECT * FROM review_requests WHERE id = $1 AND status = 'pending'`,
+        [reviewId]
+      );
+      if (reviewRes.rows.length === 0) {
+        return true;
+      }
+
+      const review = reviewRes.rows[0];
+
+      await client.query(
+        `UPDATE review_requests
+         SET status = 'approved',
+             reviewed_by = $1,
+             feedback = $2,
+             reviewed_at = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
+         WHERE id = $3`,
+        [userId, feedback || null, reviewId]
+      );
+
+      if (review.entity_type === "project") {
+        await client.query(
+          `UPDATE projects SET review_status = 'approved' WHERE id = $1`,
+          [review.entity_id]
+        );
+      } else {
+        await client.query(
+          `UPDATE content_posts SET approval_status = 'approved' WHERE id = $1`,
+          [review.entity_id]
+        );
+      }
+
+      return false;
+    });
+
+    if (notFound) {
       return { error: "Review not found or already processed" };
-    }
-
-    const review = reviewRes.rows[0];
-
-    await pool.query(
-      `UPDATE review_requests 
-       SET status = 'approved', 
-           reviewed_by = $1, 
-           feedback = $2,
-           reviewed_at = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
-       WHERE id = $3`,
-      [userId, feedback || null, reviewId]
-    );
-
-    if (review.entity_type === "project") {
-      await pool.query(
-        `UPDATE projects SET review_status = 'approved' WHERE id = $1`,
-        [review.entity_id]
-      );
-    } else {
-      await pool.query(
-        `UPDATE content_posts SET approval_status = 'approved' WHERE id = $1`,
-        [review.entity_id]
-      );
     }
 
     return { success: true };
@@ -210,36 +236,44 @@ export async function rejectReview(reviewId: number, feedback: string) {
       return { error: "Feedback is required when rejecting" };
     }
 
-    const reviewRes = await pool.query(
-      `SELECT * FROM review_requests WHERE id = $1 AND status = 'pending'`,
-      [reviewId]
-    );
-    if (reviewRes.rows.length === 0) {
+    const notFound = await withTransaction(async (client) => {
+      const reviewRes = await client.query(
+        `SELECT * FROM review_requests WHERE id = $1 AND status = 'pending'`,
+        [reviewId]
+      );
+      if (reviewRes.rows.length === 0) {
+        return true;
+      }
+
+      const review = reviewRes.rows[0];
+
+      await client.query(
+        `UPDATE review_requests
+         SET status = 'rejected',
+             reviewed_by = $1,
+             feedback = $2,
+             reviewed_at = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
+         WHERE id = $3`,
+        [userId, feedback.trim(), reviewId]
+      );
+
+      if (review.entity_type === "project") {
+        await client.query(
+          `UPDATE projects SET status = 'rejected', review_status = 'rejected' WHERE id = $1`,
+          [review.entity_id]
+        );
+      } else {
+        await client.query(
+          `UPDATE content_posts SET approval_status = 'rejected' WHERE id = $1`,
+          [review.entity_id]
+        );
+      }
+
+      return false;
+    });
+
+    if (notFound) {
       return { error: "Review not found or already processed" };
-    }
-
-    const review = reviewRes.rows[0];
-
-    await pool.query(
-      `UPDATE review_requests 
-       SET status = 'rejected', 
-           reviewed_by = $1, 
-           feedback = $2,
-           reviewed_at = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
-       WHERE id = $3`,
-      [userId, feedback.trim(), reviewId]
-    );
-
-    if (review.entity_type === "project") {
-      await pool.query(
-        `UPDATE projects SET status = 'rejected', review_status = 'rejected' WHERE id = $1`,
-        [review.entity_id]
-      );
-    } else {
-      await pool.query(
-        `UPDATE content_posts SET approval_status = 'rejected' WHERE id = $1`,
-        [review.entity_id]
-      );
     }
 
     return { success: true };

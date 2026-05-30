@@ -11,8 +11,13 @@ import { defineConfig } from "drizzle-kit";
 // explicitly before reading process.env.
 dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
 
-if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL is required for drizzle-kit");
+// Migrations (DDL) should run against a *direct* Neon connection, not the
+// pooler — PgBouncer transaction pooling breaks some DDL/session semantics.
+// Prefer DIRECT_DATABASE_URL when set, falling back to DATABASE_URL.
+const migrationUrl = process.env.DIRECT_DATABASE_URL ?? process.env.DATABASE_URL;
+
+if (!migrationUrl) {
+  throw new Error("DIRECT_DATABASE_URL or DATABASE_URL is required for drizzle-kit");
 }
 
 export default defineConfig({
@@ -20,7 +25,7 @@ export default defineConfig({
   out: "./drizzle",
   dialect: "postgresql",
   dbCredentials: {
-    url: process.env.DATABASE_URL,
+    url: migrationUrl,
   },
   verbose: true,
   strict: true,

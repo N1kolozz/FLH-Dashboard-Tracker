@@ -1,5 +1,6 @@
 "use server";
 
+import { after } from "next/server";
 import { pool } from "@/lib/db";
 import { requireAuthenticatedSession, requireDepartmentManagerSession } from "@/lib/action-auth";
 import { normalizeOwnerUserIds } from "@/lib/owner-users";
@@ -20,9 +21,28 @@ export interface ContentPostRow {
   created_at: string;
 }
 
-export async function getContentPosts() {
+// Defensive ceiling for the no-range fetch.
+const CONTENT_POSTS_DEFAULT_LIMIT = 2000;
+
+export async function getContentPosts(params?: { from?: string; to?: string }) {
   try {
     await requireAuthenticatedSession();
+
+    // The calendar passes a visible-month window so it only loads the posts it
+    // can show; callers without a range get a bounded list.
+    const filters: string[] = [];
+    const values: unknown[] = [];
+    if (params?.from) {
+      values.push(params.from);
+      filters.push(`cp.date >= $${values.length}`);
+    }
+    if (params?.to) {
+      values.push(params.to);
+      filters.push(`cp.date <= $${values.length}`);
+    }
+    const whereClause = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
+    const limitClause = filters.length ? "" : `LIMIT ${CONTENT_POSTS_DEFAULT_LIMIT}`;
+
     const res = await pool.query(
       `SELECT
          cp.id,
@@ -39,7 +59,10 @@ export async function getContentPosts() {
          cp.approval_status,
          cp.created_at
        FROM content_posts cp
-       ORDER BY cp.date DESC, cp.time ASC`
+       ${whereClause}
+       ORDER BY cp.date DESC, cp.time ASC
+       ${limitClause}`,
+      values
     );
     return { success: true, posts: res.rows as ContentPostRow[] };
   } catch (error) {
@@ -81,24 +104,26 @@ export async function createContentPost(data: {
     );
     const createdAt = res.rows[0].created_at;
 
-    try {
-      const platformLabel = PLATFORM_LABEL[data.platform] ?? data.platform;
-      await notifySubscribers({
-        topic: "content",
-        excludeUserId: actorUserId,
-        payload: createPushNotification({
+    after(async () => {
+      try {
+        const platformLabel = PLATFORM_LABEL[data.platform] ?? data.platform;
+        await notifySubscribers({
           topic: "content",
-          title: `ახალი პოსტი: ${platformLabel}`,
-          body: data.date
-            ? `დაგეგმილია ${data.date}${data.time ? `, ${data.time}` : ""}.`
-            : "კონტენტ კალენდარში ახალი პოსტი დაემატა.",
-          url: "/social/calendar",
-          tag: `content-post-${res.rows[0].id as number}`,
-        }),
-      });
-    } catch (pushError) {
-      log.error("Error sending content post push notification", pushError);
-    }
+          excludeUserId: actorUserId,
+          payload: createPushNotification({
+            topic: "content",
+            title: `ახალი პოსტი: ${platformLabel}`,
+            body: data.date
+              ? `დაგეგმილია ${data.date}${data.time ? `, ${data.time}` : ""}.`
+              : "კონტენტ კალენდარში ახალი პოსტი დაემატა.",
+            url: "/social/calendar",
+            tag: `content-post-${res.rows[0].id as number}`,
+          }),
+        });
+      } catch (pushError) {
+        log.error("Error sending content post push notification", pushError);
+      }
+    });
 
     return {
       success: true,
@@ -200,24 +225,26 @@ export async function updateContentPost(
       ]
     );
 
-    try {
-      const platformLabel = PLATFORM_LABEL[data.platform] ?? data.platform;
-      await notifySubscribers({
-        topic: "content",
-        excludeUserId: actorUserId,
-        payload: createPushNotification({
+    after(async () => {
+      try {
+        const platformLabel = PLATFORM_LABEL[data.platform] ?? data.platform;
+        await notifySubscribers({
           topic: "content",
-          title: `პოსტი განახლდა: ${platformLabel}`,
-          body: data.date
-            ? `შეამოწმეთ განახლებული გეგმა ${data.date}${data.time ? `, ${data.time}` : ""}.`
-            : "კონტენტ კალენდარში პოსტი განახლდა.",
-          url: "/social/calendar",
-          tag: `content-post-${id}`,
-        }),
-      });
-    } catch (pushError) {
-      log.error("Error sending content post update push notification", pushError);
-    }
+          excludeUserId: actorUserId,
+          payload: createPushNotification({
+            topic: "content",
+            title: `პოსტი განახლდა: ${platformLabel}`,
+            body: data.date
+              ? `შეამოწმეთ განახლებული გეგმა ${data.date}${data.time ? `, ${data.time}` : ""}.`
+              : "კონტენტ კალენდარში პოსტი განახლდა.",
+            url: "/social/calendar",
+            tag: `content-post-${id}`,
+          }),
+        });
+      } catch (pushError) {
+        log.error("Error sending content post update push notification", pushError);
+      }
+    });
 
     return { success: true };
   } catch (error) {

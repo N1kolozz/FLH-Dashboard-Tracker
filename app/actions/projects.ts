@@ -1,5 +1,6 @@
 "use server";
 
+import { after } from "next/server";
 import { getSession } from "@/lib/auth";
 import { requireAuthenticatedSession } from "@/lib/action-auth";
 import {
@@ -13,6 +14,7 @@ import {
   insertProject,
   updateProjectInDB,
   deleteProjectFromDB,
+  reorderProjectsInDB,
 } from "@/lib/dal/projects";
 import { logActivity } from "@/lib/activity";
 import { log } from "@/lib/logger";
@@ -58,23 +60,25 @@ export async function createProject(data: {
     const createdAt = row.created_at;
     const updatedAt = row.updated_at;
 
-    try {
-      await notifySubscribers({
-        topic: "projects",
-        excludeUserId: actorUserId,
-        payload: createPushNotification({
+    after(async () => {
+      try {
+        await notifySubscribers({
           topic: "projects",
-          title: `ახალი პროექტი: ${data.name}`,
-          body: data.deadline
-            ? `დედლაინი: ${data.deadline}.`
-            : "dashboard-ში ახალი პროექტი დაემატა.",
-          url: "/projects/overview",
-          tag: `project-${row.id as number}`,
-        }),
-      });
-    } catch (pushError) {
-      log.error("Error sending project push notification", pushError);
-    }
+          excludeUserId: actorUserId,
+          payload: createPushNotification({
+            topic: "projects",
+            title: `ახალი პროექტი: ${data.name}`,
+            body: data.deadline
+              ? `დედლაინი: ${data.deadline}.`
+              : "dashboard-ში ახალი პროექტი დაემატა.",
+            url: "/projects/overview",
+            tag: `project-${row.id as number}`,
+          }),
+        });
+      } catch (pushError) {
+        log.error("Error sending project push notification", pushError);
+      }
+    });
 
     await logActivity(
       "create_project",
@@ -169,25 +173,27 @@ export async function updateProject(
     const row = await updateProjectInDB(id, data);
     const updatedAt = row?.updated_at;
 
-    try {
-      const updateType = row?.last_update_type ?? "details";
-      const oldRow = row?.oldRow;
-      const notifBody = buildUpdateNotificationBody(updateType, oldRow, data);
+    after(async () => {
+      try {
+        const updateType = row?.last_update_type ?? "details";
+        const oldRow = row?.oldRow;
+        const notifBody = buildUpdateNotificationBody(updateType, oldRow, data);
 
-      await notifySubscribers({
-        topic: "projects",
-        excludeUserId: actorUserId,
-        payload: createPushNotification({
+        await notifySubscribers({
           topic: "projects",
-          title: `პროექტი განახლდა: ${data.name}`,
-          body: notifBody,
-          url: "/projects/overview",
-          tag: `project-${id}`,
-        }),
-      });
-    } catch (pushError) {
-      log.error("Error sending project update notification", pushError);
-    }
+          excludeUserId: actorUserId,
+          payload: createPushNotification({
+            topic: "projects",
+            title: `პროექტი განახლდა: ${data.name}`,
+            body: notifBody,
+            url: "/projects/overview",
+            tag: `project-${id}`,
+          }),
+        });
+      } catch (pushError) {
+        log.error("Error sending project update notification", pushError);
+      }
+    });
 
     await logActivity(
       "update_project",
@@ -208,6 +214,36 @@ export async function updateProject(
   } catch (error) {
     log.error("Error updating project", error);
     return { error: "Failed to update project" };
+  }
+}
+
+/* Persist manual board ordering (up/down arrows, drag-to-top placement). */
+export async function reorderProjects(
+  updates: { id: number; sortOrder: number }[]
+) {
+  try {
+    const session = await getSession();
+    assertCanManageProjects(session);
+
+    const sanitized = updates
+      .filter(
+        (update) =>
+          Number.isInteger(update.id) && Number.isFinite(update.sortOrder)
+      )
+      .map((update) => ({
+        id: update.id,
+        sortOrder: Math.trunc(update.sortOrder),
+      }));
+
+    if (sanitized.length === 0) {
+      return { success: true };
+    }
+
+    await reorderProjectsInDB(sanitized);
+    return { success: true };
+  } catch (error) {
+    log.error("Error reordering projects", error);
+    return { error: "Failed to reorder projects" };
   }
 }
 

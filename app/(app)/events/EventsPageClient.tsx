@@ -9,6 +9,7 @@ import FixedPortal from "@/components/FixedPortal";
 import MemberAvatarStack from "@/components/MemberAvatarStack";
 import MemberMultiSelect, { type MemberChoice } from "@/components/MemberMultiSelect";
 import Modal from "@/components/Modal";
+import Pagination from "@/components/Pagination";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import EmptyState from "@/components/EmptyState";
 import type { Session } from "@/lib/auth";
@@ -202,6 +203,342 @@ function EventListSkeleton() {
   );
 }
 
+const FILTERABLE_DEPARTMENTS: Department[] = ["pr", "logistics", "projects", "other"];
+type EventWhen = "all" | "upcoming" | "past";
+const EVENT_PAGE_SIZE = 10;
+
+// "2026-05" → "May 2026"
+function formatMonthKey(key: string) {
+  const [year, month] = key.split("-");
+  return new Date(Number(year), Number(month) - 1, 1).toLocaleDateString(undefined, {
+    month: "long",
+    year: "numeric",
+  });
+}
+
+function EventListView({
+  events,
+  members,
+  canEdit,
+  onOpenEvent,
+  onEditEvent,
+}: {
+  events: CalEvent[];
+  members: MemberChoice[];
+  canEdit: boolean;
+  onOpenEvent: (event: CalEvent) => void;
+  onEditEvent?: (event: CalEvent) => void;
+}) {
+  const memberMap = useMemo(() => Object.fromEntries(members.map((m) => [m.id, m.name])), [members]);
+  const today = getLocalISODate();
+  const [search, setSearch] = useState("");
+  const [deptFilter, setDeptFilter] = useState<Department | "all">("all");
+  const [whenFilter, setWhenFilter] = useState<EventWhen>("upcoming");
+  const [monthFilter, setMonthFilter] = useState("all");
+  const [sortDir, setSortDir] = useState<"desc" | "asc">("asc");
+  const [page, setPage] = useState(1);
+
+  const availableMonths = useMemo(() => {
+    const set = new Set(events.map((e) => e.date.slice(0, 7)).filter(Boolean));
+    return Array.from(set).sort((a, b) => b.localeCompare(a));
+  }, [events]);
+
+  const filtered = events
+    .filter((e) =>
+      (deptFilter === "all" || e.department === deptFilter) &&
+      (whenFilter === "all" || (whenFilter === "upcoming" ? e.date >= today : e.date < today)) &&
+      (monthFilter === "all" || e.date.startsWith(monthFilter)) &&
+      (search.trim() === "" || e.title.toLowerCase().includes(search.trim().toLowerCase()))
+    )
+    .sort((a, b) => {
+      const d = sortDir === "desc" ? b.date.localeCompare(a.date) : a.date.localeCompare(b.date);
+      return d || a.time.localeCompare(b.time);
+    });
+
+  const hasActiveFilters = deptFilter !== "all" || whenFilter !== "upcoming" || monthFilter !== "all" || search.trim() !== "";
+
+  // Reset to the first page whenever the filtered set changes.
+  useEffect(() => {
+    setPage(1);
+  }, [search, deptFilter, whenFilter, monthFilter, sortDir]);
+
+  const paginated = filtered.slice((page - 1) * EVENT_PAGE_SIZE, page * EVENT_PAGE_SIZE);
+
+  const resetFilters = () => {
+    setSearch("");
+    setDeptFilter("all");
+    setWhenFilter("upcoming");
+    setMonthFilter("all");
+  };
+
+  if (events.length === 0) {
+    return (
+      <div className="rounded-[28px] border border-dashed border-slate-200 bg-white/80 px-6 py-16 text-center">
+        <p className="text-sm font-semibold text-slate-700">No events yet</p>
+        <p className="mt-1 text-sm text-slate-400">Scheduled events will appear here.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {/* Filter bar */}
+      <div className="flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-white px-4 py-3 shadow-sm">
+        {/* Search */}
+        <div className="relative w-full">
+          <svg className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+          </svg>
+          <input
+            type="text"
+            placeholder="Search events…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-8 pr-3 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-amber-400 focus:bg-white focus:ring-2 focus:ring-amber-100"
+          />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded text-slate-400 hover:text-slate-600"
+            >
+              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
+        </div>
+
+        {/* Mobile: Radix selects */}
+        <div className="grid grid-cols-2 gap-2 sm:hidden">
+          <AppSelect
+            value={deptFilter}
+            onValueChange={(v) => setDeptFilter(v as Department | "all")}
+            options={[
+              { value: "all", label: "All departments" },
+              ...FILTERABLE_DEPARTMENTS.map((d) => ({ value: d, label: DEPT_CONFIG[d].label })),
+            ]}
+            className="w-full"
+          />
+          <AppSelect
+            value={whenFilter}
+            onValueChange={(v) => setWhenFilter(v as EventWhen)}
+            options={[
+              { value: "all", label: "All dates" },
+              { value: "upcoming", label: "Upcoming" },
+              { value: "past", label: "Past" },
+            ]}
+            className="w-full"
+          />
+          <AppSelect
+            value={monthFilter}
+            onValueChange={setMonthFilter}
+            options={[
+              { value: "all", label: "All months" },
+              ...availableMonths.map((m) => ({ value: m, label: formatMonthKey(m) })),
+            ]}
+            className="w-full"
+          />
+          <AppSelect
+            value={sortDir}
+            onValueChange={(v) => setSortDir(v as "asc" | "desc")}
+            options={[
+              { value: "asc", label: "Date — soonest" },
+              { value: "desc", label: "Date — latest" },
+            ]}
+            className="w-full"
+          />
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="col-span-2 rounded-xl border border-rose-200 bg-rose-50 py-2 text-[11px] font-semibold text-rose-600 transition-colors hover:bg-rose-100"
+            >
+              Clear filters
+            </button>
+          )}
+        </div>
+
+        {/* Desktop: chip buttons */}
+        <div className="hidden sm:flex flex-wrap items-center gap-2">
+          {/* Department chips */}
+          <div className="flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1">
+            <button
+              type="button"
+              onClick={() => setDeptFilter("all")}
+              className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-colors ${deptFilter === "all" ? "bg-white text-slate-700 shadow-sm" : "text-slate-400 hover:text-slate-600"}`}
+            >
+              All
+            </button>
+            {FILTERABLE_DEPARTMENTS.map((d) => (
+              <button
+                key={d}
+                type="button"
+                onClick={() => setDeptFilter(deptFilter === d ? "all" : d)}
+                className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-colors ${deptFilter === d ? "bg-white text-slate-700 shadow-sm" : "text-slate-400 hover:text-slate-600"}`}
+              >
+                {DEPT_SHORT_LABEL[d]}
+              </button>
+            ))}
+          </div>
+
+          {/* When chips */}
+          <div className="flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1">
+            {([
+              { value: "all", label: "All" },
+              { value: "upcoming", label: "Upcoming" },
+              { value: "past", label: "Past" },
+            ] as { value: EventWhen; label: string }[]).map(({ value, label }) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setWhenFilter(value)}
+                className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-colors ${whenFilter === value ? "bg-white text-slate-700 shadow-sm" : "text-slate-400 hover:text-slate-600"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* Month filter */}
+          <AppSelect
+            value={monthFilter}
+            onValueChange={setMonthFilter}
+            options={[
+              { value: "all", label: "All months" },
+              ...availableMonths.map((m) => ({ value: m, label: formatMonthKey(m) })),
+            ]}
+            className="min-w-[140px]"
+          />
+
+          {/* Sort by date */}
+          <button
+            type="button"
+            onClick={() => setSortDir((dir) => (dir === "desc" ? "asc" : "desc"))}
+            className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] font-semibold text-slate-500 transition-colors hover:bg-white hover:text-slate-700"
+            title="Toggle date sort direction"
+          >
+            <svg className={`h-3 w-3 transition-transform ${sortDir === "asc" ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+            </svg>
+            Date {sortDir === "desc" ? "↓" : "↑"}
+          </button>
+
+          {/* Clear filters */}
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] font-semibold text-rose-600 transition-colors hover:bg-rose-100"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Result count */}
+      <p className="px-1 text-[11px] text-slate-400">
+        {filtered.length === events.length
+          ? `${events.length} event${events.length !== 1 ? "s" : ""}`
+          : `${filtered.length} of ${events.length} events`}
+      </p>
+
+      {/* Table */}
+      <div className="overflow-hidden rounded-[28px] border border-slate-200/80 bg-white shadow-sm">
+        {filtered.length === 0 ? (
+          <div className="px-6 py-14 text-center">
+            <p className="text-sm font-semibold text-slate-600">No events match your filters</p>
+            <p className="mt-1 text-[13px] text-slate-400">Try adjusting or clearing the filters above.</p>
+          </div>
+        ) : (
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="border-b border-slate-100 bg-slate-50/80">
+              <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400">Department</th>
+              <th className="w-full px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400">Event</th>
+              <th className="whitespace-nowrap px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400">Date</th>
+              <th className="whitespace-nowrap px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400">Location</th>
+              <th className="px-5 py-3" />
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+          {paginated.map((event) => {
+            const ownerNames = event.ownerUserIds.map((id) => memberMap[id]).filter(Boolean);
+            const deptCfg = DEPT_CONFIG[event.department] ?? DEPT_CONFIG["other"];
+
+            return (
+              <tr
+                key={event.id}
+                onClick={() => onOpenEvent(event)}
+                className="group cursor-pointer transition-colors hover:bg-amber-50/40"
+              >
+                <td className="whitespace-nowrap px-5 py-4">
+                  <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${deptCfg.color}`}>
+                    <span className={`h-1.5 w-1.5 rounded-full ${deptCfg.dot}`} />
+                    {deptCfg.label}
+                  </span>
+                </td>
+
+                <td className="max-w-0 px-5 py-4">
+                  <p className="truncate text-sm font-medium text-slate-800">{event.title || "—"}</p>
+                  {ownerNames.length > 0 && (
+                    <p className="mt-0.5 truncate text-[11px] text-slate-400">{ownerNames.join(", ")}</p>
+                  )}
+                </td>
+
+                <td className="whitespace-nowrap px-5 py-4">
+                  <p className="text-sm font-medium text-slate-700">
+                    {event.date
+                      ? new Date(`${event.date}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+                      : "—"}
+                  </p>
+                  {event.time && (
+                    <p className="text-[11px] text-slate-400">
+                      {event.time}{event.endTime ? ` – ${event.endTime}` : ""}
+                    </p>
+                  )}
+                </td>
+
+                <td className="whitespace-nowrap px-5 py-4">
+                  <p className="max-w-[200px] truncate text-sm text-slate-600">
+                    {event.location ? `📍 ${event.location}` : "—"}
+                  </p>
+                </td>
+
+                <td className="whitespace-nowrap px-5 py-4 text-right">
+                  {canEdit && onEditEvent && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); onEditEvent(event); }}
+                      aria-label="Edit event"
+                      className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-400 opacity-0 transition-all hover:border-amber-300 hover:bg-amber-50 hover:text-amber-700 group-hover:opacity-100"
+                    >
+                      <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                      </svg>
+                    </button>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+          </tbody>
+        </table>
+        )}
+      </div>
+
+      <Pagination
+        page={page}
+        pageSize={EVENT_PAGE_SIZE}
+        total={filtered.length}
+        onPageChange={setPage}
+        className="px-1"
+      />
+    </div>
+  );
+}
+
 export default function EventsPage({
   initialSession,
   initialEvents,
@@ -291,13 +628,34 @@ export default function EventsPage({
     }
   };
 
+  // Compute the date window the current view needs. Calendar views load the
+  // visible month ± 1 month (covers week/day views that straddle months); the
+  // list view loads from today forward. This keeps each fetch bounded instead
+  // of pulling every event row.
+  const computeEventWindow = (): { from: string; to: string } => {
+    const pad = (n: number) => String(n).padStart(2, "0");
+    if (view === "list") {
+      const now = new Date();
+      const from = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`;
+      const end = new Date(now.getFullYear(), now.getMonth() + 12, 0);
+      const to = `${end.getFullYear()}-${pad(end.getMonth() + 1)}-${pad(end.getDate())}`;
+      return { from, to };
+    }
+    const start = new Date(viewYear, viewMonth - 1, 1);
+    const end = new Date(viewYear, viewMonth + 2, 0);
+    return {
+      from: `${start.getFullYear()}-${pad(start.getMonth() + 1)}-01`,
+      to: `${end.getFullYear()}-${pad(end.getMonth() + 1)}-${pad(end.getDate())}`,
+    };
+  };
+
   const refreshEvents = async ({ showLoading = false }: { showLoading?: boolean } = {}) => {
     if (showLoading) {
       setIsLoadingData(true);
     }
 
     try {
-      const res = await getEvents();
+      const res = await getEvents(computeEventWindow());
       if (res.success && res.events) {
         setEvents(sortEvents(res.events.map(rowToEvent)));
       }
@@ -307,6 +665,18 @@ export default function EventsPage({
       }
     }
   };
+
+  // Refetch when the visible window changes (month navigation or view switch).
+  // Skip the first mount since the server already provided the initial events.
+  const didMountRef = useRef(false);
+  useEffect(() => {
+    if (!didMountRef.current) {
+      didMountRef.current = true;
+      return;
+    }
+    void refreshEvents();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, viewMonth, viewYear]);
 
   const saveEvent = async () => {
     const nextEvent = {
@@ -971,63 +1341,13 @@ export default function EventsPage({
           </div>
         ) : (
           /* List view */
-          <div className="space-y-3">
-            {upcomingEvents.length === 0 ? (
-              <p className="text-sm text-slate-500 text-center py-8">No upcoming events.</p>
-            ) : (
-              upcomingEvents.map((ev) => {
-                const owners = getOwnerMembers(ev.ownerUserIds);
-
-                return (
-                  <div
-                    key={ev.id}
-                    onClick={() => setDetailEvent(ev)}
-                    className="group flex items-center gap-4 rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm transition-colors hover:bg-amber-50/40 cursor-pointer"
-                  >
-                    <div className="text-center shrink-0 w-14">
-                      <p className="text-2xl font-bold text-slate-900">{new Date(ev.date + "T00:00:00").getDate()}</p>
-                      <p className="text-[10px] font-semibold text-slate-400 uppercase">{MONTHS[new Date(ev.date + "T00:00:00").getMonth()].slice(0, 3)}</p>
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold text-slate-800">{ev.title}</p>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        {ev.time && `${ev.time}${ev.endTime ? ` – ${ev.endTime}` : ""}`}
-                        {ev.location && ` · 📍 ${ev.location}`}
-                      </p>
-                      {owners.length > 0 && (
-                        <div className="mt-1 flex items-center gap-2">
-                          <MemberAvatarStack
-                            names={owners.map((owner) => owner.name)}
-                            size="sm"
-                          />
-                          <p className="text-xs text-slate-400 truncate">
-                            {owners.map((owner) => owner.name).join(", ")}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex shrink-0 items-center gap-2">
-                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${DEPT_CONFIG[ev.department].color}`}>
-                        {DEPT_CONFIG[ev.department].label}
-                      </span>
-                      {canEdit && (
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); openEventEdit(ev); }}
-                          aria-label="Edit event"
-                          className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-400 opacity-0 transition-all hover:border-amber-300 hover:bg-amber-50 hover:text-amber-700 group-hover:opacity-100"
-                        >
-                          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                          </svg>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
+          <EventListView
+            events={events}
+            members={members}
+            canEdit={!!canEdit}
+            onOpenEvent={(ev) => setDetailEvent(ev)}
+            onEditEvent={canEdit ? openEventEdit : undefined}
+          />
         )}
       </div>
 

@@ -1,5 +1,6 @@
 "use server";
 
+import { after } from "next/server";
 import { pool } from "@/lib/db";
 import { requireAuthenticatedSession, requireDepartmentManagerSession } from "@/lib/action-auth";
 import { normalizeOwnerUserIds } from "@/lib/owner-users";
@@ -21,9 +22,29 @@ export interface EventRow {
   created_at: string;
 }
 
-export async function getEvents() {
+// Defensive ceiling for the no-range fetch (e.g. the attendance event picker),
+// so the events table can never dump unbounded rows into a page.
+const EVENTS_DEFAULT_LIMIT = 2000;
+
+export async function getEvents(params?: { from?: string; to?: string }) {
   try {
     await requireAuthenticatedSession();
+
+    // The calendar passes a visible-month window [from, to] so it only loads the
+    // events it can actually show; callers without a range get a bounded list.
+    const filters: string[] = [];
+    const values: unknown[] = [];
+    if (params?.from) {
+      values.push(params.from);
+      filters.push(`e.date >= $${values.length}`);
+    }
+    if (params?.to) {
+      values.push(params.to);
+      filters.push(`e.date <= $${values.length}`);
+    }
+    const whereClause = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
+    const limitClause = filters.length ? "" : `LIMIT ${EVENTS_DEFAULT_LIMIT}`;
+
     const res = await pool.query(
       `SELECT
          e.id,
@@ -40,7 +61,10 @@ export async function getEvents() {
          ) AS owner_user_ids,
          e.created_at
        FROM events e
-       ORDER BY e.date DESC, e.time ASC`
+       ${whereClause}
+       ORDER BY e.date DESC, e.time ASC
+       ${limitClause}`,
+      values
     );
     return { success: true, events: res.rows as EventRow[] };
   } catch (error) {
@@ -78,23 +102,25 @@ export async function createEvent(data: {
     );
     const createdAt = res.rows[0].created_at;
 
-    try {
-      await notifySubscribers({
-        topic: "events",
-        excludeUserId: actorUserId,
-        payload: createPushNotification({
+    after(async () => {
+      try {
+        await notifySubscribers({
           topic: "events",
-          title: `ახალი ღონისძიება: ${data.title}`,
-          body: data.date
-            ? `დაგეგმილია ${data.date}${data.time ? `, ${data.time}` : ""}.`
-            : "dashboard-ში ახალი ღონისძიება დაემატა.",
-          url: "/events",
-          tag: `event-${res.rows[0].id as number}`,
-        }),
-      });
-    } catch (pushError) {
-      log.error("Error sending event push notification", pushError);
-    }
+          excludeUserId: actorUserId,
+          payload: createPushNotification({
+            topic: "events",
+            title: `ახალი ღონისძიება: ${data.title}`,
+            body: data.date
+              ? `დაგეგმილია ${data.date}${data.time ? `, ${data.time}` : ""}.`
+              : "dashboard-ში ახალი ღონისძიება დაემატა.",
+            url: "/events",
+            tag: `event-${res.rows[0].id as number}`,
+          }),
+        });
+      } catch (pushError) {
+        log.error("Error sending event push notification", pushError);
+      }
+    });
 
     await logActivity("create_event", "/events", { eventId: res.rows[0].id, title: data.title }, actorUserId || undefined);
 
@@ -194,23 +220,25 @@ export async function updateEvent(
       ]
     );
 
-    try {
-      await notifySubscribers({
-        topic: "events",
-        excludeUserId: actorUserId,
-        payload: createPushNotification({
+    after(async () => {
+      try {
+        await notifySubscribers({
           topic: "events",
-          title: `ღონისძიება განახლდა: ${data.title}`,
-          body: data.date
-            ? `შეამოწმეთ განახლებული გეგმა ${data.date}${data.time ? `, ${data.time}` : ""}.`
-            : "dashboard-ში ღონისძიება განახლდა.",
-          url: "/events",
-          tag: `event-${id}`,
-        }),
-      });
-    } catch (pushError) {
-      log.error("Error sending event update notification", pushError);
-    }
+          excludeUserId: actorUserId,
+          payload: createPushNotification({
+            topic: "events",
+            title: `ღონისძიება განახლდა: ${data.title}`,
+            body: data.date
+              ? `შეამოწმეთ განახლებული გეგმა ${data.date}${data.time ? `, ${data.time}` : ""}.`
+              : "dashboard-ში ღონისძიება განახლდა.",
+            url: "/events",
+            tag: `event-${id}`,
+          }),
+        });
+      } catch (pushError) {
+        log.error("Error sending event update notification", pushError);
+      }
+    });
 
     await logActivity("update_event", "/events", { eventId: id, title: data.title }, actorUserId || undefined);
 

@@ -180,6 +180,26 @@ export default function SocialCalendarPageClient({
 
   const holidaysByDate = useMemo(() => buildHolidaysByDate(publicHolidays), [publicHolidays]);
 
+  // Window the fetch to the visible period so the calendar doesn't load every
+  // post. Calendar views load the visible month ± 1 month; the list view loads
+  // from the start of the current month forward.
+  const computePostWindow = (): { from: string; to: string } => {
+    const pad = (n: number) => String(n).padStart(2, "0");
+    if (pageView === "list") {
+      const now = new Date();
+      const from = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`;
+      const end = new Date(now.getFullYear(), now.getMonth() + 12, 0);
+      const to = `${end.getFullYear()}-${pad(end.getMonth() + 1)}-${pad(end.getDate())}`;
+      return { from, to };
+    }
+    const start = new Date(viewYear, viewMonth - 1, 1);
+    const end = new Date(viewYear, viewMonth + 2, 0);
+    return {
+      from: `${start.getFullYear()}-${pad(start.getMonth() + 1)}-01`,
+      to: `${end.getFullYear()}-${pad(end.getMonth() + 1)}-${pad(end.getDate())}`,
+    };
+  };
+
   const refreshPosts = async ({ showLoading = false }: { showLoading?: boolean } = {}) => {
     if (showLoading) {
       setIsLoadingData(true);
@@ -187,7 +207,7 @@ export default function SocialCalendarPageClient({
 
     try {
       const [res, revStatuses] = await Promise.all([
-        getContentPosts(),
+        getContentPosts(computePostWindow()),
         getPostReviewStatuses(),
       ]);
       if (res.success && res.posts) {
@@ -200,6 +220,17 @@ export default function SocialCalendarPageClient({
       }
     }
   };
+
+  // Refetch when the visible window changes (skip the server-provided mount).
+  const didMountRef = useRef(false);
+  useEffect(() => {
+    if (!didMountRef.current) {
+      didMountRef.current = true;
+      return;
+    }
+    void refreshPosts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pageView, viewMonth, viewYear]);
 
   const savePost = async () => {
     const nextPost = {

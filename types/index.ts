@@ -90,6 +90,7 @@ export interface ProjectRow {
   team: string;
   tags: string[];
   owner_user_ids: number[];
+  sort_order: number;
   created_at: string;
   updated_at: string;
 }

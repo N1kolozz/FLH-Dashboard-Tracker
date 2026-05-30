@@ -194,9 +194,6 @@ export function ProjectCardContent({
                 size="sm"
                 maxVisible={4}
               />
-              <p className="truncate text-xs text-slate-600">
-                {owners.map((owner) => owner.name).join(", ")}
-              </p>
             </div>
           </div>
         )}
@@ -213,6 +210,10 @@ export function DraggableProjectCard({
   cardRefs,
   onOpen,
   onEdit,
+  onMoveUp,
+  onMoveDown,
+  canMoveUp = false,
+  canMoveDown = false,
   daysUntilDeadline,
   reviewStatus,
 }: {
@@ -223,6 +224,10 @@ export function DraggableProjectCard({
   cardRefs: MutableRefObject<Record<number, HTMLDivElement | null>>;
   onOpen: (project: Project) => void;
   onEdit?: (project: Project) => void;
+  onMoveUp?: (project: Project) => void;
+  onMoveDown?: (project: Project) => void;
+  canMoveUp?: boolean;
+  canMoveDown?: boolean;
   daysUntilDeadline: (deadline: string) => number | null;
   reviewStatus?: ProjectReviewStatus | null;
 }) {
@@ -235,6 +240,48 @@ export function DraggableProjectCard({
     setNodeRef(node);
     cardRefs.current[project.id] = node;
   };
+
+  // Up/down arrows reorder a card within its priority group. They're pinned to
+  // the bottom-right corner of the card where they're easy to see and tap on
+  // mobile. Stop pointer events from starting a drag and clicks from opening the
+  // detail view.
+  const reorderControls =
+    canEdit && (onMoveUp || onMoveDown) && (canMoveUp || canMoveDown) ? (
+      <div className="absolute bottom-3 right-3 z-10 flex items-center overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm xl:hidden xl:group-hover:flex">
+        <button
+          type="button"
+          disabled={!canMoveUp}
+          onClick={(event) => {
+            event.stopPropagation();
+            onMoveUp?.(project);
+          }}
+          onPointerDown={(event) => event.stopPropagation()}
+          aria-label="Move up"
+          title="Move up"
+          className="inline-flex h-9 w-10 cursor-pointer items-center justify-center border-r border-slate-200 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-300 disabled:hover:bg-slate-50"
+        >
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          disabled={!canMoveDown}
+          onClick={(event) => {
+            event.stopPropagation();
+            onMoveDown?.(project);
+          }}
+          onPointerDown={(event) => event.stopPropagation()}
+          aria-label="Move down"
+          title="Move down"
+          className="inline-flex h-9 w-10 cursor-pointer items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-300 disabled:hover:bg-slate-50"
+        >
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+      </div>
+    ) : null;
 
   const editButton =
     canEdit && onEdit ? (
@@ -277,6 +324,7 @@ export function DraggableProjectCard({
         reviewStatus={reviewStatus}
         actionSlot={editButton}
       />
+      {reorderControls}
     </div>
   );
 }

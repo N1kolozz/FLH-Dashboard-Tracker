@@ -12,6 +12,8 @@ export default async function AttendancePage() {
       <AttendancePageClient
         initialSession={session}
         initialSessions={[]}
+        initialSessionsTotal={0}
+        initialSessionsPageSize={5}
         initialStats={null}
         initialEvents={[]}
         initialDetails={null}
@@ -25,10 +27,8 @@ export default async function AttendancePage() {
     getEvents(),
   ]);
 
-  const initialSessions =
-    "success" in sessionsResult && sessionsResult.sessions
-      ? sessionsResult.sessions
-      : [];
+  const hasSessions = "success" in sessionsResult && sessionsResult.sessions;
+  const initialSessions = hasSessions ? sessionsResult.sessions : [];
   const initialDetails =
     initialSessions[0] && typeof initialSessions[0].id === "number"
       ? await getAttendanceSessionDetails(initialSessions[0].id)
@@ -38,6 +38,8 @@ export default async function AttendancePage() {
     <AttendancePageClient
       initialSession={session}
       initialSessions={initialSessions}
+      initialSessionsTotal={hasSessions ? sessionsResult.total ?? initialSessions.length : 0}
+      initialSessionsPageSize={hasSessions ? sessionsResult.pageSize ?? 5 : 5}
       initialStats={
         "success" in statsResult && statsResult.stats ? statsResult.stats : null
       }

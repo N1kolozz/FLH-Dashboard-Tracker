@@ -26,27 +26,82 @@ export interface InventoryItemRow {
   created_at: string;
 }
 
-export async function getInventoryItems() {
+export interface InventoryQuery {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  status?: string;
+  category?: string;
+}
+
+const INVENTORY_PAGE_SIZE = 15;
+const INVENTORY_MAX_PAGE_SIZE = 100;
+
+export async function getInventoryItems(params?: InventoryQuery) {
   try {
     await requireAuthenticatedSession();
+
+    const pageSize = Math.min(
+      Math.max(1, params?.pageSize ?? INVENTORY_PAGE_SIZE),
+      INVENTORY_MAX_PAGE_SIZE
+    );
+    const page = Math.max(1, params?.page ?? 1);
+    const offset = (page - 1) * pageSize;
+
+    // Build filters server-side so search/status/category no longer require
+    // loading every row into the browser.
+    const filters: string[] = [];
+    const values: unknown[] = [];
+    if (params?.search && params.search.trim()) {
+      values.push(`%${params.search.trim()}%`);
+      filters.push(`name ILIKE $${values.length}`);
+    }
+    if (params?.status && params.status !== "all") {
+      values.push(params.status);
+      filters.push(`status = $${values.length}`);
+    }
+    if (params?.category && params.category !== "all") {
+      values.push(params.category);
+      filters.push(`category = $${values.length}`);
+    }
+    const whereClause = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
+
+    const countRes = await pool.query<{ count: string }>(
+      `SELECT COUNT(*)::int AS count FROM inventory_items ${whereClause}`,
+      values
+    );
+    const total = Number(countRes.rows[0]?.count ?? 0);
+
     const itemsRes = await pool.query(
-      "SELECT id, name, category, quantity, status, location, condition, notes, created_at FROM inventory_items ORDER BY created_at DESC"
+      `SELECT id, name, category, quantity, status, location, condition, notes, created_at
+       FROM inventory_items
+       ${whereClause}
+       ORDER BY created_at DESC
+       LIMIT ${pageSize} OFFSET ${offset}`,
+      values
     );
     const items = itemsRes.rows;
 
-    // Fetch all checkouts in one query for efficiency
-    const checkoutsRes = await pool.query(
-      "SELECT id, item_id, person, checkout_date::text, return_date::text FROM inventory_checkouts ORDER BY created_at ASC"
-    );
+    // Fetch checkouts only for the items on this page.
+    const itemIds = items.map((item) => item.id as number);
     const checkoutsByItemId: Record<number, CheckoutRow[]> = {};
-    for (const row of checkoutsRes.rows) {
-      if (!checkoutsByItemId[row.item_id]) checkoutsByItemId[row.item_id] = [];
-      checkoutsByItemId[row.item_id].push({
-        id: row.id,
-        person: row.person,
-        checkout_date: row.checkout_date,
-        return_date: row.return_date,
-      });
+    if (itemIds.length > 0) {
+      const checkoutsRes = await pool.query(
+        `SELECT id, item_id, person, checkout_date::text, return_date::text
+         FROM inventory_checkouts
+         WHERE item_id = ANY($1::int[])
+         ORDER BY created_at ASC`,
+        [itemIds]
+      );
+      for (const row of checkoutsRes.rows) {
+        if (!checkoutsByItemId[row.item_id]) checkoutsByItemId[row.item_id] = [];
+        checkoutsByItemId[row.item_id].push({
+          id: row.id,
+          person: row.person,
+          checkout_date: row.checkout_date,
+          return_date: row.return_date,
+        });
+      }
     }
 
     const result: InventoryItemRow[] = items.map((item) => ({
@@ -54,7 +109,7 @@ export async function getInventoryItems() {
       checkouts: checkoutsByItemId[item.id] || [],
     }));
 
-    return { success: true, items: result };
+    return { success: true, items: result, total, page, pageSize };
   } catch (error) {
     log.error("Error fetching inventory", error);
     return { error: "Failed to fetch inventory" };

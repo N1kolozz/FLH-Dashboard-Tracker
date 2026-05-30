@@ -154,6 +154,9 @@ export const projects = pgTable(
     // 'status' | 'deadline' | 'priority' | 'name' | 'description' | 'details'
     // Drives push notification copy after updates.
     lastUpdateType: text("last_update_type"),
+    // Manual kanban ordering within a (status, priority) group. Higher sits on
+    // top; 0 means "never reordered" and falls back to newest-first.
+    sortOrder: integer("sort_order").notNull().default(0),
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").defaultNow(),
   },

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { getExpenses, createExpense, updateExpense, deleteExpense } from "@/app/actions/expenses";
 import type { ExpenseRow } from "@/app/actions/expenses";
 import Modal from "@/components/Modal";
@@ -162,10 +162,10 @@ export default function ExpensesPage({
     setCachedCategoryCount(getStoredSkeletonCount(EXPENSE_CHART_SKELETON_STORAGE_KEY, 0));
   }, []);
 
-  const refreshExpenses = async (showLoading = true) => {
+  const refreshExpenses = async (showLoading = true, month = filterMonth) => {
     if (showLoading) setIsLoadingData(true);
     try {
-      const res = await getExpenses();
+      const res = await getExpenses({ month });
       if (res.success && res.expenses) {
         setExpenses(sortExpenses(res.expenses.map(rowToExpense)));
       }
@@ -173,6 +173,19 @@ export default function ExpensesPage({
       if (showLoading) setIsLoadingData(false);
     }
   };
+
+  // Expenses are fetched one month at a time. The server already provided the
+  // current month, so skip the initial mount and only re-fetch when the user
+  // navigates to a different month.
+  const didMountRef = useRef(false);
+  useEffect(() => {
+    if (!didMountRef.current) {
+      didMountRef.current = true;
+      return;
+    }
+    void refreshExpenses(true, filterMonth);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterMonth]);
 
   const canEdit = session && (
     session.role === "ADMIN" || 
@@ -333,7 +346,7 @@ export default function ExpensesPage({
               </svg>
             </h1>
             <p className="text-xs text-slate-500 mt-0.5">
-              {isLoadingData ? "Loading expenses..." : `${expenses.length} total record${expenses.length !== 1 ? "s" : ""}`}
+              {isLoadingData ? "Loading expenses..." : `${expenses.length} record${expenses.length !== 1 ? "s" : ""} this month`}
             </p>
           </div>
           {canEdit && (

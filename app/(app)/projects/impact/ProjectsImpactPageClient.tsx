@@ -1,11 +1,18 @@
 "use client";
 
-import { Suspense, useState, useEffect, useMemo } from "react";
+import { Suspense, useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { ProjectRow } from "@/types";
-import { createImpactRecord, updateImpactRecord, deleteImpactRecord } from "@/app/actions/impact";
-import type { ImpactRecordRow } from "@/app/actions/impact";
+import {
+  createImpactRecord,
+  updateImpactRecord,
+  deleteImpactRecord,
+  getImpactRecords,
+  getImpactStats,
+} from "@/app/actions/impact";
+import type { ImpactRecordRow, ImpactQuery, ImpactStats } from "@/app/actions/impact";
 import Modal from "@/components/Modal";
+import Pagination from "@/components/Pagination";
 import AppSelect from "@/components/ui/Select";
 import ProjectsSubnav from "@/components/ProjectsSubnav";
 import type { Session } from "@/lib/auth";
@@ -15,7 +22,6 @@ import {
   EMPTY_IMPACT_RECORD,
   IMPACT_PROJECT_SKELETON_STORAGE_KEY,
   IMPACT_RECORD_SKELETON_STORAGE_KEY,
-  buildProjectTotals,
   getEvidenceHref,
   getImpactPayload,
   rowToProjectOption,
@@ -35,16 +41,26 @@ function ImpactPageContent({
   initialSession,
   initialProjects,
   initialRecords,
+  initialTotal,
+  initialPageSize,
+  initialStats,
 }: {
   initialSession: Session | null;
   initialProjects: ProjectRow[];
   initialRecords: ImpactRecordRow[];
+  initialTotal: number;
+  initialPageSize: number;
+  initialStats: ImpactStats;
 }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const projectIdFromUrl = searchParams.get("projectId");
   const [records, setRecords] = useState<ImpactRecord[]>(sortRecords(initialRecords.map(rowToRecord)));
+  const [stats, setStats] = useState<ImpactStats>(initialStats);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(initialTotal);
+  const pageSize = initialPageSize;
   const [projects] = useState<ProjectOption[]>(
     initialProjects
       .map(rowToProjectOption)
@@ -55,7 +71,7 @@ function ImpactPageContent({
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [previewRecord, setPreviewRecord] = useState<ImpactRecord | null>(null);
   const [session] = useState<Session | null>(initialSession);
-  const [isLoadingData] = useState(false);
+  const [isLoadingData, setIsLoadingData] = useState(false);
   const [cachedRecordCount, setCachedRecordCount] = useState(0);
   const [cachedProjectCount, setCachedProjectCount] = useState(0);
   const [filterProjectId, setFilterProjectId] = useState(projectIdFromUrl ?? "all");
@@ -83,10 +99,67 @@ function ImpactPageContent({
   }, [projectIdFromUrl, projects]);
 
   const canEdit = session && (
-    session.role === "ADMIN" || 
-    session.role === "HEAD" || 
+    session.role === "ADMIN" ||
+    session.role === "HEAD" ||
     session.department === "Projects"
   );
+
+  // Records and aggregate stats are fetched server-side with the active filters.
+  const buildQuery = useCallback(
+    (targetPage: number): ImpactQuery => ({
+      page: targetPage,
+      pageSize,
+      projectId: filterProjectId,
+      activityType: filterActivity,
+      startDate: startDate || undefined,
+      endDate: endDate || undefined,
+    }),
+    [pageSize, filterProjectId, filterActivity, startDate, endDate]
+  );
+
+  const refreshImpact = useCallback(
+    async (targetPage: number, showLoading = true) => {
+      if (showLoading) setIsLoadingData(true);
+      try {
+        const query = buildQuery(targetPage);
+        const [recordsRes, statsRes] = await Promise.all([
+          getImpactRecords(query),
+          getImpactStats(query),
+        ]);
+        if (recordsRes.success && recordsRes.records) {
+          setRecords(sortRecords(recordsRes.records.map(rowToRecord)));
+          if (typeof recordsRes.total === "number") setTotal(recordsRes.total);
+        }
+        if (statsRes.success && statsRes.stats) {
+          setStats(statsRes.stats);
+        }
+      } finally {
+        if (showLoading) setIsLoadingData(false);
+      }
+    },
+    [buildQuery]
+  );
+
+  // Reset to page 1 when the filters change.
+  const didMountRef = useRef(false);
+  useEffect(() => {
+    if (!didMountRef.current) return;
+    setPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterProjectId, filterActivity, startDate, endDate]);
+
+  // Fetch when page or filters change (skip the server-provided first mount).
+  useEffect(() => {
+    if (!didMountRef.current) {
+      didMountRef.current = true;
+      return;
+    }
+    const handle = setTimeout(() => {
+      void refreshImpact(page, true);
+    }, 250);
+    return () => clearTimeout(handle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, filterProjectId, filterActivity, startDate, endDate]);
 
   const setEditingProject = (projectIdValue: string) => {
     const nextProjectId = projectIdValue ? Number(projectIdValue) : null;
@@ -114,120 +187,48 @@ function ImpactPageContent({
     if (!selectedProject || !nextRecord.date || nextRecord.peopleReached <= 0) return;
 
     if (nextRecord.id) {
-      const previousRecord = records.find((record) => record.id === nextRecord.id);
-
-      setRecords((current) =>
-        sortRecords(
-          current.map((record) =>
-            record.id === nextRecord.id
-              ? {
-                  ...nextRecord,
-                  createdAt: previousRecord?.createdAt ?? record.createdAt,
-                }
-              : record
-          )
-        )
-      );
-
       const result = await updateImpactRecord(nextRecord.id, getImpactPayload(nextRecord));
-
-      if (!result.success) {
-        if (previousRecord) {
-          setRecords((current) =>
-            sortRecords(
-              current.map((record) =>
-                record.id === previousRecord.id ? previousRecord : record
-              )
-            )
-          );
-        }
-        return;
-      }
+      if (!result.success) return;
     } else {
       const result = await createImpactRecord(getImpactPayload(nextRecord));
-
-      if (!result.success || typeof result.id !== "number") {
-        return;
-      }
-
-      setRecords((current) =>
-        sortRecords([
-          {
-            ...nextRecord,
-            id: result.id,
-            createdAt:
-              typeof result.createdAt === "string" && result.createdAt
-                ? result.createdAt
-                : new Date().toISOString(),
-          },
-          ...current,
-        ])
-      );
+      if (!result.success || typeof result.id !== "number") return;
     }
 
     setModalOpen(false);
     setEditing(EMPTY_IMPACT_RECORD);
+    // Refetch so the paginated table and aggregate stats stay correct.
+    void refreshImpact(page, false);
   };
 
   const handleDeleteRecord = async (id: number) => {
-    const deletedRecord = records.find((record) => record.id === id);
-
-    setRecords((current) => current.filter((record) => record.id !== id));
-
     const result = await deleteImpactRecord(id);
-
-    if (!result.success) {
-      if (deletedRecord) {
-        setRecords((current) => sortRecords([deletedRecord, ...current]));
-      }
-    }
+    if (!result.success) return;
+    void refreshImpact(page, false);
   };
 
-  const filteredRecords = useMemo(
-    () =>
-      records.filter((record) => {
-        if (filterProjectId !== "all" && String(record.projectId) !== filterProjectId) {
-          return false;
-        }
-
-        if (filterActivity !== "all" && record.activityType !== filterActivity) {
-          return false;
-        }
-
-        if (startDate && record.date < startDate) {
-          return false;
-        }
-
-        if (endDate && record.date > endDate) {
-          return false;
-        }
-
-        return true;
-      }),
-    [endDate, filterActivity, filterProjectId, records, startDate]
-  );
-
-  const totalPeople = filteredRecords.reduce((sum, record) => sum + record.peopleReached, 0);
-  const totalActivities = filteredRecords.length;
-  const unlinkedRecordCount = records.filter((record) => record.projectId === null).length;
+  // Aggregates come from server-side stats so they reflect the full filtered
+  // dataset, not just the current page of records.
+  const totalPeople = stats.totalPeople;
+  const totalActivities = stats.totalActivities;
+  const unlinkedRecordCount = stats.unlinkedCount;
   const canAddOutcome = Boolean(canEdit && projects.length > 0);
   const hasActiveFilters =
     filterProjectId !== "all" || filterActivity !== "all" || Boolean(startDate) || Boolean(endDate);
-  const allByProject = useMemo(() => buildProjectTotals(records), [records]);
-  const byProject = useMemo(() => buildProjectTotals(filteredRecords), [filteredRecords]);
+  const byProject = stats.byProject;
   const selectedProject = useMemo(
     () => projects.find((project) => String(project.id) === filterProjectId) ?? null,
     [filterProjectId, projects]
   );
 
   const maxProjectImpact = Math.max(...byProject.map(([, v]) => v), 1);
-  const sortedRecords = [...filteredRecords].sort((a, b) => b.date.localeCompare(a.date));
+  // `records` is the current page, already ordered by date desc from the server.
+  const sortedRecords = records;
   const impactRecordSkeletonCount = resolveSkeletonCount(
     records.length,
     cachedRecordCount
   );
   const impactProjectSkeletonCount = resolveSkeletonCount(
-    allByProject.length,
+    byProject.length,
     cachedProjectCount
   );
 
@@ -236,9 +237,9 @@ function ImpactPageContent({
 
     setCachedRecordCount(records.length);
     setStoredSkeletonCount(IMPACT_RECORD_SKELETON_STORAGE_KEY, records.length);
-    setCachedProjectCount(allByProject.length);
-    setStoredSkeletonCount(IMPACT_PROJECT_SKELETON_STORAGE_KEY, allByProject.length);
-  }, [allByProject.length, isLoadingData, records.length]);
+    setCachedProjectCount(byProject.length);
+    setStoredSkeletonCount(IMPACT_PROJECT_SKELETON_STORAGE_KEY, byProject.length);
+  }, [byProject.length, isLoadingData, records.length]);
 
   useEffect(() => {
     const params = new URLSearchParams(searchParams.toString());
@@ -361,8 +362,8 @@ function ImpactPageContent({
           </div>
 
           <p className="mt-3 text-sm text-slate-500">
-            Showing <span className="font-semibold text-slate-700">{filteredRecords.length}</span> of{" "}
-            <span className="font-semibold text-slate-700">{records.length}</span> outcome records.
+            Showing <span className="font-semibold text-slate-700">{records.length}</span> of{" "}
+            <span className="font-semibold text-slate-700">{total}</span> outcome records.
           </p>
           {selectedProject ? (
             <p className="mt-2 text-sm text-slate-500">
@@ -429,9 +430,9 @@ function ImpactPageContent({
         {/* Records list */}
         {isLoadingData ? (
           <ImpactTableSkeleton count={impactRecordSkeletonCount} />
-        ) : records.length === 0 ? (
+        ) : total === 0 && !hasActiveFilters ? (
           null
-        ) : filteredRecords.length === 0 ? (
+        ) : records.length === 0 ? (
           <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500 shadow-sm">
             No outcome records match the current filters.
           </div>
@@ -510,6 +511,16 @@ function ImpactPageContent({
             </table>
             </div>
           </div>
+        )}
+
+        {!isLoadingData && total > pageSize && (
+          <Pagination
+            page={page}
+            pageSize={pageSize}
+            total={total}
+            onPageChange={setPage}
+            loading={isLoadingData}
+          />
         )}
       </div>
 
@@ -704,10 +715,16 @@ export default function ProjectsImpactPageClient({
   initialSession,
   initialProjects,
   initialRecords,
+  initialTotal,
+  initialPageSize,
+  initialStats,
 }: {
   initialSession: Session | null;
   initialProjects: ProjectRow[];
   initialRecords: ImpactRecordRow[];
+  initialTotal: number;
+  initialPageSize: number;
+  initialStats: ImpactStats;
 }) {
   return (
     <Suspense fallback={
@@ -719,6 +736,9 @@ export default function ProjectsImpactPageClient({
         initialSession={initialSession}
         initialProjects={initialProjects}
         initialRecords={initialRecords}
+        initialTotal={initialTotal}
+        initialPageSize={initialPageSize}
+        initialStats={initialStats}
       />
     </Suspense>
   );

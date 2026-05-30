@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import FixedPortal from "@/components/FixedPortal";
 import MemberAvatarStack from "@/components/MemberAvatarStack";
 import MemberMultiSelect, { type MemberChoice } from "@/components/MemberMultiSelect";
 import Modal from "@/components/Modal";
+import Pagination from "@/components/Pagination";
 import AppSelect from "@/components/ui/Select";
 import { holidayLabel, type PublicHoliday } from "@/lib/public-holidays";
 import {
@@ -16,6 +17,17 @@ import {
   type Platform,
   type PostStatus,
 } from "@/features/social/calendar/model";
+
+const PAGE_SIZE = 10;
+
+// "2026-05" → "May 2026"
+function formatMonthKey(key: string) {
+  const [year, month] = key.split("-");
+  return new Date(Number(year), Number(month) - 1, 1).toLocaleDateString(undefined, {
+    month: "long",
+    year: "numeric",
+  });
+}
 
 const APPROVAL_STATUS_CONFIG: Record<string, { label: string; classes: string }> = {
   rejected: { label: "Rejected", classes: "bg-rose-100 text-rose-700 border border-rose-200" },
@@ -779,13 +791,21 @@ export function PostListView({
   const [platformFilter, setPlatformFilter] = useState<Platform | "all">("all");
   const [statusFilter, setStatusFilter] = useState<PostStatus | "all">("all");
   const [approvalFilter, setApprovalFilter] = useState<ApprovalStatus | "all">("all");
+  const [monthFilter, setMonthFilter] = useState("all");
   const [sortDir, setSortDir] = useState<"desc" | "asc">("desc");
+  const [page, setPage] = useState(1);
+
+  const availableMonths = useMemo(() => {
+    const set = new Set(posts.map((p) => p.date.slice(0, 7)).filter(Boolean));
+    return Array.from(set).sort((a, b) => b.localeCompare(a));
+  }, [posts]);
 
   const filtered = posts
     .filter((p) =>
       (platformFilter === "all" || p.platform === platformFilter) &&
       (statusFilter === "all" || p.status === statusFilter) &&
       (approvalFilter === "all" || p.approvalStatus === approvalFilter) &&
+      (monthFilter === "all" || p.date.startsWith(monthFilter)) &&
       (search.trim() === "" || p.caption.toLowerCase().includes(search.trim().toLowerCase()))
     )
     .sort((a, b) => {
@@ -793,7 +813,14 @@ export function PostListView({
       return d || a.time.localeCompare(b.time);
     });
 
-  const hasActiveFilters = platformFilter !== "all" || statusFilter !== "all" || approvalFilter !== "all" || search.trim() !== "";
+  const hasActiveFilters = platformFilter !== "all" || statusFilter !== "all" || approvalFilter !== "all" || monthFilter !== "all" || search.trim() !== "";
+
+  // Reset to the first page whenever the filtered set changes.
+  useEffect(() => {
+    setPage(1);
+  }, [search, platformFilter, statusFilter, approvalFilter, monthFilter, sortDir]);
+
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   if (posts.length === 0) {
     return (
@@ -863,18 +890,27 @@ export function PostListView({
             className="w-full"
           />
           <AppSelect
+            value={monthFilter}
+            onValueChange={setMonthFilter}
+            options={[
+              { value: "all", label: "All months" },
+              ...availableMonths.map((m) => ({ value: m, label: formatMonthKey(m) })),
+            ]}
+            className="w-full"
+          />
+          <AppSelect
             value={sortDir}
             onValueChange={(v) => setSortDir(v as "asc" | "desc")}
             options={[
               { value: "desc", label: "Date — newest" },
               { value: "asc", label: "Date — oldest" },
             ]}
-            className="w-full"
+            className="col-span-2 w-full"
           />
           {hasActiveFilters && (
             <button
               type="button"
-              onClick={() => { setSearch(""); setPlatformFilter("all"); setStatusFilter("all"); setApprovalFilter("all"); }}
+              onClick={() => { setSearch(""); setPlatformFilter("all"); setStatusFilter("all"); setApprovalFilter("all"); setMonthFilter("all"); }}
               className="col-span-2 rounded-xl border border-rose-200 bg-rose-50 py-2 text-[11px] font-semibold text-rose-600 transition-colors hover:bg-rose-100"
             >
               Clear filters
@@ -940,6 +976,17 @@ export function PostListView({
             ))}
           </div>
 
+          {/* Month filter */}
+          <AppSelect
+            value={monthFilter}
+            onValueChange={setMonthFilter}
+            options={[
+              { value: "all", label: "All months" },
+              ...availableMonths.map((m) => ({ value: m, label: formatMonthKey(m) })),
+            ]}
+            className="min-w-[140px]"
+          />
+
           {/* Sort by date */}
           <button
             type="button"
@@ -957,7 +1004,7 @@ export function PostListView({
           {hasActiveFilters && (
             <button
               type="button"
-              onClick={() => { setSearch(""); setPlatformFilter("all"); setStatusFilter("all"); setApprovalFilter("all"); }}
+              onClick={() => { setSearch(""); setPlatformFilter("all"); setStatusFilter("all"); setApprovalFilter("all"); setMonthFilter("all"); }}
               className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] font-semibold text-rose-600 transition-colors hover:bg-rose-100"
             >
               Clear
@@ -992,7 +1039,7 @@ export function PostListView({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-          {filtered.map((post) => {
+          {paginated.map((post) => {
             const isRejected = post.approvalStatus === "rejected";
             const ownerNames = post.ownerUserIds.map((id) => memberMap[id]).filter(Boolean);
             const approvalBadge = APPROVAL_STATUS_CONFIG[post.approvalStatus];
@@ -1049,9 +1096,12 @@ export function PostListView({
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); onEditPost(post); }}
-                      className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-slate-50"
+                      aria-label="Edit post"
+                      className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-400 opacity-0 transition-all hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 group-hover:opacity-100"
                     >
-                      Edit
+                      <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                      </svg>
                     </button>
                   )}
                 </td>
@@ -1062,6 +1112,14 @@ export function PostListView({
         </table>
         )}
       </div>
+
+      <Pagination
+        page={page}
+        pageSize={PAGE_SIZE}
+        total={filtered.length}
+        onPageChange={setPage}
+        className="px-1"
+      />
     </div>
   );
 }

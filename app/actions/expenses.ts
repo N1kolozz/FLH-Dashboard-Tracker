@@ -17,13 +17,30 @@ export interface ExpenseRow {
   created_at: string;
 }
 
-export async function getExpenses() {
+// The expenses UI is month-centric (Prev/Next navigation), so we fetch a single
+// month at a time instead of every row. `month` is "YYYY-MM"; defaults to the
+// current month. A defensive LIMIT caps a pathological month.
+const EXPENSES_MONTH_LIMIT = 1000;
+
+function normalizeMonth(month?: string): string {
+  if (month && /^\d{4}-\d{2}$/.test(month)) return month;
+  return new Date().toISOString().slice(0, 7);
+}
+
+export async function getExpenses(params?: { month?: string }) {
   try {
     await requireAuthenticatedSession();
+    const month = normalizeMonth(params?.month);
+    const monthStart = `${month}-01`;
     const res = await pool.query(
-      "SELECT id, description, amount::float, category, date::text, paid_by, notes, created_at FROM expenses ORDER BY date DESC, created_at DESC"
+      `SELECT id, description, amount::float, category, date::text, paid_by, notes, created_at
+       FROM expenses
+       WHERE date >= $1::date AND date < ($1::date + INTERVAL '1 month')
+       ORDER BY date DESC, created_at DESC
+       LIMIT ${EXPENSES_MONTH_LIMIT}`,
+      [monthStart]
     );
-    return { success: true, expenses: res.rows as ExpenseRow[] };
+    return { success: true, expenses: res.rows as ExpenseRow[], month };
   } catch (error) {
     log.error("Error fetching expenses", error);
     return { error: "Failed to fetch expenses" };

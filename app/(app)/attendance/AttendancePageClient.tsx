@@ -1,13 +1,15 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import EmptyState from "@/components/EmptyState";
 import Modal from "@/components/Modal";
+import Pagination from "@/components/Pagination";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import AppSelect from "@/components/ui/Select";
 import type { EventRow } from "@/app/actions/events";
 import {
   createAttendanceSession,
+  createWeeklySundayAttendance,
   deleteAttendanceSession,
   getAttendanceSessionDetails,
   getAttendanceSessions,
@@ -122,12 +124,16 @@ function sessionRate(session: AttendanceSessionRow) {
 export default function AttendancePage({
   initialSession,
   initialSessions,
+  initialSessionsTotal,
+  initialSessionsPageSize,
   initialStats,
   initialEvents,
   initialDetails,
 }: {
   initialSession: Session | null;
   initialSessions: AttendanceSessionRow[];
+  initialSessionsTotal: number;
+  initialSessionsPageSize: number;
   initialStats: AttendanceStats | null;
   initialEvents: EventRow[];
   initialDetails: AttendanceDetails | null;
@@ -135,6 +141,10 @@ export default function AttendancePage({
   const { confirm: confirmDelete, dialog: confirmDialog } = useConfirmDialog();
   const [session] = useState<Session | null>(initialSession);
   const [sessions, setSessions] = useState<AttendanceSessionRow[]>(initialSessions);
+  const [sessionsPage, setSessionsPage] = useState(1);
+  const [sessionsTotal, setSessionsTotal] = useState(initialSessionsTotal);
+  const [monthFilter, setMonthFilter] = useState(""); // "" = all months, else "YYYY-MM"
+  const sessionsPageSize = initialSessionsPageSize;
   const [details, setDetails] = useState<AttendanceDetails | null>(initialDetails);
   const [stats, setStats] = useState<AttendanceStats | null>(initialStats);
   const events: EventChoice[] = initialEvents.map((event) => ({
@@ -149,19 +159,26 @@ export default function AttendancePage({
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<AttendanceFormState>(EMPTY_FORM);
   const [savingSession, setSavingSession] = useState(false);
+  const [creatingWeekly, setCreatingWeekly] = useState(false);
   const [savingRecordId, setSavingRecordId] = useState<number | null>(null);
   const [error, setError] = useState("");
 
   const canManage = canManageAttendanceAndWorkload(session);
 
-  const refreshDashboard = useCallback(async () => {
+  const refreshDashboard = useCallback(async (targetPage = 1, month = monthFilter) => {
     const [sessionRes, statRes] = await Promise.all([
-      getAttendanceSessions(),
+      getAttendanceSessions({
+        page: targetPage,
+        pageSize: sessionsPageSize,
+        month: month || undefined,
+      }),
       getAttendanceStats(),
     ]);
 
     if (sessionRes.success && sessionRes.sessions) {
       setSessions(sessionRes.sessions);
+      if (typeof sessionRes.total === "number") setSessionsTotal(sessionRes.total);
+      setSessionsPage(targetPage);
     } else if ("error" in sessionRes) {
       setError(errorMessage(sessionRes.error, "Failed to fetch attendance sessions"));
     }
@@ -171,7 +188,19 @@ export default function AttendancePage({
     }
 
     return sessionRes.success && sessionRes.sessions ? sessionRes.sessions : [];
-  }, []);
+  }, [sessionsPageSize, monthFilter]);
+
+  // Refetch the session list (page 1) when the month filter changes. Skip the
+  // first mount since the server already provided the unfiltered first page.
+  const monthDidMountRef = useRef(false);
+  useEffect(() => {
+    if (!monthDidMountRef.current) {
+      monthDidMountRef.current = true;
+      return;
+    }
+    void refreshDashboard(1, monthFilter);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [monthFilter]);
 
   const loadDetails = useCallback(async (id: number) => {
     setIsDetailLoading(true);
@@ -195,6 +224,19 @@ export default function AttendancePage({
       title: linkedEvent?.title ?? current.title,
       meetingDate: linkedEvent?.date ?? current.meetingDate,
     }));
+  };
+
+  const createWeekly = async () => {
+    setCreatingWeekly(true);
+    setError("");
+    const result = await createWeeklySundayAttendance();
+    if (result.success && "id" in result && typeof result.id === "number") {
+      await refreshDashboard();
+      await loadDetails(result.id);
+    } else if ("error" in result) {
+      setError(errorMessage(result.error, "Failed to create weekly attendance"));
+    }
+    setCreatingWeekly(false);
   };
 
   const openNew = () => {
@@ -384,15 +426,28 @@ export default function AttendancePage({
               </svg>
             </h1>
             <p className="mt-1 text-sm text-slate-600">
-              {sessions.length} attendance sheet{sessions.length === 1 ? "" : "s"} tracked
+              {sessionsTotal} attendance sheet{sessionsTotal === 1 ? "" : "s"} tracked
             </p>
           </div>
-          <button
-            onClick={openNew}
-            className="h-10 w-full rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-purple-700 sm:w-auto"
-          >
-            + New Attendance
-          </button>
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+            <button
+              onClick={createWeekly}
+              disabled={creatingWeekly}
+              title="Create an attendance sheet for the upcoming Sunday and notify everyone"
+              className="inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-lg border border-purple-200 bg-white px-4 py-2 text-sm font-semibold text-purple-700 shadow-sm transition-colors hover:bg-purple-50 disabled:opacity-60 sm:w-auto"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3M5 11h14m-9 4l2 2 4-4M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              {creatingWeekly ? "Creating..." : "Weekly Sunday Sheet"}
+            </button>
+            <button
+              onClick={openNew}
+              className="h-10 w-full rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-purple-700 sm:w-auto"
+            >
+              + New Attendance
+            </button>
+          </div>
         </div>
       </header>
 
@@ -411,26 +466,52 @@ export default function AttendancePage({
                   <h2 className="text-sm font-semibold text-slate-900">Attendance Sheets</h2>
                   <p className="mt-0.5 text-xs text-slate-500">Linked meetings and event prompts</p>
                 </div>
-                <button
-                  onClick={openNew}
-                  className="rounded-lg border border-purple-200 bg-purple-50 px-3 py-1.5 text-xs font-semibold text-purple-700 transition-colors hover:bg-purple-100"
-                >
-                  Add
-                </button>
+              </div>
+
+              <div className="mt-3 flex items-center gap-2">
+                <input
+                  type="month"
+                  value={monthFilter}
+                  onChange={(e) => setMonthFilter(e.target.value)}
+                  title="Filter sheets by month"
+                  aria-label="Filter attendance sheets by month"
+                  className="h-9 flex-1 rounded-lg border border-purple-200 bg-white px-3 text-xs text-slate-600 focus:outline-none focus:ring-2 focus:ring-purple-300"
+                />
+                {monthFilter ? (
+                  <button
+                    type="button"
+                    onClick={() => setMonthFilter("")}
+                    className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-500 transition-colors hover:bg-slate-50"
+                  >
+                    Clear
+                  </button>
+                ) : null}
               </div>
 
               <div className="mt-4 space-y-2">
                 {sessions.length === 0 ? (
-                  <EmptyState
-                    title="No attendance yet"
-                    description="Create a meeting attendance sheet to start tracking responses."
-                    action={{ label: "Create Attendance", onClick: openNew }}
-                    icon={
-                      <svg className="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3M5 11h14m-9 4l2 2 4-4M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                    }
-                  />
+                  monthFilter ? (
+                    <EmptyState
+                      title="No sheets this month"
+                      description="No attendance sheets fall in the selected month. Try another month or clear the filter."
+                      icon={
+                        <svg className="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3M5 11h14m-9 4l2 2 4-4M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                      }
+                    />
+                  ) : (
+                    <EmptyState
+                      title="No attendance yet"
+                      description="Create a meeting attendance sheet to start tracking responses."
+                      action={{ label: "Create Attendance", onClick: openNew }}
+                      icon={
+                        <svg className="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3M5 11h14m-9 4l2 2 4-4M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                      }
+                    />
+                  )
                 ) : (
                   sessions.map((attendanceSession) => {
                     const active =
@@ -478,6 +559,16 @@ export default function AttendancePage({
                   })
                 )}
               </div>
+
+              {sessionsTotal > sessionsPageSize && (
+                <Pagination
+                  className="mt-4"
+                  page={sessionsPage}
+                  pageSize={sessionsPageSize}
+                  total={sessionsTotal}
+                  onPageChange={(p) => void refreshDashboard(p)}
+                />
+              )}
             </div>
 
             <div className="rounded-2xl border border-purple-200/80 bg-white p-4 shadow-sm shadow-purple-100/40">

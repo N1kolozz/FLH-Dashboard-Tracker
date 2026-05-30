@@ -5,12 +5,15 @@ import * as path from "path";
 dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
 
 async function migrate() {
-  if (!process.env.DATABASE_URL) {
-    throw new Error("DATABASE_URL is not set in .env.local");
+  // Migrations should run against a *direct* Neon connection (not the pooler).
+  // Prefer DIRECT_DATABASE_URL when set, falling back to DATABASE_URL.
+  const migrationUrl = process.env.DIRECT_DATABASE_URL ?? process.env.DATABASE_URL;
+  if (!migrationUrl) {
+    throw new Error("DIRECT_DATABASE_URL or DATABASE_URL is not set in .env.local");
   }
 
   const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
+    connectionString: migrationUrl,
     ssl:
       process.env.NODE_ENV === "production"
         ? { rejectUnauthorized: false }
@@ -134,6 +137,12 @@ async function migrate() {
       ADD COLUMN IF NOT EXISTS last_update_type TEXT
     `);
     console.log("✓ projects last_update_type column ready");
+
+    await client.query(`
+      ALTER TABLE projects
+      ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0
+    `);
+    console.log("✓ projects sort_order column ready");
 
     await client.query(`
       CREATE TABLE IF NOT EXISTS events (

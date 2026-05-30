@@ -15,6 +15,13 @@
       "when": 1779815453566,
       "tag": "0001_happy_leper_queen",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1780143099949,
+      "tag": "0002_bouncy_deathbird",
+      "breakpoints": true
     }
   ]
 }

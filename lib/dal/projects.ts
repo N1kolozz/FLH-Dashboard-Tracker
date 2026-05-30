@@ -7,6 +7,14 @@ import { pool } from "@/lib/db";
 import { normalizeOwnerUserIds } from "@/lib/owner-users";
 import { ProjectRow } from "@/types";
 
+// The kanban board needs every active card visible at once (you can't "page" a
+// board), and this fetch is also shared by the portfolio overview and the impact
+// project picker — so we load the full set rather than paginate. These ceilings
+// exist purely so the query can never return an unbounded result set as the
+// table grows; they're far above any realistic project count.
+const PROJECTS_LIMIT = 2000;
+const REJECTED_PROJECTS_LIMIT = 1000;
+
 export async function fetchAllProjects(): Promise<ProjectRow[]> {
   const res = await pool.query(
     `SELECT
@@ -26,13 +34,15 @@ export async function fetchAllProjects(): Promise<ProjectRow[]> {
          NULLIF(p.owner_user_ids, '{}'),
          CASE WHEN p.owner_user_id IS NULL THEN '{}'::INTEGER[] ELSE ARRAY[p.owner_user_id] END
        ) AS owner_user_ids,
+       p.sort_order,
        -- Force UTC suffix so JS Date parsing is unambiguous on all platforms.
        (p.created_at AT TIME ZONE 'UTC')::text || 'Z' as created_at,
        (p.updated_at AT TIME ZONE 'UTC')::text || 'Z' as updated_at
      FROM projects p
      -- Default sort: kanban column order first, then priority within each column,
-     -- then newest-first as a tiebreaker. The board UI re-sorts client-side too,
-     -- but this order is what server components and the overview page see.
+     -- then the manual board order (sort_order), then newest-first. The board UI
+     -- re-sorts client-side too, but this order is what server components and the
+     -- overview page see.
      ORDER BY
        CASE p.status
          WHEN 'planning' THEN 0
@@ -47,7 +57,9 @@ export async function fetchAllProjects(): Promise<ProjectRow[]> {
          WHEN 'low' THEN 2
          ELSE 3
        END,
-       p.created_at DESC`
+       p.sort_order DESC,
+       p.created_at DESC
+     LIMIT ${PROJECTS_LIMIT}`
   );
   return res.rows as ProjectRow[];
 }
@@ -67,6 +79,7 @@ export async function fetchRejectedProjects() {
          NULLIF(p.owner_user_ids, '{}'),
          CASE WHEN p.owner_user_id IS NULL THEN '{}'::INTEGER[] ELSE ARRAY[p.owner_user_id] END
        ) AS owner_user_ids,
+       p.sort_order,
        (p.created_at AT TIME ZONE 'UTC')::text || 'Z' as created_at,
        (p.updated_at AT TIME ZONE 'UTC')::text || 'Z' as updated_at,
        rr.feedback AS rejection_feedback,
@@ -84,7 +97,8 @@ export async function fetchRejectedProjects() {
      ) rr ON true
      LEFT JOIN users u ON u.id = rr.reviewed_by
      WHERE p.status = 'rejected'
-     ORDER BY p.updated_at DESC`
+     ORDER BY p.updated_at DESC
+     LIMIT ${REJECTED_PROJECTS_LIMIT}`
   );
   return res.rows;
 }
@@ -109,9 +123,15 @@ export async function insertProject(data: {
        team,
        tags,
        owner_user_ids,
+       sort_order,
        updated_at
      )
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'))
+     VALUES (
+       $1, $2, $3, $4, $5, $6, $7, $8,
+       -- New cards land on top of their (status, priority) group.
+       (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM projects WHERE status = $3 AND priority = $4),
+       (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
+     )
      RETURNING id, (created_at AT TIME ZONE 'UTC')::text || 'Z' as created_at, (updated_at AT TIME ZONE 'UTC')::text || 'Z' as updated_at`,
     [
       data.name,
@@ -223,4 +243,26 @@ export async function updateProjectInDB(
 
 export async function deleteProjectFromDB(id: number) {
   await pool.query("DELETE FROM projects WHERE id = $1", [id]);
+}
+
+// Persists manual board ordering for one or more cards in a single statement.
+// Each entry maps a project id to its new sort_order. Used by drag-to-column
+// (one card bumped to the top of its group) and the up/down reorder arrows
+// (a whole priority group renumbered).
+export async function reorderProjectsInDB(updates: { id: number; sortOrder: number }[]) {
+  if (updates.length === 0) return;
+
+  // Build a VALUES list: ($1::int, $2::int), ($3::int, $4::int), …
+  const valueTuples = updates
+    .map((_, i) => `($${i * 2 + 1}::int, $${i * 2 + 2}::int)`)
+    .join(", ");
+  const params = updates.flatMap((update) => [update.id, update.sortOrder]);
+
+  await pool.query(
+    `UPDATE projects AS p
+     SET sort_order = v.sort_order
+     FROM (VALUES ${valueTuples}) AS v(id, sort_order)
+     WHERE p.id = v.id`,
+    params
+  );
 }

@@ -12,7 +12,7 @@ import {
   type DragOverEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { getProjects, createProject, updateProject, deleteProject } from "@/app/actions/projects";
+import { getProjects, createProject, updateProject, deleteProject, reorderProjects } from "@/app/actions/projects";
 import type { ProjectRow } from "@/types";
 import { type MemberChoice } from "@/components/MemberMultiSelect";
 import EmptyState from "@/components/EmptyState";
@@ -35,8 +35,11 @@ import {
   getDropPreviewIndex,
   getProjectPayload,
   isStatus,
+  reorderWithinPriorityGroup,
   rowToProject,
   sortProjectsByPriority,
+  topSortOrderForGroup,
+  type Priority,
   type ProjectPriorityFilter,
   type Project,
   type Status,
@@ -633,9 +636,13 @@ export default function ProjectsBoardPageClient({
       }
     }
 
+    // Dropping into a new column always lands the card on top of its priority
+    // group in that column.
+    const nextSortOrder = topSortOrderForGroup(projects, col, project.priority, project.id);
     const nextProject = {
       ...project,
       status: col,
+      sortOrder: nextSortOrder,
       updatedAt: new Date().toISOString(),
     };
 
@@ -643,7 +650,10 @@ export default function ProjectsBoardPageClient({
       current.map((item) => (item.id === nextProject.id ? nextProject : item))
     );
 
-    const result = await updateProject(nextProject.id, getProjectPayload(nextProject));
+    const [result] = await Promise.all([
+      updateProject(nextProject.id, getProjectPayload(nextProject)),
+      reorderProjects([{ id: nextProject.id, sortOrder: nextSortOrder }]),
+    ]);
 
     if (!result.success) {
       setProjects((current) =>
@@ -653,6 +663,28 @@ export default function ProjectsBoardPageClient({
     }
 
     void refreshProjects();
+  };
+
+  const handleMoveCard = async (project: Project, dir: -1 | 1) => {
+    const updates = reorderWithinPriorityGroup(projects, project.id, dir);
+    if (updates.length === 0) return;
+
+    const previousProjects = projects;
+    const orderById = new Map(updates.map((update) => [update.id, update.sortOrder]));
+
+    setProjects((current) =>
+      current.map((item) =>
+        orderById.has(item.id)
+          ? { ...item, sortOrder: orderById.get(item.id)! }
+          : item
+      )
+    );
+
+    const result = await reorderProjects(updates);
+
+    if (!result.success) {
+      setProjects(previousProjects);
+    }
   };
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -779,6 +811,33 @@ export default function ProjectsBoardPageClient({
       }, { ...EMPTY_COLUMN_COUNTS }),
     [projects]
   );
+
+  // Per-card flags for the up/down reorder arrows: a card can move up unless it
+  // is first in its (column, priority) group, and down unless it is last. Based
+  // on the full project set so it matches reorderWithinPriorityGroup.
+  const reorderFlags = useMemo(() => {
+    const flags = new Map<number, { canMoveUp: boolean; canMoveDown: boolean }>();
+    const priorities: Priority[] = ["high", "medium", "low"];
+
+    COLUMNS.forEach((column) => {
+      priorities.forEach((priority) => {
+        const group = sortProjectsByPriority(
+          projects.filter(
+            (project) =>
+              project.status === column.id && project.priority === priority
+          )
+        );
+        group.forEach((project, index) => {
+          flags.set(project.id, {
+            canMoveUp: index > 0,
+            canMoveDown: index < group.length - 1,
+          });
+        });
+      });
+    });
+
+    return flags;
+  }, [projects]);
 
   useEffect(() => {
     if (isLoadingData) return;
@@ -925,6 +984,10 @@ export default function ProjectsBoardPageClient({
                             cardRefs={cardRefs}
                             onOpen={handleOpenProject}
                             onEdit={canEdit ? handleEditProject : undefined}
+                            onMoveUp={canEdit ? (project) => void handleMoveCard(project, -1) : undefined}
+                            onMoveDown={canEdit ? (project) => void handleMoveCard(project, 1) : undefined}
+                            canMoveUp={reorderFlags.get(p.id)?.canMoveUp ?? false}
+                            canMoveDown={reorderFlags.get(p.id)?.canMoveDown ?? false}
                             daysUntilDeadline={daysUntilDeadline}
                             reviewStatus={rs}
                           />

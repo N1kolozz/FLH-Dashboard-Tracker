@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   getInventoryItems,
   createInventoryItem,
@@ -11,6 +11,7 @@ import {
 } from "@/app/actions/inventory";
 import type { InventoryItemRow, CheckoutRow } from "@/app/actions/inventory";
 import Modal from "@/components/Modal";
+import Pagination from "@/components/Pagination";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import AppSelect from "@/components/ui/Select";
 import EmptyState from "@/components/EmptyState";
@@ -159,9 +160,13 @@ function InventoryListSkeleton({ count }: { count: number }) {
 export default function InventoryPage({
   initialSession,
   initialItems,
+  initialTotal,
+  initialPageSize,
 }: {
   initialSession: Session | null;
   initialItems: InventoryItemRow[];
+  initialTotal: number;
+  initialPageSize: number;
 }) {
   const { confirm: confirmDelete, dialog: confirmDialog } = useConfirmDialog();
   const [items, setItems] = useState<InventoryItem[]>(sortItems(initialItems.map(rowToItem)));
@@ -177,6 +182,9 @@ export default function InventoryPage({
   const [session] = useState<Session | null>(initialSession);
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [cachedItemCount, setCachedItemCount] = useState(0);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(initialTotal);
+  const pageSize = initialPageSize;
 
   useEffect(() => {
     setCachedItemCount(getStoredSkeletonCount(INVENTORY_SKELETON_STORAGE_KEY, 0));
@@ -195,17 +203,47 @@ export default function InventoryPage({
     session.department === "Projects"
   );
 
-  const refreshItems = async (showLoading = true) => {
+  const refreshItems = async (showLoading = true, targetPage = page) => {
     if (showLoading) setIsLoadingData(true);
     try {
-      const res = await getInventoryItems();
+      const res = await getInventoryItems({
+        page: targetPage,
+        pageSize,
+        search,
+        status: filterStatus,
+        category: filterCategory,
+      });
       if (res.success && res.items) {
         setItems(sortItems(res.items.map(rowToItem)));
+        if (typeof res.total === "number") setTotal(res.total);
       }
     } finally {
       if (showLoading) setIsLoadingData(false);
     }
   };
+
+  // Reset to the first page whenever the filters change.
+  const didMountRef = useRef(false);
+  useEffect(() => {
+    if (!didMountRef.current) return;
+    setPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, filterStatus, filterCategory]);
+
+  // Fetch the current page from the server (debounced so typing in search
+  // doesn't fire a request per keystroke). The server already provided page 1
+  // for the initial filters, so skip the first mount.
+  useEffect(() => {
+    if (!didMountRef.current) {
+      didMountRef.current = true;
+      return;
+    }
+    const handle = setTimeout(() => {
+      void refreshItems(true, page);
+    }, 250);
+    return () => clearTimeout(handle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, search, filterStatus, filterCategory]);
 
   /* ─── CRUD ─── */
   const saveItem = async () => {
@@ -366,13 +404,9 @@ export default function InventoryPage({
     void refreshItems(false);
   };
 
-  /* ─── Filtering ─── */
-  const filtered = items.filter((item) => {
-    if (filterStatus !== "all" && item.status !== filterStatus) return false;
-    if (filterCategory !== "all" && item.category !== filterCategory) return false;
-    if (search && !item.name.toLowerCase().includes(search.toLowerCase())) return false;
-    return true;
-  });
+  /* ─── Filtering is server-side; `items` is the current page. ─── */
+  const hasActiveFilters =
+    Boolean(search.trim()) || filterStatus !== "all" || filterCategory !== "all";
 
   const inventorySkeletonCount = resolveSkeletonCount(items.length, cachedItemCount);
 
@@ -391,7 +425,7 @@ export default function InventoryPage({
               </svg>
             </h1>
             <p className="text-xs text-slate-500 mt-0.5">
-              {isLoadingData ? "Loading inventory..." : `${items.length} item${items.length !== 1 ? "s" : ""} tracked`}
+              {isLoadingData ? "Loading inventory..." : `${total} item${total !== 1 ? "s" : ""} tracked`}
             </p>
           </div>
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
@@ -444,20 +478,32 @@ export default function InventoryPage({
             <InventoryListSkeleton count={inventorySkeletonCount} />
           )
         ) : items.length === 0 ? (
-          <EmptyState
-            title="No inventory items"
-            description="Start tracking your NGO's assets, equipment, and supplies."
-            icon={
-              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-              </svg>
-            }
-            action={{ label: "Add First Item", onClick: () => { setEditing(EMPTY); setModalOpen(true); } }}
-          />
+          hasActiveFilters ? (
+            <EmptyState
+              title="No matching items"
+              description="No inventory items match the current search or filters."
+              icon={
+                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
+                </svg>
+              }
+            />
+          ) : (
+            <EmptyState
+              title="No inventory items"
+              description="Start tracking your NGO's assets, equipment, and supplies."
+              icon={
+                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                </svg>
+              }
+              action={{ label: "Add First Item", onClick: () => { setEditing(EMPTY); setModalOpen(true); } }}
+            />
+          )
         ) : viewMode === "grid" ? (
           /* Grid View */
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filtered.map((item) => {
+            {items.map((item) => {
               const sc = STATUS_CONFIG[item.status];
               const lastCheckout = item.checkouts[item.checkouts.length - 1];
               return (
@@ -526,7 +572,7 @@ export default function InventoryPage({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filtered.map((item) => {
+                {items.map((item) => {
                   const sc = STATUS_CONFIG[item.status];
                   return (
                     <tr key={item.id} className="hover:bg-slate-50 transition-colors">
@@ -571,6 +617,16 @@ export default function InventoryPage({
               </tbody>
             </table>
           </div>
+        )}
+
+        {!isLoadingData && total > pageSize && (
+          <Pagination
+            page={page}
+            pageSize={pageSize}
+            total={total}
+            onPageChange={setPage}
+            loading={isLoadingData}
+          />
         )}
       </div>
 

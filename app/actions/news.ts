@@ -1,5 +1,6 @@
 "use server";
 
+import { after } from "next/server";
 import { pool } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { requireAuthenticatedSession } from "@/lib/action-auth";
@@ -355,21 +356,23 @@ export async function createNewsPost(data: { title: string; body: string }) {
 
     const createdAt = res.rows[0].created_at;
 
-    try {
-      await notifySubscribers({
-        topic: "news",
-        excludeUserId: actorUserId,
-        payload: createPushNotification({
+    after(async () => {
+      try {
+        await notifySubscribers({
           topic: "news",
-          title: title,
-          body: body || "გუნდს ახალი განახლება დაემატა.",
-          url: "/dashboard",
-          tag: `news-${res.rows[0].id as number}`,
-        }),
-      });
-    } catch (pushError) {
-      log.error("Error sending news push notification", pushError);
-    }
+          excludeUserId: actorUserId,
+          payload: createPushNotification({
+            topic: "news",
+            title: title,
+            body: body || "გუნდს ახალი განახლება დაემატა.",
+            url: "/dashboard",
+            tag: `news-${res.rows[0].id as number}`,
+          }),
+        });
+      } catch (pushError) {
+        log.error("Error sending news push notification", pushError);
+      }
+    });
 
     return {
       success: true,
