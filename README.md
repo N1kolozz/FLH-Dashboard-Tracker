@@ -1,4 +1,4 @@
-# FLHub Dashboard & Social Media Tracker
+# FLHub Dashboard & Social Media Tracker.
  
 A full-stack operational dashboard for **Future Leaders Hub (FLHUB)**. It combines a secure Role-Based Access Control (RBAC) internal portal with automated social media growth tracking across Instagram, TikTok, and Facebook.
 
