@@ -16,17 +16,44 @@ interface VoiceAssistantProps {
 }
 
 export default function VoiceAssistant({ collapsed = false }: VoiceAssistantProps) {
-  const [open, setOpen] = useState(false);
+  // `active` keeps the overlay (and the live session it owns) mounted.
+  // `minimized` only hides the modal UI — the session keeps running so the
+  // user can navigate the app and keep talking. Only ending fully unmounts.
+  const [active, setActive] = useState(false);
+  const [minimized, setMinimized] = useState(false);
+
+  // When the sidebar is collapsed the launch button would float outside the
+  // narrow rail, so hide it there. Minimized pill rendering is unaffected.
+  if (collapsed) {
+    return active ? (
+      <VoiceAssistantOverlay
+        minimized={minimized}
+        onMinimize={() => setMinimized(true)}
+        onRestore={() => setMinimized(false)}
+        onClose={() => {
+          setActive(false);
+          setMinimized(false);
+        }}
+      />
+    ) : null;
+  }
 
   return (
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          setActive(true);
+          setMinimized(false);
+        }}
         title="ხმოვანი ასისტენტი (Gemini 3 Flash Live)"
         aria-label="Open voice assistant"
         className={`group relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 via-fuchsia-500 to-indigo-500 text-white shadow-[0_4px_14px_-4px_rgba(168,85,247,0.6)] transition-all hover:scale-105 hover:shadow-[0_6px_18px_-4px_rgba(168,85,247,0.8)] active:scale-95 ${
           collapsed ? "" : ""
+        } ${
+          // On mobile the minimized pill replaces this logo in the header,
+          // so hide the launch button there. Desktop keeps it as-is.
+          active && minimized ? "max-md:hidden" : ""
         }`}
       >
         <span
@@ -35,7 +62,17 @@ export default function VoiceAssistant({ collapsed = false }: VoiceAssistantProp
         />
         <AudioLines className="relative h-4 w-4" strokeWidth={2.2} />
       </button>
-      {open && <VoiceAssistantOverlay onClose={() => setOpen(false)} />}
+      {active && (
+        <VoiceAssistantOverlay
+          minimized={minimized}
+          onMinimize={() => setMinimized(true)}
+          onRestore={() => setMinimized(false)}
+          onClose={() => {
+            setActive(false);
+            setMinimized(false);
+          }}
+        />
+      )}
     </>
   );
 }

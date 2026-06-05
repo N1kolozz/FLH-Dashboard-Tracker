@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { GoogleGenAI, Modality, type Session } from "@google/genai";
-import { Mic, MicOff, X, Loader2, AudioLines } from "lucide-react";
+import { Mic, MicOff, X, Loader2, AudioLines, Minus, Maximize2 } from "lucide-react";
 import FixedPortal from "@/components/FixedPortal";
 import {
   createVoiceAssistantToken,
@@ -22,7 +22,14 @@ type Status =
   | "ended";
 
 interface Props {
+  /** Fully ends the session and unmounts the overlay. */
   onClose: () => void;
+  /** Hides the modal UI but keeps the live session running. */
+  onMinimize: () => void;
+  /** Brings the modal UI back from the minimized pill. */
+  onRestore: () => void;
+  /** When true, only the compact pill is shown — session stays alive. */
+  minimized: boolean;
 }
 
 const OUTPUT_SAMPLE_RATE = 24_000;
@@ -58,7 +65,12 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
   return btoa(binary);
 }
 
-export default function VoiceAssistantOverlay({ onClose }: Props) {
+export default function VoiceAssistantOverlay({
+  onClose,
+  onMinimize,
+  onRestore,
+  minimized,
+}: Props) {
   const [status, setStatus] = useState<Status>("connecting");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [muted, setMuted] = useState(false);
@@ -440,14 +452,16 @@ export default function VoiceAssistantOverlay({ onClose }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ESC closes
+  // ESC minimizes (non-destructive) — the session keeps running. Only the
+  // red "დასრულება" button ends the session entirely.
   useEffect(() => {
+    if (minimized) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") handleClose();
+      if (e.key === "Escape") onMinimize();
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [handleClose]);
+  }, [minimized, onMinimize]);
 
   const toggleMute = () => {
     setMuted((m) => {
@@ -475,11 +489,61 @@ export default function VoiceAssistantOverlay({ onClose }: Props) {
     }
   })();
 
+  // Minimized: hide the modal but keep the session alive. A compact pill
+  // lets the user reopen the assistant or end it entirely.
+  if (minimized) {
+    return (
+      <FixedPortal>
+        {/* Mobile: sits in the header's right slot, replacing the launch logo.
+            Desktop: floats at the bottom-right (unchanged). */}
+        <div className="fixed z-[100] flex items-center gap-2 rounded-full border border-white/15 bg-gradient-to-br from-slate-900 via-purple-950/90 to-indigo-950 shadow-2xl max-md:right-3 max-md:top-3 max-md:gap-2.5 max-md:py-1 max-md:pl-1.5 max-md:pr-1.5 md:bottom-4 md:right-4 md:py-2 md:pl-3 md:pr-2">
+          <span
+            aria-hidden="true"
+            className={`flex h-7 w-7 items-center justify-center rounded-full bg-white/10 ${
+              status === "speaking" || status === "listening"
+                ? "animate-pulse"
+                : ""
+            }`}
+          >
+            {status === "connecting" ? (
+              <Loader2 className="h-4 w-4 animate-spin text-white" />
+            ) : status === "muted" ? (
+              <MicOff className="h-4 w-4 text-white/70" />
+            ) : (
+              <AudioLines className="h-4 w-4 text-white" />
+            )}
+          </span>
+          <span className="max-w-[10rem] truncate text-xs font-medium text-white/80 max-md:hidden">
+            {statusLabel}
+          </span>
+          <button
+            type="button"
+            onClick={onRestore}
+            className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-white/5 text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+            aria-label="ასისტენტის გახსნა"
+            title="ასისტენტის გახსნა"
+          >
+            <Maximize2 className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={handleClose}
+            className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-rose-500/90 text-white transition-colors hover:bg-rose-600 max-md:ml-3.5"
+            aria-label="დასრულება"
+            title="დასრულება"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </FixedPortal>
+    );
+  }
+
   return (
     <FixedPortal>
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/70 backdrop-blur-sm"
-      onClick={handleClose}
+      onClick={onMinimize}
     >
       <div
         className="relative mx-4 w-full max-w-md rounded-3xl border border-white/15 bg-gradient-to-br from-slate-900 via-purple-950/90 to-indigo-950 p-8 shadow-2xl"
@@ -487,11 +551,12 @@ export default function VoiceAssistantOverlay({ onClose }: Props) {
       >
         <button
           type="button"
-          onClick={handleClose}
+          onClick={onMinimize}
           className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/5 text-white/70 transition-colors hover:bg-white/10 hover:text-white"
-          aria-label="დახურვა"
+          aria-label="ჩაკეცვა"
+          title="ჩაკეცვა — საუბარი გრძელდება"
         >
-          <X className="h-4 w-4" />
+          <Minus className="h-4 w-4" />
         </button>
 
         <div className="flex flex-col items-center gap-6">

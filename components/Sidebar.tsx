@@ -15,6 +15,11 @@ export default function Sidebar({ session }: { session: Session | null }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  // True only while the sidebar width is animating. During that window the
+  // active-indicator must snap to the ResizeObserver measurements (no transition
+  // of its own) so it follows the sidebar smoothly instead of lagging behind.
+  const [collapseAnimating, setCollapseAnimating] = useState(false);
+  const collapseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const navRef = useRef<HTMLElement | null>(null);
   const linkRefs = useRef<Record<string, HTMLAnchorElement | null>>({});
   const [activeIndicator, setActiveIndicator] = useState({
@@ -110,6 +115,20 @@ export default function Sidebar({ session }: { session: Session | null }) {
     };
   }, [activeHref, updateActiveIndicator]);
 
+  const toggleCollapsed = useCallback(() => {
+    setCollapseAnimating(true);
+    setCollapsed((v) => !v);
+    if (collapseTimerRef.current) clearTimeout(collapseTimerRef.current);
+    // Matches the aside's `duration-300` width transition (+ a small buffer).
+    collapseTimerRef.current = setTimeout(() => setCollapseAnimating(false), 320);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (collapseTimerRef.current) clearTimeout(collapseTimerRef.current);
+    };
+  }, []);
+
   const handleLogout = async () => {
     await logout();
   };
@@ -136,12 +155,14 @@ export default function Sidebar({ session }: { session: Session | null }) {
       </div>
 
       {/* Nav Links */}
-      <nav ref={navRef} className="sidebar-scroll relative flex-1 overflow-y-auto px-2 py-3 space-y-4 min-h-0">
+      <nav ref={navRef} className="sidebar-scroll relative flex-1 overflow-y-auto overflow-x-hidden px-2 py-3 space-y-4 min-h-0">
         <span
           aria-hidden="true"
-          className={`pointer-events-none absolute rounded-xl bg-purple-100/80 shadow-sm ring-1 ring-purple-200/70 transition-[opacity,transform,width,height] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-            activeIndicator.visible ? "opacity-100" : "opacity-0"
-          }`}
+          className={`pointer-events-none absolute rounded-xl bg-purple-100/80 shadow-sm ring-1 ring-purple-200/70 ${
+            collapseAnimating
+              ? "transition-[opacity] duration-200"
+              : "transition-[opacity,transform,width,height] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]"
+          } ${activeIndicator.visible ? "opacity-100" : "opacity-0"}`}
           style={{
             height: activeIndicator.height,
             left: activeIndicator.left,
@@ -220,7 +241,7 @@ export default function Sidebar({ session }: { session: Session | null }) {
           </div>
         )}
         <button
-          onClick={() => setCollapsed((v) => !v)}
+          onClick={toggleCollapsed}
           className="hidden md:flex w-full items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-medium text-purple-600 hover:text-purple-700 hover:bg-purple-100 transition-colors"
         >
           <svg
