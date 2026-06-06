@@ -106,7 +106,7 @@ const NEWS_CONFIG: Record<
   },
   project: {
     label: "Project",
-    badge: "bg-violet-100 text-violet-700 border-violet-200",
+    badge: "bg-blue-100 text-blue-700 border-blue-200",
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -124,7 +124,7 @@ const NEWS_CONFIG: Record<
   },
   content: {
     label: "Content Post",
-    badge: "bg-cyan-100 text-cyan-700 border-cyan-200",
+    badge: "bg-purple-100 text-purple-700 border-purple-200",
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -179,13 +179,13 @@ function NewsItem({
       <div className="flex items-start justify-between gap-3">
         <div className="flex flex-wrap items-center gap-1.5">
           <div
-            className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-semibold ${config.badge}`}
+            className={`inline-flex items-center gap-1.5 rounded-md border px-1.5 py-1 text-xs font-semibold ${config.badge}`}
           >
             {config.icon}
             {config.label}
           </div>
           {item.update_type && (
-            <span className="inline-flex items-center gap-1 rounded-md border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-600">
+            <span className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-600">
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
@@ -597,7 +597,7 @@ export default function DashboardPage({
                 </p>
                 <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                   {reviewItems.map((item) => (
-                    <div key={item.id} className="h-44">
+                    <div key={item.id} className="min-h-44">
                       <NewsItem
                         item={item}
                         canDelete={canDeleteNewsItem(item)}
@@ -623,7 +623,7 @@ export default function DashboardPage({
             ) : newsItems.length > 0 ? (
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 {newsItems.map((item) => (
-                  <div key={item.id} className="h-44">
+                  <div key={item.id} className="min-h-44">
                     <NewsItem
                       item={item}
                       canDelete={canDeleteNewsItem(item)}
