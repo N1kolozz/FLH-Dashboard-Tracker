@@ -36,7 +36,9 @@ A full-stack operational dashboard for **Future Leaders Hub (FLHUB)**. It combin
 Copy `.env.local.example` to `.env.local` and fill in:
 
 ```
-DATABASE_URL=postgresql://USER:PASSWORD@HOST:PORT/DATABASE
+DATABASE_URL=postgresql://USER:PASSWORD@HOST:PORT/DATABASE   # Neon POOLED string (host contains "-pooler") — used by the runtime app
+DIRECT_DATABASE_URL=postgresql://...                        # Optional: Neon DIRECT (non-pooled) string for migrations. Falls back to DATABASE_URL when unset
+PG_POOL_MAX=5                                               # Optional: max pg pool connections per serverless instance (default 5)
 JWT_SECRET=your-secure-random-secret          # Required in production; local dev falls back to a built-in dev-only value
 GEMINI_API_KEY=...                            # Google Generative AI (daily briefings, itinerary generation)
 NEXT_PUBLIC_VAPID_PUBLIC_KEY=...              # Web Push (must be NEXT_PUBLIC_ so the browser can read it)
@@ -59,11 +61,27 @@ If `SEED_ADMIN_EMAIL` is set, the migration creates that user with ADMIN role on
 
 ### 2. Database Migration
 
+Schema is defined in **`lib/db/schema.ts` (Drizzle)** — the source of truth for table structure. Runtime queries still use raw SQL via `pool.query()`; Drizzle is used for schema definition and migration generation only.
+
+**Schema change workflow:**
+
+```bash
+# 1. Edit lib/db/schema.ts
+npm run db:generate   # Diffs the schema and writes drizzle/NNNN_*.sql
+# 2. Review the generated SQL
+npm run db:migrate    # Applies pending migrations against DATABASE_URL
+# 3. Commit both the schema change AND the generated SQL
+```
+
+Other Drizzle commands: `npm run db:push` (sync schema without a migration file — prototyping only), `npm run db:studio` (browser data GUI).
+
+**Legacy path (existing database):**
+
 ```bash
 npm run migrate
 ```
 
-Creates all tables and seeds social_accounts + optional admin. Migrations are additive — safe to re-run.
+`scripts/migrate.ts` runs additive, idempotent SQL — safe to re-run. It creates all tables and seeds social_accounts + the optional bootstrap admin. It is kept for the pre-Drizzle database; see [`drizzle/README.md`](drizzle/README.md) for the baseline-and-cutover plan.
 
 ### 3. Development Server
 
@@ -160,6 +178,8 @@ Add the output to `.env.local`, re-run `npm run migrate`, then enable notificati
 │           └── skeletons.tsx
 │
 ├── lib/                          # Shared server-side utilities (never imported by client components directly)
+│   ├── db/
+│   │   └── schema.ts             # Drizzle schema — source of truth for table structure
 │   ├── db.ts                     # pg Pool singleton (hot-reload safe via global._pgPool)
 │   ├── session-token.ts          # Hand-rolled JWT: encrypt / decrypt (Web Crypto, no jose)
 │   ├── auth.ts                   # getSession() / updateSession() — reads the cookie
@@ -184,8 +204,9 @@ Add the output to `.env.local`, re-run `npm run migrate`, then enable notificati
 ├── types/
 │   └── index.ts                  # Shared TypeScript types (ProjectRow, etc.)
 │
+├── drizzle/                      # Generated migration SQL (npm run db:generate) — do not hand-edit
 ├── scripts/
-│   ├── migrate.ts                # Additive SQL migrations — run with npm run migrate
+│   ├── migrate.ts                # Legacy additive SQL migrations — run with npm run migrate
 │   └── scrapeFollowers.ts        # Meta Graph API + Playwright TikTok scraper
 │
 ├── public/
@@ -198,6 +219,8 @@ Add the output to `.env.local`, re-run `npm run migrate`, then enable notificati
 ---
 
 ## Database Schema
+
+> The canonical schema lives in [`lib/db/schema.ts`](lib/db/schema.ts) (Drizzle). The SQL below is a human-readable mirror — if the two diverge, the Drizzle schema wins.
 
 All timestamps are stored in UTC. Tbilisi (UTC+4) formatting is applied at display time.
 
