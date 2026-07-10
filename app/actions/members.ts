@@ -2,7 +2,7 @@
 
 import { pool } from "@/lib/db";
 import { getSession } from "@/lib/auth";
-import { requireAuthenticatedSession } from "@/lib/action-auth";
+import { assertSameOrigin, requireAuthenticatedSession } from "@/lib/action-auth";
 import {
   assertCanAssignPrivilegedRole,
   assertHeadOrAdmin,
@@ -18,6 +18,7 @@ export async function addMember(formData: {
   phoneNumber?: string;
 }) {
   try {
+    await assertSameOrigin();
     const session = assertHeadOrAdmin(await getSession());
 
     const targetRole = formData.systemRole || "MEMBER";
@@ -70,6 +71,7 @@ export async function getMembers() {
 
 export async function deleteMember(id: number) {
   try {
+    await assertSameOrigin();
     assertHeadOrAdmin(await getSession());
 
     await pool.query("DELETE FROM users WHERE id = $1", [id]);
@@ -95,6 +97,7 @@ export async function updateMember(
   }
 ) {
   try {
+    await assertSameOrigin();
     const session = assertHeadOrAdmin(await getSession());
 
     const targetRole = data.systemRole || "MEMBER";

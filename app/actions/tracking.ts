@@ -1,5 +1,6 @@
 "use server";
 
+import { after } from "next/server";
 import { headers } from "next/headers";
 import { pool } from "@/lib/db";
 import { getSession } from "@/lib/auth";
@@ -33,8 +34,10 @@ async function cleanupOldData() {
 
 export async function pingSession() {
   try {
-    // Run 30-day data retention cleanup (rate-limited to once per 24h)
-    cleanupOldData();
+    // Run 30-day data retention cleanup (rate-limited to once per 24h).
+    // Deferred with after() so the DELETEs run after the response is flushed
+    // and aren't cut short if the serverless instance freezes post-response.
+    after(() => cleanupOldData());
 
     const session = await getSession();
     if (!session?.userId || session.role === "ADMIN") return;

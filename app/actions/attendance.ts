@@ -4,6 +4,7 @@ import { after } from "next/server";
 import type { Pool, PoolClient } from "pg";
 import { pool, withTransaction } from "@/lib/db";
 import { getSession } from "@/lib/auth";
+import { assertSameOrigin } from "@/lib/action-auth";
 import {
   assertCanManageAttendance,
   getSessionUserId,
@@ -330,6 +331,7 @@ export async function createAttendanceSession(data: {
   isActive: boolean;
 }) {
   try {
+    await assertSameOrigin();
     const tempSession = await getSession();
     const session = assertCanManageAttendance(tempSession);
     const eventId =
@@ -411,6 +413,7 @@ export async function createAttendanceSession(data: {
 // created for that Sunday so repeated clicks don't pile up duplicates.
 export async function createWeeklySundayAttendance() {
   try {
+    await assertSameOrigin();
     const session = assertCanManageAttendance(await getSession());
     const createdBy = getSessionUserId(session);
     const meetingDate = nextSundayTbilisi();
@@ -506,6 +509,7 @@ export async function updateAttendanceSession(
   }
 ) {
   try {
+    await assertSameOrigin();
     const session = assertCanManageAttendance(await getSession());
     const actorUserId = getSessionUserId(session);
     const eventId =
@@ -576,6 +580,7 @@ export async function updateAttendanceSession(
 
 export async function deleteAttendanceSession(id: number) {
   try {
+    await assertSameOrigin();
     const session = assertCanManageAttendance(await getSession());
     const actorUserId = getSessionUserId(session);
     await pool.query("DELETE FROM attendance_sessions WHERE id = $1", [id]);
@@ -594,6 +599,7 @@ export async function deleteAttendanceSession(id: number) {
 
 export async function setAttendanceSessionActive(id: number, isActive: boolean) {
   try {
+    await assertSameOrigin();
     const session = assertCanManageAttendance(await getSession());
     const actorUserId = getSessionUserId(session);
     // Resync records and toggle active state atomically.
@@ -650,6 +656,7 @@ export async function updateAttendanceRecord(
   }
 ) {
   try {
+    await assertSameOrigin();
     const tempSession = await getSession();
     const session = assertCanManageAttendance(tempSession);
     const updatedBy = getSessionUserId(session);
@@ -792,6 +799,7 @@ export async function submitMyAttendance(
   }
 ) {
   try {
+    await assertSameOrigin();
     const session = await getSession();
     if (!session) {
       return { error: "Not authorized" };

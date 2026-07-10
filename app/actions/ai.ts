@@ -148,6 +148,8 @@ export async function getDailyBriefingForToday(): Promise<DailyBriefingResult> {
 
 export async function generateItinerary(prompt: string) {
   try {
+    await requireAuthenticatedSession();
+
     if (!process.env.GEMINI_API_KEY) {
       return {
         success: false,

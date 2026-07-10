@@ -2,7 +2,7 @@
 
 import { after } from "next/server";
 import { getSession } from "@/lib/auth";
-import { requireAuthenticatedSession } from "@/lib/action-auth";
+import { assertSameOrigin, requireAuthenticatedSession } from "@/lib/action-auth";
 import {
   assertCanManageProjects,
   getSessionUserId,
@@ -53,6 +53,7 @@ export async function createProject(data: {
   ownerUserIds: number[];
 }) {
   try {
+    await assertSameOrigin();
     const session = await getSession();
     assertCanManageProjects(session);
     const actorUserId = getSessionUserId(session);
@@ -167,6 +168,7 @@ export async function updateProject(
   }
 ) {
   try {
+    await assertSameOrigin();
     const session = await getSession();
     assertCanManageProjects(session);
     const actorUserId = getSessionUserId(session);
@@ -222,6 +224,7 @@ export async function reorderProjects(
   updates: { id: number; sortOrder: number }[]
 ) {
   try {
+    await assertSameOrigin();
     const session = await getSession();
     assertCanManageProjects(session);
 
@@ -249,6 +252,7 @@ export async function reorderProjects(
 
 export async function deleteProject(id: number) {
   try {
+    await assertSameOrigin();
     const session = await getSession();
     assertCanManageProjects(session);
     await deleteProjectFromDB(id);

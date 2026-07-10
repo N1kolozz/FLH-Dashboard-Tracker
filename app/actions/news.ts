@@ -3,7 +3,7 @@
 import { after } from "next/server";
 import { pool } from "@/lib/db";
 import { getSession } from "@/lib/auth";
-import { requireAuthenticatedSession } from "@/lib/action-auth";
+import { assertSameOrigin, requireAuthenticatedSession } from "@/lib/action-auth";
 import { canPublishNews, getSessionUserId } from "@/lib/permissions";
 import { createPushNotification, notifySubscribers } from "@/lib/push";
 import { log } from "@/lib/logger";
@@ -335,6 +335,7 @@ export async function getDashboardNews() {
 
 export async function createNewsPost(data: { title: string; body: string }) {
   try {
+    await assertSameOrigin();
     const session = await getSession();
     if (!session || !canPublishNews(session)) {
       return { error: "Not authorized" };
@@ -390,6 +391,7 @@ export async function createNewsPost(data: { title: string; body: string }) {
 
 export async function deleteNewsPost(id: number) {
   try {
+    await assertSameOrigin();
     const session = await getSession();
     if (!session) return { error: "Not authorized" };
 
