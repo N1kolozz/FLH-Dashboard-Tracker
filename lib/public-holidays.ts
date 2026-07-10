@@ -34,11 +34,6 @@ export async function fetchPublicHolidaysWithStatus(
   }
 }
 
-export async function fetchPublicHolidays(year: number): Promise<PublicHoliday[]> {
-  const result = await fetchPublicHolidaysWithStatus(year);
-  return result.holidays;
-}
-
 export function holidayLabel(h: PublicHoliday): string {
   return h.localName?.trim() || h.name;
 }

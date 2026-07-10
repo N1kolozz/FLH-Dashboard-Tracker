@@ -26,7 +26,7 @@ export function getDateFromISO(isoDate: string) {
   return new Date(`${isoDate}T00:00:00`);
 }
 
-export function getWeekStart(date: Date) {
+function getWeekStart(date: Date) {
   const start = new Date(date);
   const day = start.getDay();
   const diff = day === 0 ? -6 : 1 - day;

@@ -2,6 +2,7 @@
 
 import { pool } from "@/lib/db";
 import { encrypt } from "@/lib/auth";
+import { getSessionMaxAgeSeconds } from "@/lib/session-token";
 import { cookies } from "next/headers";
 import { compare, hash } from "bcryptjs";
 import { redirect } from "next/navigation";
@@ -15,7 +16,8 @@ const SESSION_COOKIE_OPTIONS = {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
   sameSite: "lax" as const,
-  maxAge: 7 * 24 * 60 * 60,
+  // Matches the JWT exp claim so the cookie can't outlive (or undercut) the token.
+  maxAge: getSessionMaxAgeSeconds(),
   path: "/",
 };
 

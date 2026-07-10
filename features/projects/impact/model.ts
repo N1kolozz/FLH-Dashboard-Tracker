@@ -96,16 +96,6 @@ export function rowToRecord(row: ImpactRecordRow): ImpactRecord {
   };
 }
 
-export function buildProjectTotals(items: ImpactRecord[]) {
-  const map: Record<string, number> = {};
-
-  items.forEach((record) => {
-    map[record.projectName] = (map[record.projectName] || 0) + record.peopleReached;
-  });
-
-  return Object.entries(map).sort((a, b) => b[1] - a[1]);
-}
-
 export function getEvidenceHref(value: string) {
   const trimmed = value.trim();
 

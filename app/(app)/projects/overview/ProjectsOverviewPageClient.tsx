@@ -9,7 +9,6 @@ import EmptyState from "@/components/EmptyState";
 import Modal from "@/components/Modal";
 import ProjectsSubnav from "@/components/ProjectsSubnav";
 import {
-  ATTENTION_BADGE_CLASSES,
   EMPTY_OUTCOME_SUMMARY,
   PRIORITY_CONFIG,
   STATUS_CONFIG,
@@ -19,7 +18,6 @@ import {
   formatDeadlineLabel,
   formatRelativeUpdate,
   getDaysUntilDeadline,
-  getPortfolioAttentionLabel,
   mergeOutcomeSummary,
   normalizeProjectName,
   rowToOutcome,
@@ -113,8 +111,6 @@ export default function ProjectsOverviewPage({
           ...project,
           ownerNames,
           daysUntilDeadline,
-          attentionItems: [],
-          attentionScore: 0,
           outcomeSummary,
         };
       })
@@ -139,9 +135,6 @@ export default function ProjectsOverviewPage({
   }, [enrichedProjects, priorityFilter, search, statusFilter]);
 
   const totalPeopleReached = outcomes.reduce((sum, record) => sum + record.peopleReached, 0);
-  const projectsWithOutcomes = enrichedProjects.filter(
-    (project) => project.outcomeSummary.activities > 0
-  ).length;
   const inProgressCount = enrichedProjects.filter((project) => project.status === "in_progress").length;
   const overdueCount = enrichedProjects.filter(
     (project) =>
@@ -401,7 +394,6 @@ export default function ProjectsOverviewPage({
                     <th className="px-4 py-3 whitespace-nowrap">Deadline</th>
                     <th className="px-4 py-3 whitespace-nowrap">Last Update</th>
                     <th className="px-4 py-3 whitespace-nowrap">Outcomes</th>
-                    <th className="px-4 py-3 whitespace-nowrap">Attention</th>
                     <th className="px-4 py-3 whitespace-nowrap"></th>
                   </tr>
                 </thead>
@@ -469,30 +461,6 @@ export default function ProjectsOverviewPage({
                             {project.outcomeSummary.activities === 1 ? "y" : "ies"}
                           </p>
                         </td>
-                        <td className="min-w-[170px] px-4 py-3">
-                          {project.attentionItems.length === 0 ? (
-                            <PortfolioBadge
-                              label="On track"
-                              className="border-emerald-200 bg-emerald-50 text-emerald-700"
-                            />
-                          ) : (
-                            <div className="flex max-w-xs flex-wrap items-center gap-1.5">
-                              {project.attentionItems.slice(0, 1).map((item) => (
-                                <PortfolioBadge
-                                  key={`${project.id}-${item.label}`}
-                                  label={getPortfolioAttentionLabel(item.label)}
-                                  title={item.label}
-                                  className={ATTENTION_BADGE_CLASSES[item.tone]}
-                                />
-                              ))}
-                              {project.attentionItems.length > 1 ? (
-                                <span className="text-xs font-medium text-slate-500">
-                                  +{project.attentionItems.length - 1} more
-                                </span>
-                              ) : null}
-                            </div>
-                          )}
-                        </td>
                         <td className="whitespace-nowrap px-4 py-3 text-right">
                           <Link
                             href={`/projects/impact?projectId=${project.id}`}
@@ -536,12 +504,6 @@ export default function ProjectsOverviewPage({
                   label={`${PRIORITY_CONFIG[detailProject.priority].label} priority`}
                   className={PRIORITY_CONFIG[detailProject.priority].classes}
                 />
-                {detailProject.attentionItems.length === 0 ? (
-                  <PortfolioBadge
-                    label="On track"
-                    className="border-emerald-200 bg-emerald-50 text-emerald-700"
-                  />
-                ) : null}
               </div>
             </div>
 
@@ -623,23 +585,6 @@ export default function ProjectsOverviewPage({
                 </div>
               )}
             </div>
-
-            {detailProject.attentionItems.length > 0 ? (
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                  Attention
-                </p>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {detailProject.attentionItems.map((item) => (
-                    <PortfolioBadge
-                      key={`${detailProject.id}-detail-${item.label}`}
-                      label={item.label}
-                      className={ATTENTION_BADGE_CLASSES[item.tone]}
-                    />
-                  ))}
-                </div>
-              </div>
-            ) : null}
 
             {detailProject.status === "rejected" &&
             rejectionFeedbacks[detailProject.id]?.feedback ? (

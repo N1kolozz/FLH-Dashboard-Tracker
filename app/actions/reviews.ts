@@ -283,32 +283,6 @@ export async function rejectReview(reviewId: number, feedback: string) {
   }
 }
 
-// Get review status for one entity detail view.
-export async function getReviewForEntity(
-  entityType: ReviewEntityType,
-  entityId: number
-): Promise<{ review: ReviewRequest | null }> {
-  try {
-    await requireAuthenticatedSession();
-    const res = await pool.query(
-      `SELECT rr.*, 
-              u1.full_name as submitted_by_name, 
-              u2.full_name as reviewed_by_name
-       FROM review_requests rr
-       LEFT JOIN users u1 ON u1.id = rr.submitted_by
-       LEFT JOIN users u2 ON u2.id = rr.reviewed_by
-       WHERE rr.entity_type = $1 AND rr.entity_id = $2
-       ORDER BY rr.created_at DESC
-       LIMIT 1`,
-      [entityType, entityId]
-    );
-    return { review: res.rows[0] || null };
-  } catch (error) {
-    log.error("Error fetching review", error);
-    return { review: null };
-  }
-}
-
 // Get pending reviews for HEAD/ADMIN and ignore stale requests whose target was deleted.
 export async function getPendingReviews(): Promise<{
   reviews: ReviewRequest[];

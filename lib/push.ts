@@ -282,36 +282,6 @@ export async function syncPushSubscription(
   return toPreferences(result.rows[0]);
 }
 
-export async function updatePushPreferences(
-  userId: number,
-  endpoint: string,
-  preferences: PushPreferences
-) {
-  const result = await pool.query<PreferenceRow>(
-    `UPDATE push_subscriptions
-     SET topic_news = $1,
-         topic_events = $2,
-         topic_projects = $3,
-         topic_attendance = $4,
-         topic_content = $5,
-         updated_at = CURRENT_TIMESTAMP
-     WHERE endpoint = $6
-       AND user_id = $7
-     RETURNING topic_news, topic_events, topic_projects, topic_attendance, topic_content`,
-    [
-      preferences.news,
-      preferences.events,
-      preferences.projects,
-      preferences.attendance,
-      preferences.content,
-      endpoint,
-      userId,
-    ]
-  );
-
-  return toPreferences(result.rows[0]);
-}
-
 export async function deletePushSubscription(userId: number, endpoint: string) {
   await pool.query(
     `DELETE FROM push_subscriptions

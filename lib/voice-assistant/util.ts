@@ -1,8 +1,6 @@
 // Shared helpers for the voice assistant tools.
 // Kept framework-free so both server actions and client config can import.
 
-import type { Session } from "@/lib/auth";
-
 // ── Role tiers ───────────────────────────────────────────────────────────────
 // Only two effective access levels: anyone logged in, or HEAD/ADMIN.
 // The Management-dept tier exists in the dashboard nav (for the workload &
@@ -10,11 +8,6 @@ import type { Session } from "@/lib/auth";
 // HEAD/ADMIN by user preference.
 
 export type RoleLevel = "any" | "headOrAdmin";
-
-export function isHeadOrAdminSession(session: Session): boolean {
-  const role = session.role?.toUpperCase();
-  return role === "ADMIN" || role === "HEAD";
-}
 
 // ── Sanitizers ───────────────────────────────────────────────────────────────
 // `users` rows contain server-only fields that must never reach the model.

@@ -13,10 +13,7 @@ import {
   findToolDecl,
   type VoiceAssistantToolName,
 } from "@/lib/voice-assistant/config";
-import {
-  sanitizeArgsForLogging,
-  isHeadOrAdminSession,
-} from "@/lib/voice-assistant/util";
+import { sanitizeArgsForLogging } from "@/lib/voice-assistant/util";
 import { checkVoiceRateLimit } from "@/lib/voice-assistant/rate-limit";
 import * as tools from "./voice-assistant-tools";
 import type { Session } from "@/lib/auth";
@@ -238,7 +235,3 @@ export async function runVoiceAssistantTool(
     return { success: false, error: message };
   }
 }
-
-// Suppress lint warning — exported function reads helper for type-only side
-// effect (isHeadOrAdminSession is re-exported below for ergonomics).
-void isHeadOrAdminSession;

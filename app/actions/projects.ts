@@ -10,7 +10,6 @@ import {
 import { createPushNotification, notifySubscribers } from "@/lib/push";
 import {
   fetchAllProjects,
-  fetchRejectedProjects,
   insertProject,
   updateProjectInDB,
   deleteProjectFromDB,
@@ -27,18 +26,6 @@ export async function getProjects() {
   } catch (error) {
     log.error("Error fetching projects", error);
     return { error: "Failed to fetch projects" };
-  }
-}
-
-/* Get rejected projects for portfolio page */
-export async function getRejectedProjects() {
-  try {
-    await requireAuthenticatedSession();
-    const projects = await fetchRejectedProjects();
-    return { success: true, projects };
-  } catch (error) {
-    log.error("Error fetching rejected projects", error);
-    return { error: "Failed to fetch rejected projects" };
   }
 }
 

@@ -16,7 +16,6 @@ export type ActivityType =
   | "mentoring"
   | "event"
   | "other";
-export type AttentionTone = "rose" | "amber" | "blue" | "slate";
 
 export interface Project {
   id: number;
@@ -53,17 +52,9 @@ export interface OutcomeSummary {
   lastActivityDate: string | null;
 }
 
-export interface AttentionItem {
-  label: string;
-  tone: AttentionTone;
-  weight: number;
-}
-
 export interface EnrichedProject extends Project {
   ownerNames: string[];
   daysUntilDeadline: number | null;
-  attentionItems: AttentionItem[];
-  attentionScore: number;
   outcomeSummary: OutcomeSummary;
 }
 
@@ -102,39 +93,6 @@ export const PRIORITY_CONFIG: Record<Priority, { label: string; classes: string 
   low: {
     label: "Low",
     classes: "bg-slate-100 text-slate-600 border-slate-200",
-  },
-};
-
-export const ATTENTION_BADGE_CLASSES: Record<AttentionTone, string> = {
-  rose: "bg-rose-100 text-rose-700 border-rose-200",
-  amber: "bg-amber-100 text-amber-700 border-amber-200",
-  blue: "bg-blue-100 text-blue-700 border-blue-200",
-  slate: "bg-slate-100 text-slate-600 border-slate-200",
-};
-
-export const ATTENTION_CARD_CLASSES: Record<
-  AttentionTone,
-  { card: string; accent: string; metric: string }
-> = {
-  rose: {
-    card: "border-rose-200 bg-gradient-to-br from-rose-50 via-white to-white",
-    accent: "bg-rose-500",
-    metric: "border-rose-100 bg-white/80",
-  },
-  amber: {
-    card: "border-amber-200 bg-gradient-to-br from-amber-50 via-white to-white",
-    accent: "bg-amber-500",
-    metric: "border-amber-100 bg-white/80",
-  },
-  blue: {
-    card: "border-blue-200 bg-gradient-to-br from-blue-50 via-white to-white",
-    accent: "bg-blue-500",
-    metric: "border-blue-100 bg-white/80",
-  },
-  slate: {
-    card: "border-slate-200 bg-gradient-to-br from-slate-50 via-white to-white",
-    accent: "bg-slate-400",
-    metric: "border-slate-200 bg-white/80",
   },
 };
 
@@ -256,68 +214,7 @@ export function formatDeadlineLabel(project: EnrichedProject) {
   return `${project.daysUntilDeadline}d left`;
 }
 
-export function getAttentionItems(
-  project: Project,
-  daysUntilDeadline: number | null,
-  outcomeSummary: OutcomeSummary
-) {
-  const items: AttentionItem[] = [];
-
-  if (project.status === "rejected") return items;
-
-  if (project.status !== "completed" && daysUntilDeadline !== null && daysUntilDeadline < 0) {
-    items.push({
-      label: `Overdue by ${Math.abs(daysUntilDeadline)}d`,
-      tone: "rose",
-      weight: 4,
-    });
-  }
-
-  if (
-    project.status !== "completed" &&
-    daysUntilDeadline !== null &&
-    daysUntilDeadline >= 0 &&
-    daysUntilDeadline <= 7
-  ) {
-    items.push({
-      label: daysUntilDeadline === 0 ? "Due today" : `Due in ${daysUntilDeadline}d`,
-      tone: "amber",
-      weight: 3,
-    });
-  }
-
-  if (project.status !== "completed" && project.ownerUserIds.length === 0) {
-    items.push({
-      label: "No owner assigned",
-      tone: "amber",
-      weight: 3,
-    });
-  }
-
-  if (project.priority === "high" && project.status === "planning") {
-    items.push({
-      label: "High priority not started",
-      tone: "blue",
-      weight: 2,
-    });
-  }
-
-  if (project.status === "completed" && outcomeSummary.activities === 0) {
-    items.push({
-      label: "Completed without outcomes",
-      tone: "slate",
-      weight: 1,
-    });
-  }
-
-  return items;
-}
-
 export function compareProjects(a: EnrichedProject, b: EnrichedProject) {
-  if (b.attentionScore !== a.attentionScore) {
-    return b.attentionScore - a.attentionScore;
-  }
-
   const aDeadline = a.daysUntilDeadline ?? Number.POSITIVE_INFINITY;
   const bDeadline = b.daysUntilDeadline ?? Number.POSITIVE_INFINITY;
 
@@ -326,44 +223,4 @@ export function compareProjects(a: EnrichedProject, b: EnrichedProject) {
   }
 
   return a.name.localeCompare(b.name);
-}
-
-export function getPrimaryAttentionTone(items: AttentionItem[]): AttentionTone {
-  return items.reduce<AttentionTone>((current, item) => {
-    const currentWeight = items.find((entry) => entry.tone === current)?.weight ?? -1;
-    return item.weight > currentWeight ? item.tone : current;
-  }, items[0]?.tone ?? "slate");
-}
-
-export function formatOwnerSummary(ownerNames: string[]) {
-  if (ownerNames.length === 0) return "Unassigned";
-  if (ownerNames.length <= 2) return ownerNames.join(", ");
-  return `${ownerNames.slice(0, 2).join(", ")} +${ownerNames.length - 2}`;
-}
-
-export function getAttentionDescription(project: EnrichedProject) {
-  if (project.description.trim()) {
-    return project.description.trim();
-  }
-
-  if (project.status === "review") {
-    return "Waiting on review feedback or a final approval step.";
-  }
-
-  if (project.status === "planning") {
-    return "Needs an owner or a kickoff push to move out of planning.";
-  }
-
-  if (project.status === "completed") {
-    return "Completed project that still needs outcomes or a final wrap-up check.";
-  }
-
-  return "Needs follow-up to keep delivery and reporting on track.";
-}
-
-export function getPortfolioAttentionLabel(label: string) {
-  if (label === "High priority not started") return "Start pending";
-  if (label === "Completed without outcomes") return "Needs outcomes";
-  if (label === "No owner assigned") return "No owner";
-  return label;
 }

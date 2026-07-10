@@ -13,7 +13,6 @@ import { ProjectRow } from "@/types";
 // exist purely so the query can never return an unbounded result set as the
 // table grows; they're far above any realistic project count.
 const PROJECTS_LIMIT = 2000;
-const REJECTED_PROJECTS_LIMIT = 1000;
 
 export async function fetchAllProjects(): Promise<ProjectRow[]> {
   const res = await pool.query(
@@ -62,45 +61,6 @@ export async function fetchAllProjects(): Promise<ProjectRow[]> {
      LIMIT ${PROJECTS_LIMIT}`
   );
   return res.rows as ProjectRow[];
-}
-
-export async function fetchRejectedProjects() {
-  const res = await pool.query(
-    `SELECT
-       p.id,
-       p.name,
-       p.description,
-       p.status,
-       p.priority,
-       p.deadline::text,
-       p.team,
-       p.tags,
-       COALESCE(
-         NULLIF(p.owner_user_ids, '{}'),
-         CASE WHEN p.owner_user_id IS NULL THEN '{}'::INTEGER[] ELSE ARRAY[p.owner_user_id] END
-       ) AS owner_user_ids,
-       p.sort_order,
-       (p.created_at AT TIME ZONE 'UTC')::text || 'Z' as created_at,
-       (p.updated_at AT TIME ZONE 'UTC')::text || 'Z' as updated_at,
-       rr.feedback AS rejection_feedback,
-       u.full_name AS rejected_by_name,
-       (rr.reviewed_at AT TIME ZONE 'UTC')::text || 'Z' AS rejected_at
-     FROM projects p
-     LEFT JOIN LATERAL (
-       SELECT rr2.feedback, rr2.reviewed_by, rr2.reviewed_at
-       FROM review_requests rr2
-       WHERE rr2.entity_type = 'project'
-         AND rr2.entity_id = p.id
-         AND rr2.status = 'rejected'
-       ORDER BY rr2.created_at DESC
-       LIMIT 1
-     ) rr ON true
-     LEFT JOIN users u ON u.id = rr.reviewed_by
-     WHERE p.status = 'rejected'
-     ORDER BY p.updated_at DESC
-     LIMIT ${REJECTED_PROJECTS_LIMIT}`
-  );
-  return res.rows;
 }
 
 export async function insertProject(data: {
