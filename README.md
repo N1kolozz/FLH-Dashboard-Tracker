@@ -7,7 +7,7 @@ A full-stack operational dashboard for **Future Leaders Hub (FLHUB)**. It combin
 ## Features
 
 ### Role-Based Access Control (RBAC)
-- **Authentication:** Secure hand-rolled JWT sessions (HttpOnly cookie, 7-day expiry, HMAC-SHA256 via Web Crypto API — no `jose` dependency).
+- **Authentication:** Secure hand-rolled JWT sessions (HttpOnly cookie, 7-day expiry, HMAC-SHA256 via Web Crypto API — sessions do not use `jose`; the `jose` package is used only for Web Push VAPID signing in `lib/push.ts`).
 - **Onboarding Flow:** Admins/Heads pre-add users via the Team page. A user whose email exists but has no password is redirected to `/create-password` on first sign-in.
 - **Roles & Permissions:**
   - **ADMIN:** Full access. Can add/edit/delete any member and assign HEAD/ADMIN roles.
@@ -21,6 +21,11 @@ A full-stack operational dashboard for **Future Leaders Hub (FLHUB)**. It combin
 - **Logistics:** Inventory management (checkout/checkin flow), expense tracking.
 - **Organization:** Events with attendance tracking, team directory, workload view, monthly summary.
 - **System:** Admin panel (user management, activity logs).
+
+### Voice Assistant (Georgian)
+- **Live voice chat:** A Georgian-language voice assistant available from the sidebar, powered by the Gemini Live API (`gemini-3.1-flash-live-preview`). The client connects directly to Gemini using a short-lived ephemeral token minted by a server action (`createVoiceAssistantToken`) — the API key never reaches the browser.
+- **Read-only data tools:** ~28 function-calling tools (dashboard overview, upcoming events, project search, inventory status, monthly spending, etc.) declared in `lib/voice-assistant/config.ts`. Tool calls are dispatched through a server action that re-checks auth per call; HEAD/ADMIN-only tools (workload, attendance stats, pending approvals) return `FORBIDDEN` for members.
+- **Rate limiting:** Sliding-window limit of 30 tool calls per 5 minutes per user (`lib/voice-assistant/rate-limit.ts`).
 
 ### Social Media Tracker
 - **Automated Scraping:** Daily follower counts via Meta Graph API (Instagram/Facebook) and Playwright (TikTok). Runs on a GitHub Actions schedule — cannot run on Vercel due to Chromium.
@@ -40,7 +45,8 @@ DATABASE_URL=postgresql://USER:PASSWORD@HOST:PORT/DATABASE   # Neon POOLED strin
 DIRECT_DATABASE_URL=postgresql://...                        # Optional: Neon DIRECT (non-pooled) string for migrations. Falls back to DATABASE_URL when unset
 PG_POOL_MAX=5                                               # Optional: max pg pool connections per serverless instance (default 5)
 JWT_SECRET=your-secure-random-secret          # Required in production; local dev falls back to a built-in dev-only value
-GEMINI_API_KEY=...                            # Google Generative AI (daily briefings, itinerary generation)
+GEMINI_API_KEY=...                            # Google Generative AI (daily briefings, itinerary generation, voice assistant)
+APP_TIMEZONE=Asia/Tbilisi                     # Timezone for recorded_date and "today" windows in APIs
 NEXT_PUBLIC_VAPID_PUBLIC_KEY=...              # Web Push (must be NEXT_PUBLIC_ so the browser can read it)
 VAPID_PRIVATE_KEY=...
 VAPID_SUBJECT=https://your-domain.com         # Or mailto:admin@example.com
@@ -92,7 +98,7 @@ npm run dev   # Listens on 0.0.0.0 — accessible over LAN for mobile PWA testin
 ### 4. PWA Push Notifications (one-time setup)
 
 ```bash
-npm run generate:vapid   # Prints VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY
+npm run generate:vapid   # Prints NEXT_PUBLIC_VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY
 ```
 
 Add the output to `.env.local`, re-run `npm run migrate`, then enable notifications from the installed PWA.
@@ -130,12 +136,13 @@ Add the output to `.env.local`, re-run `npm run migrate`, then enable notificati
 │   │   ├── impact.ts             # Impact records
 │   │   ├── reviews.ts            # Review/approval workflow
 │   │   ├── news.ts               # News posts
-│   │   ├── session.ts            # Session cookie management helpers
 │   │   ├── tracking.ts           # pingSession, trackPageView, endSession
 │   │   ├── monthly-summary.ts    # Aggregated monthly stats
 │   │   ├── workload.ts           # Workload data aggregation
-│   │   └── dashboard-stats.ts    # Dashboard KPI aggregation
-│   ├── api/                      # REST endpoints (push subscription, holidays, stats, history)
+│   │   ├── dashboard-stats.ts    # Dashboard KPI aggregation
+│   │   ├── voice-assistant.ts    # Ephemeral Gemini Live token mint + tool call dispatcher
+│   │   └── voice-assistant-tools.ts  # Read-only DB tools exposed to the voice assistant
+│   ├── api/                      # REST endpoints (push subscription, holidays, stats, history, report, scrape)
 │   ├── layout.tsx                # Root layout — fonts, PWA metadata, global CSS
 │   ├── manifest.ts               # Web App Manifest (dynamic, typed)
 │   ├── apple-icon.tsx            # Dynamic apple-touch-icon via next/og
@@ -153,6 +160,8 @@ Add the output to `.env.local`, re-run `npm run migrate`, then enable notificati
 │   ├── Modal.tsx                 # Generic modal wrapper
 │   ├── ConfirmDialog.tsx         # Reusable confirmation dialog
 │   ├── MemberMultiSelect.tsx     # Multi-select dropdown for owner assignment
+│   ├── VoiceAssistant.tsx        # Gemini Live voice assistant (mic capture, audio playback, tool calls)
+│   ├── VoiceAssistantOverlay.tsx # Full-screen overlay UI for the voice assistant
 │   ├── Icons.tsx                 # All SVG icons as React components
 │   └── ui/                       # Low-level UI primitives (Select, etc.)
 │
@@ -186,7 +195,12 @@ Add the output to `.env.local`, re-run `npm run migrate`, then enable notificati
 │   ├── action-auth.ts            # requireAuthenticatedSession / requireHeadOrAdminSession / requireDepartmentManagerSession
 │   ├── permissions.ts            # Pure boolean helpers: isHeadOrAdmin, canManageDepartment, etc.
 │   ├── activity.ts               # logActivity() — writes to user_activities table
+│   ├── logger.ts                 # Structured logging helper
 │   ├── owner-users.ts            # normalizeOwnerUserIds, indexRowsByOwner
+│   ├── voice-assistant/
+│   │   ├── config.ts             # Live API model, Georgian system instruction, tool declarations
+│   │   ├── rate-limit.ts         # Sliding-window per-user tool-call rate limit (in-memory)
+│   │   └── util.ts               # Role levels + arg sanitization for logging
 │   ├── calendar-ui.ts            # getMonthDays, MONTHS, WEEKDAYS — shared calendar helpers
 │   ├── avatar-colors.ts          # Deterministic color assignment for member avatars
 │   ├── member-avatar.ts          # Avatar URL / initials helpers
@@ -235,6 +249,7 @@ CREATE TABLE users (
   role         VARCHAR(50)  NOT NULL,    -- 'ADMIN' | 'HEAD' | 'MEMBER'
   department   VARCHAR(100) NOT NULL,    -- e.g. 'Management', 'Projects', 'PR & Social'
   position     VARCHAR(255) DEFAULT '',  -- Job title
+  phone_number VARCHAR(50)  DEFAULT '',
   created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
